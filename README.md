@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-	![](https://github.com/RobertBorghese/TastyFresh/workflows/Rust/badge.svg)
+	<a><img src="https://github.com/RobertBorghese/TastyFresh/workflows/Rust/badge.svg" /></a>
 </p>
 
 ---
