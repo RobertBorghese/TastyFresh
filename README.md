@@ -1,5 +1,9 @@
 # TastyFresh
-Many C++ frameworks, such as Qt5 and Unreal Engine, are wonderful libraries that sit upon a tiresome language. While one would expect such frameworks to have a plethora of bindings for other, much palatable, system-level languages such as Rust or D, due to each frameworks' scale, complexity, and reliance on macros and other incompatible compile-time features, creating consistent, up-to-date bindings is an unfeasible task. Tasty Fresh is a programming language that aims to tackle this problem by transpiling directly to human-readable C++ without the need for explicit bindings. The language hopes to achieve this while also provding modern features and slicker syntax. Another way to look at Tasty Fresh is as a pseudo-superset/metaprogramming wrapper for C++.
+C++ frameworks like Qt5 and Unreal Engine are wonderful libraries that unfortunately rest upon a tiresome language. One would expect such frameworks to have a plethora of bindings for other, palatable, system-level languages such as Rust or D. However, due to each frameworks' scale, complexity, and reliance on macros/unique compile-time configurations, creating consistent, up-to-date bindings is an unfeasible task for most of them.
+
+Tasty Fresh is a programming language that aims to tackle this problem by transpiling directly to human-readable C++ without the need for explicit bindings. The language hopes to achieve this while also provding modern features and slicker syntax. Another way to look at Tasty Fresh is as a pseudo-superset/metaprogramming wrapper for C++.
+
+---
 
 By version `1.0.0`, Tasty Fresh hopes to include:
 
