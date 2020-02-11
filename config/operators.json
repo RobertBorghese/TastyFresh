@@ -1,0 +1,71 @@
+{
+	"prefix": [
+		{ "operator": "++", "priority": 900 },
+		{ "operator": "--", "priority": 900 },
+		{ "operator": "+",  "priority": 900 },
+		{ "operator": "-",  "priority": 900 },
+		{ "operator": "!",  "priority": 900 },
+		{ "operator": "~",  "priority": 900 },
+		{ "operator": "*",  "priority": 900 },
+		{ "operator": "&",  "priority": 900 },
+		{ "operator": "sizeof",   "priority": 900, "cannot_touch": true },
+		{ "operator": "new",      "priority": 900, "cannot_touch": true },
+		{ "operator": "delete",   "priority": 900, "cannot_touch": true },
+		{ "operator": "throw",    "priority": 250, "cannot_touch": true },
+		{ "operator": "co_yield", "priority": 250, "cannot_touch": true },
+		{ "operator": ["new","[","]"],    "priority": 900 },
+		{ "operator": ["delete","[","]"], "priority": 900 }
+	],
+	"suffix": [
+		{ "operator": "++", "priority": 950 },
+		{ "operator": "--", "priority": 950 }
+	],
+	"infix": [
+		{ "operator": "::",  "priority": 1000 },
+		{ "operator": ".",   "priority": 950 },
+		{ "operator": "->",  "priority": 950 },
+		{ "operator": ".*",  "priority": 850 },
+		{ "operator": "->*", "priority": 850 },
+		{ "operator": "*",   "priority": 800 },
+		{ "operator": "/",   "priority": 800 },
+		{ "operator": "%",   "priority": 800 },
+		{ "operator": "+",   "priority": 750 },
+		{ "operator": "-",   "priority": 750 },
+		{ "operator": "<<",  "priority": 700 },
+		{ "operator": ">>",  "priority": 700 },
+		{ "operator": "<=>", "priority": 650 },
+		{ "operator": "<",   "priority": 600 },
+		{ "operator": "<=",  "priority": 600 },
+		{ "operator": ">",   "priority": 600 },
+		{ "operator": ">=",  "priority": 600 },
+		{ "operator": "==",  "priority": 550 },
+		{ "operator": "!=",  "priority": 550 },
+		{ "operator": "&",   "priority": 500 },
+		{ "operator": "^",   "priority": 450 },
+		{ "operator": "|",   "priority": 400 },
+		{ "operator": "&&",  "priority": 350 },
+		{ "operator": "||",  "priority": 300 },
+		{ "operator": "=",   "priority": 250 },
+		{ "operator": "+=",  "priority": 250 },
+		{ "operator": "-=",  "priority": 250 },
+		{ "operator": "*=",  "priority": 250 },
+		{ "operator": "/=",  "priority": 250 },
+		{ "operator": "%=",  "priority": 250 },
+		{ "operator": "<<=", "priority": 250 },
+		{ "operator": ">>=", "priority": 250 },
+		{ "operator": "&=",  "priority": 250 },
+		{ "operator": "^=",  "priority": 250 },
+		{ "operator": "|=",  "priority": 250 },
+		{ "operator": ",",   "priority": 100 }
+	],
+	"ternary": [
+		{ "operator": [null,"?",null,":",null], "priority": 250 }
+	],
+	"prefix_input": [
+		{ "operator": ["(",null,")"], "priority": 900 }
+	],
+	"suffix_input": [
+		{ "operator": ["(",null,")"], "priority": 950 },
+		{ "operator": ["[",null,"]"], "priority": 950 }
+	]
+}
