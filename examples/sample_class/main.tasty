@@ -1,0 +1,24 @@
+include system iostream;
+
+assume std is a namespace;
+
+class Counter {
+
+	copy count = 0;
+
+	fn increment() {
+		count++;
+	}
+}
+
+fn main() -> int {
+	copy c = new Counter();
+
+	for i in 0..10 {
+		c.increment();
+	}
+
+	std.cout << c.count << std.endl;
+
+	return 0;
+}
