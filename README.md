@@ -1,11 +1,9 @@
 <p align="center">
   <a><img src="https://i.imgur.com/lD7bEE9.png" /></a>
 </p>
-
 <p align="center">
 	<a><img src="https://github.com/RobertBorghese/TastyFresh/workflows/Rust/badge.svg" /></a>
 </p>
-
 ---
 
 C++ frameworks like Qt5 and Unreal Engine are wonderful libraries that unfortunately rest upon a tiresome language. One would expect such frameworks to have a plethora of bindings for other, palatable, system-level languages such as Rust or D. However, due to each frameworks' scale, complexity, and reliance on macros/unique compile-time configurations, creating consistent, up-to-date bindings is an unfeasible task for most of them.
