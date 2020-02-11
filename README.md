@@ -4,6 +4,7 @@
 <p align="center">
 	<a><img src="https://github.com/RobertBorghese/TastyFresh/workflows/Rust/badge.svg" /></a>
 </p>
+
 ---
 
 C++ frameworks like Qt5 and Unreal Engine are wonderful libraries that unfortunately rest upon a tiresome language. One would expect such frameworks to have a plethora of bindings for other, palatable, system-level languages such as Rust or D. However, due to each frameworks' scale, complexity, and reliance on macros/unique compile-time configurations, creating consistent, up-to-date bindings is an unfeasible task for most of them.
@@ -17,7 +18,7 @@ By version `1.0.0`, Tasty Fresh hopes to include:
 * No header files or archaic import systems, but features to help configure how they translate to C++ if necessary.
 * Static-typing and null-safety for all Tasty Fresh code prior to being transpiled into C++.
 * Allow for the usage of unknown classes and variables that may only exist in the C++ context.
-* Have line numbers in the C++ source files match directly to the line numbers from the Tasty Fresh source files to help decypher errors and warnings that may arise from the C++ compiler.
+* Have C++ source file line numbers match the line numbers from the Tasty Fresh source files to help decypher C++ errors and warnings.
 * Modern, Rust-like enums with union storage and pattern matching.
 * Static extensions for classes, primitives, and unknown C++ types.
 * Smart `.` operators as opposed to explicit use of `->` or `::`.
