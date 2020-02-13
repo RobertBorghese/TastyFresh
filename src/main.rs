@@ -32,41 +32,27 @@
  *
  **********************************************************/
 
+mod config_management;
+mod context_management;
+
 mod expression;
 mod expression_components;
+mod expression_parser;
+mod expression_piece;
 mod value_type;
 mod variable_type;
 
-mod operator_data;
+use expression_parser::ExpressionParser;
 
-use expression::{ Expression, ExpressionEnder };
+use context_management::position::Position;
 
 use std::env;
 use std::env::Args;
 use std::collections::BTreeMap;
 
-use std::fs::File;
-use std::io::prelude::*;
-
 use regex::Regex;
 
 use colored::*;
-
-/// Reads a text file and returns the contents as a `String`.
-///
-/// # Arguments
-///
-/// * `path` - The path of the file.
-///
-/// # Return
-///
-/// The contents of the file.
-pub fn read_file(path: &str) -> std::io::Result<String> {
-	let mut result = String::new();
-	let mut file = File::open(path)?;
-	file.read_to_string(&mut result)?;
-	Ok(result)
-}
 
 /// Parses arguments with `--KEY` or `--KEY:VALUE` format.
 ///
@@ -122,10 +108,13 @@ fn main() {
 	let arguments = parse_arguments(env::args());
 	println!("{:?}", arguments);
 
-	let operators_data = operator_data::parse_operators_json("config/operators.json");
+	//let operators_data = operator_data::parse_operators_json("config/operators.json");
+	let data = config_management::read_config_files();
 
-	let mut ender = ExpressionEnder { until_chars: Vec::new(), end_index: 0, end_char: ' ' };
-	let test = Expression::new("++!&&a(!~dfjks.jfdk[32.help],12,ew)()+sd", &operators_data, &mut ender);
+	//let mut ender = ExpressionEnder { until_chars: Vec::new(), end_index: 0, end_char: ' ' };
+	//let test = Expression::new("++!&&a(!~dfjks.jfdk[32.help],12,ew)()+sd", &operators_data, &mut ender);
+	ExpressionParser::new("++&&&a++++ - b", Position::new("test.tasty".to_string(), 1, 0, None), data, None);
+	//"++!&&a(!~dfjks.jfdk[32.help],12,ew)()+sd"
 	//" + ++ !& ^^^& (!~dfjks.  jfdk[32.help]  ,  12, ew) () + sd"
 	//println!("{:?}", test.components);
 }

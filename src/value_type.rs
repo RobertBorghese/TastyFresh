@@ -7,6 +7,7 @@
 
 use crate::variable_type::VariableType;
 
+/*
 pub enum ValueType {
 	Variable(String, VariableType),
 	NullLiteral,
@@ -14,6 +15,36 @@ pub enum ValueType {
 	CharLiteral(String),
 	NumberLiteral(String, NumberType),
 	StringLiteral(String, StringType)
+}
+*/
+
+pub enum ValueType {
+	Unknown,
+	Null,
+	Boolean,
+	Number(NumberType),
+	String,
+	Class(ClassType)
+}
+
+impl ValueType {
+	pub fn new(expr_str: &str) -> ValueType {
+		if expr_str == "null" { return ValueType::Null; }
+		if expr_str == "true" || expr_str == "false" { return ValueType::Boolean; }
+		let mut all_numbers = true;
+		for a in expr_str.chars() {
+			if !a.is_numeric() {
+				all_numbers = false;
+			}
+		}
+		if all_numbers { return ValueType::Number(NumberType::Int); }
+		return ValueType::Class(ClassType {
+			name: "".to_string(),
+			type_params: None,
+			properties: Vec::new(),
+			functions: Vec::new()
+		})
+	}
 }
 
 pub enum NumberType {
@@ -25,11 +56,11 @@ pub enum NumberType {
 	UInt,       // u
 	Long,       // l
 	ULong,      // ul
-	SuperLong,  // ll
-	USuperLong, // ull
+	LongLong,   // ll
+	ULongLong,  // ull
 	Float,      // f
 	Double,
-	SuperDouble // l
+	LongDouble  // l
 }
 
 pub enum StringType {
@@ -40,6 +71,7 @@ pub enum StringType {
 
 pub struct ClassType {
 	name: String,
+	type_params: Option<Vec<ValueType>>,
 	properties: Vec<Property>,
 	functions: Vec<Function>
 }
