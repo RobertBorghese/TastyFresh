@@ -6,9 +6,9 @@
  **********************************************************/
 
 use crate::expression::Expression;
-use crate::value_type::ValueType;
+use crate::expression::value_type::ValueType;
 
-pub enum ExpressionComponents {
+pub enum ExpressionComponent {
 	Test(String),
 	Test2(String, Vec<Expression>),
 	Expression(Expression),

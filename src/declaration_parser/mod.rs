@@ -1,0 +1,11 @@
+/**********************************************************
+ * --- Declaration Parser ---
+ *
+ * Parses out all of the "declared" information from the
+ * source files. This information is necessary prior
+ * to parsing and type-checking the expression content
+ * contained within the program.
+ **********************************************************/
+
+pub mod parser;
+pub mod variable_declaration;

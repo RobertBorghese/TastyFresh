@@ -34,15 +34,13 @@
 
 mod config_management;
 mod context_management;
-
+mod declaration_parser;
 mod expression;
-mod expression_components;
-mod expression_parser;
-mod expression_piece;
-mod value_type;
-mod variable_type;
 
-use expression_parser::ExpressionParser;
+mod module;
+mod module_component;
+
+use expression::expression_parser::ExpressionParser;
 
 use context_management::position::Position;
 
@@ -113,8 +111,35 @@ fn main() {
 
 	//let mut ender = ExpressionEnder { until_chars: Vec::new(), end_index: 0, end_char: ' ' };
 	//let test = Expression::new("++!&&a(!~dfjks.jfdk[32.help],12,ew)()+sd", &operators_data, &mut ender);
-	ExpressionParser::new("++&&&a++++ - b", Position::new("test.tasty".to_string(), 1, 0, None), data, None);
+	ExpressionParser::new("++&&&a++++ - + b", Position::new("test.tasty".to_string(), Some(1), 0, None), data, None);
 	//"++!&&a(!~dfjks.jfdk[32.help],12,ew)()+sd"
 	//" + ++ !& ^^^& (!~dfjks.  jfdk[32.help]  ,  12, ew) () + sd"
 	//println!("{:?}", test.components);
+
+	//content: &str, index: &mut usize, position: Position, line_offset: &mut usize
+	let mut index: usize = 0;
+	let pos = Position::new("test2.tasty".to_string(), Some(1), 0, None);
+	let mut line_offset: usize = 0;
+	let result = crate::declaration_parser::variable_declaration::VariableDeclaration::new("copy test: QVector<QString> = \"fjdskfjdk", &mut index, pos, &mut line_offset);
+
+	if result.is_none() { return; }
+	println!("NAME {} ", result.as_ref().unwrap().name);
+	match &result.unwrap().var_type.var_type {
+		crate::expression::variable_type::Type::Inferred => println!("Inferred"),
+		crate::expression::variable_type::Type::Undeclared(ss) => println!("Undeclared : {}", ss),
+		crate::expression::variable_type::Type::UndeclaredWParams(ss, vv) => {
+			println!("UndeclaredWParams : {}", ss);
+			for v in vv {
+				match v {
+					crate::expression::variable_type::Type::Inferred => println!(" - Inferred"),
+					crate::expression::variable_type::Type::Undeclared(ss) => println!(" - Undeclared : {}", ss),
+					crate::expression::variable_type::Type::UndeclaredWParams(ss, vv) => {
+						println!(" - UndeclaredWParams : {}", ss)
+					},
+					_ => println!("OTHER VAR TYPE")
+				}
+			}
+		},
+		_ => println!("OTHER VAR TYPE")
+	}
 }

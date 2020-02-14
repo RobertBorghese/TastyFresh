@@ -5,7 +5,13 @@
  * using the `Expression` struct provided in this file.
  **********************************************************/
 
-use crate::value_type::ValueType;
+pub mod expression_component;
+pub mod expression_parser;
+pub mod expression_piece;
+pub mod value_type;
+pub mod variable_type;
+
+use crate::expression::value_type::ValueType;
 
 use crate::config_management::operator_data::OperatorDataStructure;
 

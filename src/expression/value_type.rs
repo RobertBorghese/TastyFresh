@@ -5,7 +5,7 @@
  * inside of Tasty Fresh.
  **********************************************************/
 
-use crate::variable_type::VariableType;
+use crate::expression::variable_type::VariableType;
 
 /*
 pub enum ValueType {

@@ -7,13 +7,13 @@
 
 pub struct Position {
 	pub file: String,
-	pub line: usize,
+	pub line: Option<usize>,
 	pub start: usize,
 	pub end: Option<usize>
 }
 
 impl Position {
-	pub fn new(file: String, line: usize, start: usize, end: Option<usize>) -> Position {
+	pub fn new(file: String, line: Option<usize>, start: usize, end: Option<usize>) -> Position {
 		return Position {
 			file: file,
 			line: line,

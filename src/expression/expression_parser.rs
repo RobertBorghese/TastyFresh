@@ -5,11 +5,9 @@
  * `ExpressionParser` provided in this file.
  **********************************************************/
 
-use crate::value_type::ValueType;
-
 use crate::expression::Expression;
-
-use crate::expression_piece::ExpressionPiece;
+use crate::expression::expression_piece::ExpressionPiece;
+use crate::expression::value_type::ValueType;
 
 use crate::config_management::ConfigData;
 use crate::config_management::operator_data::{ Operator, OperatorDataStructure };
@@ -26,21 +24,21 @@ use std::rc::Rc;
 /// Parses an expression represented as a String.
 /// The properties are used throughout the parsing process implemented below.
 pub struct ExpressionParser {
-	expression: Expression,
+	pub expression: Expression,
 
-	position: ExpressionParserPosition,
+	pub position: ExpressionParserPosition,
 
-	expr_str: String,
-	expr_chars: Vec<char>,
+	pub expr_str: String,
+	pub expr_chars: Vec<char>,
 
-	parts: Vec<ExpressionPiece>,
-	end_data: ExpressionEnder,
+	pub parts: Vec<ExpressionPiece>,
+	pub end_data: ExpressionEnder,
 
-	config_data: ConfigData
+	pub config_data: ConfigData
 }
 
 /// Tracks the positional information of the parser.
-struct ExpressionParserPosition {
+pub struct ExpressionParserPosition {
 	line_offset: i32,
 	line_start: i32,
 	index: i32,
@@ -48,7 +46,7 @@ struct ExpressionParserPosition {
 }
 
 /// Stores important data to be retrieved after the parser ends.
-struct ExpressionEnder {
+pub struct ExpressionEnder {
 	until_chars: Vec<char>,
 	end_index: i32,
 	end_char: char
@@ -91,133 +89,13 @@ impl ExpressionParser {
 			}
 		};
 		result.parse_expr_str();
-		result.parse_expr_parts();
+		ExpressionPiece::parse_expr_parts(&mut result);
+		//result.parse_expr_parts();
 		return result;
 	}
 
-	fn get_operator(&self, op_type: &str, index: usize) -> &Operator {
+	pub fn get_operator(&self, op_type: &str, index: usize) -> &Operator {
 		return &self.config_data.operators[op_type][index];
-	}
-
-	fn parse_expr_parts(&mut self) {
-		while self.parts.len() > 1 {
-			let mut i = 0;
-			let mut next_op_index = None;
-			let mut next_op_priority = -1;
-			for part in &self.parts {
-				let mut priority = -2;
-				let mut reverse_priority = false;
-				match part {
-					ExpressionPiece::Prefix(index, _) |
-					ExpressionPiece::Suffix(index, _) |
-					ExpressionPiece::Infix(index, _) => {
-						let op = self.get_operator(match part {
-							ExpressionPiece::Prefix(..) => "prefix",
-							ExpressionPiece::Suffix(..) => "suffix",
-							ExpressionPiece::Infix(..) => "infix",
-							_ => ""
-						}, *index);
-						priority = op.priority;
-						reverse_priority = op.reverse_priority;
-					},
-					ExpressionPiece::FunctionParameters(..) |
-					ExpressionPiece::ArrayAccessParameters(..) => {
-						next_op_priority = 950;
-					},
-					ExpressionPiece::TernaryCondition(..) => {},
-					_ => ()
-				}
-				if (priority > next_op_priority) || (priority == next_op_priority && reverse_priority) {
-					next_op_index = Some(i);
-					next_op_priority = priority;
-				}
-				i += 1;
-			}
-
-			if next_op_index.is_some() && next_op_index.unwrap() < self.parts.len() {
-				let op_index = next_op_index.unwrap();
-				match &self.parts[op_index] {
-					ExpressionPiece::Prefix(index, position) => {
-						let result = match &self.parts[op_index + 1] {
-							ExpressionPiece::Value(value, position) => {
-								Expression::Prefix(Rc::new(Expression::Value(value.clone(), ValueType::Unknown)), *index, ValueType::Unknown)
-							},
-							ExpressionPiece::Expression(expr) => {
-								Expression::Prefix(Rc::clone(expr), *index, ValueType::Unknown)
-							},
-							ExpressionPiece::EncapsulatedValues(expressions, position) => {
-								Expression::Prefix(Rc::new(Expression::Expressions(Rc::clone(expressions), ValueType::Unknown)), *index, ValueType::Unknown)
-							},
-							_ => Expression::Invalid
-						};
-						self.parts.insert(op_index, ExpressionPiece::Expression(Rc::new(result)));
-						self.parts.remove(op_index + 1);
-						self.parts.remove(op_index + 1);
-					},
-					ExpressionPiece::Suffix(index, position) => {
-						let result = match &self.parts[op_index - 1] {
-							ExpressionPiece::Value(value, position) => {
-								Expression::Suffix(Rc::new(Expression::Value(value.clone(), ValueType::Unknown)), *index, ValueType::Unknown)
-							},
-							ExpressionPiece::Expression(expr) => {
-								Expression::Suffix(Rc::clone(expr), *index, ValueType::Unknown)
-							},
-							ExpressionPiece::EncapsulatedValues(expressions, position) => {
-								Expression::Suffix(Rc::new(Expression::Expressions(Rc::clone(expressions), ValueType::Unknown)), *index, ValueType::Unknown)
-							},
-							_ => Expression::Invalid
-						};
-						self.parts.insert(op_index - 1, ExpressionPiece::Expression(Rc::new(result)));
-						self.parts.remove(op_index);
-						self.parts.remove(op_index);
-					},
-					ExpressionPiece::Infix(index, position) => {
-						let left_result = match &self.parts[op_index - 1] {
-							ExpressionPiece::Value(value, position) => {
-								Some(Rc::new(Expression::Value(value.clone(), ValueType::Unknown)))
-							},
-							ExpressionPiece::Expression(expr) => {
-								Some(Rc::clone(expr))
-							},
-							ExpressionPiece::EncapsulatedValues(expressions, position) => {
-								Some(Rc::new(Expression::Expressions(Rc::clone(expressions), ValueType::Unknown)))
-							},
-							_ => None
-						};
-						let right_result = match &self.parts[op_index + 1] {
-							ExpressionPiece::Value(value, position) => {
-								Some(Rc::new(Expression::Value(value.clone(), ValueType::Unknown)))
-							},
-							ExpressionPiece::Expression(expr) => {
-								Some(Rc::clone(expr))
-							},
-							ExpressionPiece::EncapsulatedValues(expressions, position) => {
-								Some(Rc::new(Expression::Expressions(Rc::clone(expressions), ValueType::Unknown)))
-							},
-							_ => None
-						};
-						if left_result.is_some() && right_result.is_some() {
-							self.parts.insert(op_index - 1, ExpressionPiece::Expression(Rc::new(Expression::Infix(left_result.unwrap(), right_result.unwrap(), *index, ValueType::Unknown))));
-							for i in 0..3 { self.parts.remove(op_index); }
-						}
-						
-					},
-					_ => {
-						println!("No support for this expression atm!");
-						break;
-					}
-				}
-			} else {
-				panic!("Could not parse expression components!");
-			}
-		}
-
-		match &self.parts[0] {
-			ExpressionPiece::Expression(expr) => {
-				println!("Expression: {}", expr.to_string(&self.config_data.operators));
-			}
-			_ => ()
-		}
 	}
 
 	fn parse_expr_str(&mut self) {
@@ -310,7 +188,7 @@ impl ExpressionParser {
 		};
 		return Position::new(
 			self.position.start_position.file.clone(),
-			self.position.start_position.line + self.position.line_offset.to_usize().unwrap(),
+			Some(self.position.start_position.line.unwrap_or(1) + self.position.line_offset.to_usize().unwrap()),
 			pos_start.to_usize().unwrap(),
 			pos_end
 		);
