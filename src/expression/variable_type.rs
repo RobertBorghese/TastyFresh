@@ -7,9 +7,13 @@
 
 use crate::expression::value_type::{ NumberType, StringType, ClassType };
 
+lazy_static! {
+	pub static ref STYLE_TYPES: Vec<&'static str> = vec!("copy", "ref", "borrow", "move", "ptr", "autoptr", "uniqueptr", "classptr");
+}
+
 pub struct VariableType {
 	pub var_type: Type,
-	pub var_style: Style
+	pub var_style: VarStyle
 }
 
 pub enum Type {
@@ -24,7 +28,7 @@ pub enum Type {
 	UndeclaredWParams(String, Vec<Type>)
 }
 
-pub enum Style {
+pub enum VarStyle {
 	Unknown,
 	Copy,
 	Ref,
@@ -36,43 +40,54 @@ pub enum Style {
 	ClassPtr
 }
 
-impl Style {
-	pub fn new(name: &str) -> Style {
+impl VarStyle {
+	pub fn new(name: &str) -> VarStyle {
 		return match name {
-			"copy" => Style::Copy,
-			"ref" => Style::Ref,
-			"borrow" => Style::Borrow,
-			"move" => Style::Move,
-			"ptr" => Style::Ptr,
-			"autoptr" => Style::AutoPtr,
-			"uniqueptr" => Style::UniquePtr,
-			"classptr" => Style::ClassPtr,
-			_ => Style::Unknown
+			"copy" => VarStyle::Copy,
+			"ref" => VarStyle::Ref,
+			"borrow" => VarStyle::Borrow,
+			"move" => VarStyle::Move,
+			"ptr" => VarStyle::Ptr,
+			"autoptr" => VarStyle::AutoPtr,
+			"uniqueptr" => VarStyle::UniquePtr,
+			"classptr" => VarStyle::ClassPtr,
+			_ => VarStyle::Unknown
 		}
 	}
 
-	pub fn styles() -> Vec<&'static str> {
-		return vec!("copy", "ref", "borrow", "move", "ptr", "autoptr", "uniqueptr", "classptr");
+	pub fn styles() -> &'static Vec<&'static str> {
+		return &STYLE_TYPES;
 	}
 
 	pub fn get_name(&self) -> &str {
 		return match self {
-			Style::Unknown => "",
-			Style::Copy => "copy",
-			Style::Ref => "ref",
-			Style::Borrow => "borrow",
-			Style::Move => "move",
-			Style::Ptr => "ptr",
-			Style::AutoPtr => "autoptr",
-			Style::UniquePtr => "uniqueptr",
-			Style::ClassPtr => "classptr"
+			VarStyle::Unknown => "",
+			VarStyle::Copy => "copy",
+			VarStyle::Ref => "ref",
+			VarStyle::Borrow => "borrow",
+			VarStyle::Move => "move",
+			VarStyle::Ptr => "ptr",
+			VarStyle::AutoPtr => "autoptr",
+			VarStyle::UniquePtr => "uniqueptr",
+			VarStyle::ClassPtr => "classptr"
 		}
 	}
 
 	pub fn is_unknown(&self) -> bool {
 		return match self {
-			Style::Unknown => true,
+			VarStyle::Unknown => true,
 			_ => false
 		}
+	}
+
+	pub fn class_only(&self) -> bool {
+		return match self {
+			VarStyle::ClassPtr => true,
+			_ => false
+		}
+	}
+
+	pub fn module_only(&self) -> bool {
+		return false;
 	}
 }

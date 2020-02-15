@@ -8,4 +8,7 @@
  **********************************************************/
 
 pub mod parser;
+pub mod declaration;
 pub mod variable_declaration;
+pub mod function_declaration;
+pub mod attribute_declaration;

@@ -142,6 +142,7 @@ impl Parser {
 					*index += 1;
 					if Self::check_for_end(chars, index, out_of_space) { return Type::Inferred; }
 				} else if next_char == '>' {
+					*index += 1;
 					break;
 				} else {
 					*unexpected_character = true;
