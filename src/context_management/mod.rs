@@ -11,7 +11,7 @@ use position::Position;
 
 use num::*;
 
-pub fn print_code_error(title: &str, message: &str, position: &Position) {
+pub fn print_code_error(title: &str, message: &str, position: &Position, custom_content: Option<&str>) {
 	let mut output = String::from("");
 
 	// title
@@ -20,8 +20,11 @@ pub fn print_code_error(title: &str, message: &str, position: &Position) {
 	output += "==============================\n";
 
 	// contents
-	let file_content = "8934293048940230984238423574890589345893405893405835803450";
-	let file_chars: Vec<char> = file_content.chars().collect();
+	let file_content = "copy test: QVector   <  QString    , int   g > = 32 + 5;";//"8934293048940230984238423574890589345893405893405835803450";
+	let file_chars: Vec<char> = match custom_content {
+		Some(c) => c,
+		None => file_content
+	}.chars().collect();
 	let mut line_content = "".to_string();
 
 	let mut line = position.line.unwrap_or(1) - 1;

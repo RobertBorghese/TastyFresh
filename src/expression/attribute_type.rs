@@ -28,7 +28,8 @@ impl Attribute {
 			"preference" => new_preference(params),
 			"append" => new_append(params),
 			"prepend" => new_prepend(params),
-			"include" => new_include(params)
+			"include" => new_include(params),
+			custom => Custom(params)
 		}
 	}
 

@@ -29,10 +29,12 @@ pub struct FunctionParamDeclaration {
 impl FunctionDeclaration {
 	pub fn out_of_space(pos: Position, index: &mut usize) {
 		let temp_pos = Position { file: pos.file, line: None, start: *index - 1, end: Some(*index) };
-		print_code_error("Unexpected End", "unexpected end of variable declaration", &temp_pos);
+		print_code_error("Unexpected End", "unexpected end of variable declaration", &temp_pos, None);
 	}
 
 	pub fn new(content: &str, index: &mut usize, position: Position, line_offset: &mut usize) -> Option<FunctionDeclaration> {
+		return None;
+		/*
 		let state = 0;
 		let chars = content[*index..].chars().collect();
 		let mut out_of_space = false;
@@ -41,6 +43,7 @@ impl FunctionDeclaration {
 		loop {
 			let style_name = Parser::parse_ascii_char_name(&chars, index, &mut out_of_space);
 		}
+		*/
 	}
 
 	pub fn is_func_declaration(content: &str, index: usize) -> bool {

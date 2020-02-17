@@ -62,7 +62,7 @@ impl ExpressionPiece {
 							parser.parts.insert(part_index - 1, expr.unwrap());
 							for i in 0..3 { parser.parts.remove(part_index); }
 						} else {
-							print_code_error("Expected Expression", "expected expressions to surrond this operator", position);
+							print_code_error("Expected Expression", "expected expressions to surrond this operator", position, None);
 							//println!("Expected expression at {}:{}:{}", position.file, position.line, position.end.unwrap_or(0));
 							error = true;
 							break;

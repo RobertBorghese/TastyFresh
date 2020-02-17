@@ -63,27 +63,57 @@ pub enum NumberType {
 	LongDouble  // l
 }
 
+impl NumberType {
+	pub fn to_cpp(&self) -> &'static str {
+		return match self {
+			NumberType::Byte => "char",
+			NumberType::UByte => "unsigned char",
+			NumberType::Short => "short",
+			NumberType::UShort => "unsigned short",
+			NumberType::Int => "int",
+			NumberType::UInt => "unsigned int",
+			NumberType::Long => "long",
+			NumberType::ULong => "unsigned long",
+			NumberType::LongLong => "long long",
+			NumberType::ULongLong => "unsigned long long",
+			NumberType::Float => "float",
+			NumberType::Double => "double",
+			NumberType::LongDouble => "long double"
+		}
+	}
+}
+
 pub enum StringType {
 	ConstCharArray,
 	MutlilineConstCharArray,
 	StringClass
 }
 
+impl StringType {
+	pub fn to_cpp(&self) -> &'static str {
+		return match self {
+			StringType::ConstCharArray => "const char*",
+			StringType::MutlilineConstCharArray => "const char*",
+			StringType::StringClass => "std::string"
+		}
+	}
+}
+
 pub struct ClassType {
-	name: String,
-	type_params: Option<Vec<ValueType>>,
-	properties: Vec<Property>,
-	functions: Vec<Function>
+	pub name: String,
+	pub type_params: Option<Vec<ValueType>>,
+	pub properties: Vec<Property>,
+	pub functions: Vec<Function>
 }
 
 pub struct Property {
-	name: String,
-	prop_type: VariableType,
-	default_value: Option<String>
+	pub name: String,
+	pub prop_type: VariableType,
+	pub default_value: Option<String>
 }
 
 pub struct Function {
-	name: String,
-	parameters: Vec<Property>,
-	return_type: VariableType
+	pub name: String,
+	pub parameters: Vec<Property>,
+	pub return_type: VariableType
 }

@@ -28,6 +28,39 @@ pub enum Type {
 	UndeclaredWParams(String, Vec<Type>)
 }
 
+impl Type {
+	pub fn to_cpp(&self) -> String {
+		match self {
+			Type::Unknown(name) => name.clone(),
+			Type::Null => "void*".to_string(),
+			Type::Boolean => "bool".to_string(),
+			Type::Number(num_type) => num_type.to_cpp().to_string(),
+			Type::String(string_type) => string_type.to_cpp().to_string(),
+			Type::Class(class_type) => class_type.name.clone(),
+			Type::Inferred => "auto".to_string(),
+			Type::Undeclared(name) => name.clone(),
+			Type::UndeclaredWParams(name, type_args) => {
+				let mut result = name.clone();
+				result += "<";
+				let mut i = 0;
+				loop {
+					if i < type_args.len() {
+						result += type_args[i].to_cpp().as_str();
+						i += 1;
+						if i < type_args.len() {
+							result += ", ";
+						}
+					} else {
+						break;
+					}
+				}
+				result += ">";
+				result
+			}
+		}
+	}
+}
+
 pub enum VarStyle {
 	Unknown,
 	Copy,
