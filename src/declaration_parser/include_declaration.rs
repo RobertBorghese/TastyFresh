@@ -5,13 +5,8 @@
  **********************************************************/
 
 use crate::{
-	declare_parse_whitespace,
 	declare_parse_required_whitespace,
 	declare_parse_ascii,
-	declare_parse_required_ascii,
-	declare_parse_required_next_char,
-	declare_parse_expr_until_either_char,
-	declare_parse_type,
 	declare_parse_until_char
 };
 
@@ -92,6 +87,6 @@ impl IncludeDeclaration {
 
 	pub fn is_include_declaration(content: &str, index: usize) -> bool {
 		let declare = &content[index..];
-		return declare.starts_with("include");
+		return declare.starts_with("include ");
 	}
 }

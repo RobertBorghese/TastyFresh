@@ -50,7 +50,9 @@ use context_management::position::Position;
 
 use declaration_parser::parser::Parser;
 use declaration_parser::module_declaration::ModuleDeclaration;
+use declaration_parser::attribute_declaration::AttributeDeclaration;
 use declaration_parser::include_declaration::IncludeDeclaration;
+use declaration_parser::import_declaration::ImportDeclaration;
 
 use config_management::ConfigData;
 
@@ -244,26 +246,11 @@ fn main() {
 	//let files = list_all_files(".".to_string(), "tasty".to_string());
 
 	//let c = "u8\"fdsfdsfd 3 \\\\ \\x1a \\n \\r\"";
+
+	// VARIABLE INIT
 	let c = "copy a: int = 32;";
-	let mut parser = Parser {
-		content: c,
-		chars: c.chars().collect(),
-		index: 0,
-		line: 1,
-		out_of_space: false
-	};
-
-	//println!("{}", parser.parse_string());
-
-	let pos = Position {
-		file: "tasty".to_string(),
-		line: Some(1),
-		start: 0,
-		end: None
-	};
-
+	let mut parser = Parser::new(c);
 	let result = crate::declaration_parser::variable_declaration::VariableDeclaration::new(&mut parser);
-
 	if result.is_error() {
 		result.print_error("tast2.tasty".to_string(), "copy a: int = 32;");
 		return;
@@ -275,10 +262,11 @@ fn main() {
 	println!("{}", rr.var_type.var_style.get_name());
 	println!("RESULT: {}", &c[rr.start_index..rr.end_index]);
 
+	// ATTRIBUTE
 	let attribute_content = " fdjs fdsjkldfs @Test(fds fdksleqw 21l dsfd, 999)";
 	let mut parser2 = Parser::new(attribute_content);
 	parser2.index = 16;
-	let result2 = crate::declaration_parser::attribute_declaration::AttributeDeclaration::new(&mut parser2);
+	let result2 = AttributeDeclaration::new(&mut parser2);
 	if result2.is_error() {
 		result2.print_error("atttribute.tasty".to_string(), attribute_content);
 		return;
@@ -288,6 +276,7 @@ fn main() {
 	println!("{}", rr2.name);
 	println!("{:?}", rr2.parameters);
 
+	// INCLUDE
 	let include_content = "include local hjkj/sdfdsf\\qrewre.h;";
 	let mut parser3 = Parser::new(include_content);
 	parser3.index = 0;
@@ -300,6 +289,20 @@ fn main() {
 	println!("---- Include ----");
 	println!("{}", rr3.path);
 	println!("{}", (rr3.inc_type as i32));
+
+	// IMPORT
+	let import_content = "import test/bla;";
+	let mut parser4 = Parser::new(import_content);
+	parser4.index = 0;
+	let result4 = ImportDeclaration::new(&mut parser4);
+	if result4.is_error() {
+		result4.print_error("include.tasty".to_string(), import_content);
+		return;
+	}
+	let rr4 = result4.as_ref().unwrap();
+	println!("---- Import ----");
+	println!("{}", rr4.path);
+
 
 /*
 	let mut index: usize = 0;

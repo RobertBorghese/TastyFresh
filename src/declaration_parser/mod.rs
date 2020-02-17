@@ -14,3 +14,4 @@ pub mod variable_declaration;
 pub mod function_declaration;
 pub mod attribute_declaration;
 pub mod include_declaration;
+pub mod import_declaration;
