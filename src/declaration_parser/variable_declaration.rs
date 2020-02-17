@@ -39,7 +39,6 @@ impl Declaration<VariableDeclaration> for VariableDeclaration {
 impl VariableDeclaration {
 	pub fn new(parser: &mut Parser) -> VariableDeclarationResult {
 		let initial_line = parser.line;
-		let state = 0;
 
 		// Parse Var Style
 		let mut style_name = "".to_string();

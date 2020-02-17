@@ -37,7 +37,6 @@ impl Declaration<AttributeDeclaration> for AttributeDeclaration {
 impl AttributeDeclaration {
 	pub fn new(parser: &mut Parser) -> AttributeDeclarationResult {
 		let initial_line = parser.line;
-		let state = 0;
 
 		let mut next_char = parser.get_curr();
 		if next_char != '@' {

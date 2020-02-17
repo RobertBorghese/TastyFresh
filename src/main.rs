@@ -50,6 +50,7 @@ use context_management::position::Position;
 
 use declaration_parser::parser::Parser;
 use declaration_parser::module_declaration::ModuleDeclaration;
+use declaration_parser::include_declaration::IncludeDeclaration;
 
 use config_management::ConfigData;
 
@@ -286,6 +287,19 @@ fn main() {
 	println!("---- Attribute ----");
 	println!("{}", rr2.name);
 	println!("{:?}", rr2.parameters);
+
+	let include_content = "include local hjkj/sdfdsf\\qrewre.h;";
+	let mut parser3 = Parser::new(include_content);
+	parser3.index = 0;
+	let result3 = IncludeDeclaration::new(&mut parser3);
+	if result3.is_error() {
+		result3.print_error("include.tasty".to_string(), include_content);
+		return;
+	}
+	let rr3 = result3.as_ref().unwrap();
+	println!("---- Include ----");
+	println!("{}", rr3.path);
+	println!("{}", (rr3.inc_type as i32));
 
 /*
 	let mut index: usize = 0;

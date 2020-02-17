@@ -176,6 +176,15 @@ macro_rules! declare_parse_required_next_char {
 
 /// Parses all content until reaching the desired character.
 #[macro_export]
+macro_rules! declare_parse_until_char {
+	($c:expr, $parser:expr) => {
+		$parser.parse_until($c);
+		if $parser.out_of_space { return Self::out_of_space($parser.index); }
+	}
+}
+
+/// Parses all content, assumed to be an expression, until reaching the desired character.
+#[macro_export]
 macro_rules! declare_parse_expr_until_next_char {
 	($c:expr, $parser:expr) => {
 		let mut result = ' ';
@@ -184,7 +193,7 @@ macro_rules! declare_parse_expr_until_next_char {
 	}
 }
 
-/// Parses all content until reaching one of the two desired characters.
+/// Parses all content, assumed to be an expression, until reaching one of the two desired characters.
 #[macro_export]
 macro_rules! declare_parse_expr_until_either_char {
 	($c:expr, $c2:expr, $result:expr, $parser:expr) => {
