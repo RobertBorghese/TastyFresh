@@ -24,6 +24,14 @@ pub trait Declaration<T> {
 		return DeclarationResult::Err("Unexpected Symbol", "unexpected symbol", index, index + 1);
 	}
 
+	fn increment_parser(parser: &mut Parser) -> Option<DeclarationResult<T>> {
+		parser.increment();
+		if parser.out_of_space {
+			return Some(Self::out_of_space(parser.index));
+		}
+		return None;
+	}
+
 	fn parse_whitespace(parser: &mut Parser) -> Option<DeclarationResult<T>> {
 		parser.parse_whitespace();
 		if parser.out_of_space {
@@ -123,6 +131,16 @@ impl<T> DeclarationResult<T> {
 
 /// Parses all next whitespace if any exists.
 #[macro_export]
+macro_rules! delcare_increment {
+	($parser:expr) => {
+		if let Some(result) = Self::increment_parser($parser) {
+			return result;
+		}
+	}
+}
+
+/// Parses all next whitespace if any exists.
+#[macro_export]
 macro_rules! declare_parse_whitespace {
 	($parser:expr) => {
 		if let Some(result) = Self::parse_whitespace($parser) {
@@ -208,8 +226,11 @@ macro_rules! declare_parse_expr_until_either_char {
 macro_rules! declare_parse_type {
 	($var_type:expr, $parser:expr) => {
 		let mut unexpected_char = false;
-		$var_type =  $parser.parse_type(&mut unexpected_char);
-		if unexpected_char {
+		let mut specifier_error: Option<&'static str> = None;
+		$var_type =  $parser.parse_type(&mut unexpected_char, &mut specifier_error);
+		if specifier_error.is_some() {
+			return DeclarationResult::Err("Specifier Error", specifier_error.unwrap(), $parser.index - 1, $parser.index);
+		} else if unexpected_char {
 			return DeclarationResult::Err("Unexpected Character", "unexpected character here", $parser.index - 1, $parser.index);
 		} else if  $parser.out_of_space {
 			return Self::out_of_space($parser.index);

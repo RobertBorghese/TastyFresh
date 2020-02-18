@@ -6,12 +6,13 @@
  **********************************************************/
 
 lazy_static! {
-	pub static ref FUNCTION_STYLES: Vec<&'static str> = vec!("static", "virtual", "inline", "meta");
+	pub static ref FUNCTION_STYLES: Vec<&'static str> = vec!("static", "extern", "virtual", "inline", "meta");
 }
 
 pub enum FunStyle {
 	Unknown,
 	Static,
+	Extern,
 	Virtual,
 	Inline,
 	Meta
@@ -21,6 +22,7 @@ impl FunStyle {
 	pub fn new(name: &str) -> FunStyle {
 		return match name {
 			"static" => FunStyle::Static,
+			"extern" => FunStyle::Extern,
 			"virtual" => FunStyle::Virtual,
 			"inline" => FunStyle::Inline,
 			"meta" => FunStyle::Meta,
@@ -36,6 +38,7 @@ impl FunStyle {
 		return match self {
 			FunStyle::Unknown => "",
 			FunStyle::Static => "static",
+			FunStyle::Extern => "extern",
 			FunStyle::Virtual => "virtual",
 			FunStyle::Inline => "inline",
 			FunStyle::Meta => "meta"
@@ -59,6 +62,7 @@ impl FunStyle {
 	pub fn module_only(&self) -> bool {
 		return match self {
 			FunStyle::Meta => true,
+			FunStyle::Extern => true,
 			_ => false
 		}
 	}

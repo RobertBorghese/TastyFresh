@@ -10,6 +10,7 @@ pub mod expression_parser;
 pub mod expression_piece;
 pub mod value_type;
 pub mod variable_type;
+pub mod function_type;
 
 use crate::expression::value_type::ValueType;
 

@@ -1,0 +1,60 @@
+/**********************************************************
+ * --- Assume Declaration ---
+ *
+ * Represents and parses an assume statement.
+ **********************************************************/
+
+use crate::{
+	declare_parse_required_whitespace,
+	declare_parse_ascii,
+	declare_parse_until_char
+};
+
+use crate::expression::variable_type::VariableType;
+use crate::expression::variable_type::{ Type, VarStyle };
+
+use crate::declaration_parser::declaration::{ Declaration, DeclarationResult };
+use crate::declaration_parser::parser::Parser;
+
+type AssumeDeclarationResult = DeclarationResult<AssumeDeclaration>;
+
+pub struct AssumeDeclaration {
+	pub path: String,
+	pub line: usize
+}
+
+impl Declaration<AssumeDeclaration> for AssumeDeclaration {
+	fn out_of_space_error_msg() -> &'static str {
+		return "unexpected end of assume";
+	}
+}
+
+impl AssumeDeclaration {
+	pub fn new(parser: &mut Parser) -> AssumeDeclarationResult {
+		let initial_line = parser.line;
+
+		// Parse Var Style
+		let mut assume_keyword = "".to_string();
+		declare_parse_ascii!(assume_keyword, parser);
+		if assume_keyword != "assume" {
+			return AssumeDeclarationResult::Err("Unexpected Keyword", "\"assume\" keyword expected", parser.index - assume_keyword.len(), parser.index);
+		}
+
+		declare_parse_required_whitespace!(parser);
+
+		let content_start = parser.index;
+		declare_parse_until_char!(';', parser);
+
+		let mut assume_path = parser.content[content_start..parser.index].to_string();
+
+		return AssumeDeclarationResult::Ok(AssumeDeclaration {
+			path: assume_path,
+			line: initial_line
+		});
+	}
+
+	pub fn is_assume_declaration(content: &str, index: usize) -> bool {
+		let declare = &content[index..];
+		return declare.starts_with("assume ");
+	}
+}

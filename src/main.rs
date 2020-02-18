@@ -53,6 +53,7 @@ use declaration_parser::module_declaration::ModuleDeclaration;
 use declaration_parser::attribute_declaration::AttributeDeclaration;
 use declaration_parser::include_declaration::IncludeDeclaration;
 use declaration_parser::import_declaration::ImportDeclaration;
+use declaration_parser::function_declaration::{ FunctionDeclaration, FunctionDeclarationType };
 
 use config_management::ConfigData;
 
@@ -248,18 +249,19 @@ fn main() {
 	//let c = "u8\"fdsfdsfd 3 \\\\ \\x1a \\n \\r\"";
 
 	// VARIABLE INIT
-	let c = "copy a: int = 32;";
+	let c = "const static copy a: int = 32;";
 	let mut parser = Parser::new(c);
 	let result = crate::declaration_parser::variable_declaration::VariableDeclaration::new(&mut parser);
 	if result.is_error() {
-		result.print_error("tast2.tasty".to_string(), "copy a: int = 32;");
+		result.print_error("tast2.tasty".to_string(), c);
 		return;
 	}
 	let rr = result.as_ref().unwrap();
 	println!("---- Initialize ----");
-	println!("{}", rr.name);
-	println!("{}", rr.var_type.var_type.to_cpp());
+	for a in &rr.var_type.var_properties { println!("{}", a.get_name()); }
 	println!("{}", rr.var_type.var_style.get_name());
+	println!("{}", rr.var_type.var_type.to_cpp());
+	println!("{}", rr.name);
 	println!("RESULT: {}", &c[rr.start_index..rr.end_index]);
 
 	// ATTRIBUTE
@@ -303,7 +305,27 @@ fn main() {
 	println!("---- Import ----");
 	println!("{}", rr4.path);
 
-
+	// FUNCTION
+	let func_content = "static inline fn test(copy a: vector<unsigned char>, ptr b: Bla);";
+	let mut parser5 = Parser::new(func_content);
+	parser5.index = 0;
+	let result5 = FunctionDeclaration::new(&mut parser5, FunctionDeclarationType::ModuleLevel);
+	if result5.is_error() {
+		result5.print_error("include.tasty".to_string(), func_content);
+		return;
+	}
+	let rr5 = result5.as_ref().unwrap();
+	println!("---- Function ----");
+	println!("{}", rr5.name);
+	for prop in &rr5.props {
+		println!("{}", prop.get_name());
+	}
+	for param in &rr5.parameters {
+		println!(",");
+		println!("{}", param.0.var_style.get_name());
+		println!("{}", param.0.var_type.to_cpp());
+		println!("{}", param.1);
+	}
 /*
 	let mut index: usize = 0;
 	let pos = Position::new("test2.tasty".to_string(), Some(1), 0, None);

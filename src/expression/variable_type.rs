@@ -9,38 +9,55 @@ use crate::expression::value_type::{ NumberType, StringType, ClassType };
 
 lazy_static! {
 	pub static ref STYLE_TYPES: Vec<&'static str> = vec!("copy", "ref", "borrow", "move", "ptr", "autoptr", "uniqueptr", "classptr");
+	pub static ref VARIABLE_PROPS: Vec<&'static str> = vec!("const", "constexpr", "constinit", "extern", "mutable", "static", "thread_local", "volatile");
 }
 
 pub struct VariableType {
 	pub var_type: Type,
-	pub var_style: VarStyle
+	pub var_style: VarStyle,
+	pub var_properties: Vec<VarProps> 
 }
 
 pub enum Type {
 	Unknown(String),
-	Null,
+	Void,
 	Boolean,
 	Number(NumberType),
 	String(StringType),
 	Class(ClassType),
 	Inferred,
-	Undeclared(String),
-	UndeclaredWParams(String, Vec<Type>)
+	Undeclared(Vec<String>),
+	UndeclaredWParams(Vec<String>, Vec<Type>)
 }
 
 impl Type {
 	pub fn to_cpp(&self) -> String {
 		match self {
 			Type::Unknown(name) => name.clone(),
-			Type::Null => "void*".to_string(),
+			Type::Void => "void".to_string(),
 			Type::Boolean => "bool".to_string(),
 			Type::Number(num_type) => num_type.to_cpp().to_string(),
 			Type::String(string_type) => string_type.to_cpp().to_string(),
 			Type::Class(class_type) => class_type.name.clone(),
 			Type::Inferred => "auto".to_string(),
-			Type::Undeclared(name) => name.clone(),
-			Type::UndeclaredWParams(name, type_args) => {
-				let mut result = name.clone();
+			Type::Undeclared(names) => {
+				let mut result = "".to_string();
+				for i in 0..names.len() {
+					if i > 0 {
+						result += "::";
+					}
+					result += &names[i];
+				}
+				result
+			},
+			Type::UndeclaredWParams(names, type_args) => {
+				let mut result = "".to_string();
+				for i in 0..names.len() {
+					if i > 0 {
+						result += "::";
+					}
+					result += &names[i];
+				}
 				result += "<";
 				let mut i = 0;
 				loop {
@@ -122,5 +139,51 @@ impl VarStyle {
 
 	pub fn module_only(&self) -> bool {
 		return false;
+	}
+}
+
+pub enum VarProps {
+	Unknown,
+	Const,
+	Constexpr,
+	Constinit,
+	Extern,
+	Mutable,
+	Static,
+	Threadlocal,
+	Volatile
+}
+
+impl VarProps {
+	pub fn new(name: &str) -> VarProps {
+		return match name {
+			"const" => VarProps::Const,
+			"constexpr" => VarProps::Constexpr,
+			"constinit" => VarProps::Constinit,
+			"extern" => VarProps::Extern,
+			"mutable" => VarProps::Mutable,
+			"static" => VarProps::Static,
+			"thread_local" => VarProps::Threadlocal,
+			"volatile" => VarProps::Volatile,
+			_ => VarProps::Unknown
+		}
+	}
+
+	pub fn properties() -> &'static Vec<&'static str> {
+		return &VARIABLE_PROPS;
+	}
+
+	pub fn get_name(&self) -> &str {
+		return match self {
+			VarProps::Unknown => "",
+			VarProps::Const => "const",
+			VarProps::Constexpr => "constexpr",
+			VarProps::Constinit => "constinit",
+			VarProps::Extern => "extern",
+			VarProps::Mutable => "mutable",
+			VarProps::Static => "static",
+			VarProps::Threadlocal => "thread_local",
+			VarProps::Volatile => "volatile"
+		}
 	}
 }

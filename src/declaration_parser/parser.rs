@@ -6,6 +6,7 @@
  **********************************************************/
 
 use crate::expression::variable_type::Type;
+use crate::expression::value_type::{ NumberType, StringType };
 
 /// Stores information about the parser.
 ///
@@ -397,14 +398,153 @@ impl<'a> Parser<'a> {
 	/// # Return
 	///
 	/// Returns the `Type` as an `Undeclared` or `UndeclaredWParams`.
-	pub fn parse_type(&mut self, unexpected_character: &mut bool) -> Type {
+	pub fn parse_type(&mut self, unexpected_character: &mut bool, conflicting_specifiers: &mut Option<&'static str>) -> Type {
 
 		// Ensure Content Exists
 		if self.check_for_end() { return Type::Inferred; }
 
-		// Get Type Name
-		let name = self.parse_ascii_char_name();
-		if self.out_of_space { return Type::Inferred; }
+		// Check const
+		let mut is_const = false;
+		let mut unsigned: Option<bool> = None;
+		let mut long = false;
+		let mut name_chain: Vec<String> = Vec::new();
+
+		// Get Type Name and Specifiers
+		'outer: loop {
+			let content = self.parse_ascii_char_name();
+			if self.out_of_space { return Type::Inferred; }
+			match content.as_str() {
+				"const" => {
+					is_const = true;
+				},
+				"unsigned" => {
+					if let None = unsigned {
+						unsigned = Some(true);
+					} else {
+						*conflicting_specifiers = Some("\"signed\" and \"unsigned\" specifiers conflict");
+						return Type::Inferred;
+					}
+				},
+				"signed" => {
+					if let None = unsigned {
+						unsigned = Some(false);
+					} else {
+						*conflicting_specifiers = Some("\"signed\" and \"unsigned\" specifiers conflict");
+						return Type::Inferred;
+					}
+				},
+				"long" => {
+					if !long {
+						long = true;
+					}
+					self.parse_whitespace();
+					if self.check_ahead("long") {
+						return Type::Number({
+								if unsigned.is_none() || !unsigned.unwrap() {
+									NumberType::LongLong
+								} else {
+									NumberType::ULongLong
+								}
+							});
+					} else if self.check_ahead("=") || self.check_ahead(",") {
+						return Type::Number({
+								if unsigned.is_none() || !unsigned.unwrap() {
+									NumberType::Long
+								} else {
+									NumberType::ULong
+								}
+							});
+					}
+				},
+				name => {
+					match name {
+						"char" => {
+							if long {
+								*conflicting_specifiers = Some("cannot use \"long\" specifier on \"char\"");
+							}
+							return Type::Number({
+									if unsigned.is_none() || !unsigned.unwrap() {
+										NumberType::Byte
+									} else {
+										NumberType::UByte
+									}
+								});
+						},
+						"short" => {
+							if long {
+								*conflicting_specifiers = Some("cannot use \"long\" specifier on \"short\"");
+							}
+							return Type::Number({
+									if unsigned.is_none() || !unsigned.unwrap() {
+										NumberType::Short
+									} else {
+										NumberType::UShort
+									}
+								});
+						},
+						"int" => {
+							if long {
+								*conflicting_specifiers = Some("cannot use \"long\" specifier on \"int\"");
+							}
+							return Type::Number({
+									if unsigned.is_none() || !unsigned.unwrap() {
+										NumberType::Int
+									} else {
+										NumberType::UInt
+									}
+								});
+						},
+						"float" => {
+							if long {
+								*conflicting_specifiers = Some("cannot use \"long\" specifier on \"float\"");
+							}
+							if unsigned.unwrap_or(false) {
+								*conflicting_specifiers = Some("cannot use \"unsigned\" specifier on \"float\"");
+							}
+							return Type::Number(NumberType::Float);
+						},
+						"double" => {
+							if unsigned.unwrap_or(false) {
+								*conflicting_specifiers = Some("cannot use \"unsigned\" specifier on \"float\"");
+							}
+							return Type::Number({
+								if long {
+									NumberType::LongDouble
+								} else {
+									NumberType::Double
+								}
+							});
+						},
+						"bool" => {
+							return Type::Boolean;
+						},
+						"void" => {
+							return Type::Void;
+						},
+						type_name => {
+							if long {
+								*conflicting_specifiers = Some("cannot use \"long\" specifier on this type");
+							}
+							if unsigned.is_some() {
+								*conflicting_specifiers = Some("cannot use sign-able specifier on this type");
+							}
+							name_chain.push(type_name.to_string());
+							loop {
+								self.parse_whitespace();
+								if self.check_ahead("::") || self.check_ahead(".") {
+									let content = self.parse_ascii_char_name();
+									if self.out_of_space { return Type::Inferred; }
+									name_chain.push(content);
+								} else {
+									break 'outer;
+								}
+							}
+						}
+					}
+				}
+			}
+			self.parse_whitespace();
+		}
 
 		// Parse Whitespace
 		if self.parse_whitespace_and_check_space() { return Type::Inferred; }
@@ -424,10 +564,10 @@ impl<'a> Parser<'a> {
 				if self.parse_whitespace_and_check_space() { return Type::Inferred; }
 
 				// Parse Type Parameter
-				type_params.push(self.parse_type(unexpected_character));
+				type_params.push(self.parse_type(unexpected_character, conflicting_specifiers));
 
 				// Check for Errors
-				if self.out_of_space || *unexpected_character { return Type::Inferred; }
+				if self.out_of_space || *unexpected_character || conflicting_specifiers.is_some() { return Type::Inferred; }
 
 				// Parse Whitespace
 				if self.parse_whitespace_and_check_space() { return Type::Inferred; }
@@ -446,10 +586,10 @@ impl<'a> Parser<'a> {
 			}
 
 			// Return Type with Parameters
-			return Type::UndeclaredWParams(name, type_params);
+			return Type::UndeclaredWParams(name_chain, type_params);
 		}
 
 		// Return Type Without Parameters
-		return Type::Undeclared(name);
+		return Type::Undeclared(name_chain);
 	}
 }
