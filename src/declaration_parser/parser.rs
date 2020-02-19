@@ -5,7 +5,7 @@
  * parsing text.
  **********************************************************/
 
-use crate::expression::variable_type::Type;
+use crate::expression::variable_type::{ Type, VarStyle };
 use crate::expression::value_type::{ NumberType, StringType };
 
 /// Stores information about the parser.
@@ -244,28 +244,30 @@ impl<'a> Parser<'a> {
 		}
 		let mut brackets = 0;
 		let mut parentheses = 0;
-		loop {
+		while !self.out_of_space {
 			if self.parse_string() {
+				if self.increment() {
+					break;
+				}
 			} else if self.parse_whitespace() {
 			} else {
 				if self.increment() {
 					break;
 				}
-				match self.get_curr() {
-					'{' => brackets += 1,
-					'}' => brackets -= 1,
-					'(' => parentheses += 1,
-					')' => parentheses -= 1,
-					_ => ()
-				}
-				if brackets <= 0 && parentheses <= 0 {
-					if self.get_curr() == c || self.get_curr() == c2 {
-						*result = self.get_curr();
-						break;
-					}
+			}
+			match self.get_curr() {
+				'{' => brackets += 1,
+				'}' => brackets -= 1,
+				'(' => parentheses += 1,
+				')' => parentheses -= 1,
+				_ => ()
+			}
+			if brackets <= 0 && parentheses <= 0 {
+				if self.get_curr() == c || self.get_curr() == c2 {
+					*result = self.get_curr();
+					break;
 				}
 			}
-			
 		}
 		return true;
 	}
@@ -389,15 +391,16 @@ impl<'a> Parser<'a> {
 		return true;
 	}
 
-	/// Parses the next content as Tasty Fresh syntax.
+	/// Parses the next content as a Tasty Fresh type.
 	///
 	/// # Arguments
 	///
 	/// * `unexpected_character` - This is set to `true` if the parser hits an unexpected `char`.
+	/// * `conflicting_specifiers` - This is set to `true` if a type specifier is incompatible with the type.
 	///
 	/// # Return
 	///
-	/// Returns the `Type` as an `Undeclared` or `UndeclaredWParams`.
+	/// Returns the `Type` as a primitive, `Inferred`, `Undeclared` or `UndeclaredWParams`.
 	pub fn parse_type(&mut self, unexpected_character: &mut bool, conflicting_specifiers: &mut Option<&'static str>) -> Type {
 
 		// Ensure Content Exists
@@ -591,5 +594,34 @@ impl<'a> Parser<'a> {
 
 		// Return Type Without Parameters
 		return Type::Undeclared(name_chain);
+	}
+
+	/// Parses the next content as a Tasty Fresh style and type.
+	///
+	/// # Arguments
+	///
+	/// * `unexpected_character` - This is set to `true` if the parser hits an unexpected `char`.
+	/// * `conflicting_specifiers` - This is set to `true` if a type specifier is incompatible with the type.
+	///
+	/// # Return
+	///
+	/// Returns the `VarStyle` as `Copy` by default and the `Type` as a primitive, `Inferred`, `Undeclared` or `UndeclaredWParams`.
+	pub fn parse_type_and_style(&mut self, unexpected_character: &mut bool, conflicting_specifiers: &mut Option<&'static str>) -> (VarStyle, Type) {
+		let old_index = self.index;
+		let content = self.parse_ascii_char_name();
+		if self.out_of_space { return (VarStyle::Copy, Type::Inferred); }
+
+		let mut style = VarStyle::Copy;
+		if VarStyle::styles().contains(&content.as_str()) {
+			style = VarStyle::new(&content);
+		} else {
+			self.index = old_index;
+		}
+
+		self.parse_whitespace();
+
+		let var_type = self.parse_type(unexpected_character, conflicting_specifiers);
+
+		return (style, var_type);
 	}
 }

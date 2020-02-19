@@ -77,7 +77,7 @@ pub trait Declaration<T> {
 				return Some(Self::out_of_space(parser.index));
 			}
 		} else {
-			return Some(DeclarationResult::Err("Unexpected Symbol", error_msg, parser.index - 1, parser.index));
+			return Some(DeclarationResult::Err("Unexpected Symbol", error_msg, parser.index, parser.index + 1));
 		}
 		return None;
 	}
@@ -101,6 +101,13 @@ impl<T> DeclarationResult<T> {
 		return !self.is_ok();
 	}
 
+	pub fn unwrap_and_move(self) -> T {
+		match self {
+			DeclarationResult::Ok(result) => return result,
+			_ => panic!("Result is error.")
+		}
+	}
+
 	pub fn unwrap(&self) -> &T {
 		match self {
 			DeclarationResult::Ok(result) => return result,
@@ -112,9 +119,13 @@ impl<T> DeclarationResult<T> {
 		return self;
 	}
 
-	pub fn print_error(&self, file: String, custom_content: &str) {
+	pub fn as_mut(&mut self) -> &mut DeclarationResult<T> {
+		return self;
+	}
+
+	pub fn print_error(&self, file: String, custom_content: Option<&str>) {
 		match self {
-			DeclarationResult::Err(title, message, start, end) => print_code_error(title, message, &Position::new(file, None, *start, Some(*end)), Some(custom_content)),
+			DeclarationResult::Err(title, message, start, end) => print_code_error(title, message, &Position::new(file, None, *start, Some(*end)), custom_content),
 			_ => panic!("Result is not an error.")
 		}
 	}
@@ -221,13 +232,33 @@ macro_rules! declare_parse_expr_until_either_char {
 }
 
 /// Parses the next content as a Tasty Fresh type.
-/// No type information should be available at this point, so it will only return either an `Undeclared` or `UndeclaredWParams`.
+/// No type information should be available at this point, so it will only return a primitive, `Inferred`, `Undeclared` or `UndeclaredWParams`.
 #[macro_export]
 macro_rules! declare_parse_type {
 	($var_type:expr, $parser:expr) => {
 		let mut unexpected_char = false;
 		let mut specifier_error: Option<&'static str> = None;
-		$var_type =  $parser.parse_type(&mut unexpected_char, &mut specifier_error);
+		$var_type = $parser.parse_type(&mut unexpected_char, &mut specifier_error);
+		if specifier_error.is_some() {
+			return DeclarationResult::Err("Specifier Error", specifier_error.unwrap(), $parser.index - 1, $parser.index);
+		} else if unexpected_char {
+			return DeclarationResult::Err("Unexpected Character", "unexpected character here", $parser.index - 1, $parser.index);
+		} else if  $parser.out_of_space {
+			return Self::out_of_space($parser.index);
+		}
+	}
+}//parse_type_and_style
+
+/// Parses the next content as a Tasty Fresh style and type.
+/// No type information should be available at this point, so it will only return a primitive, `Inferred`, `Undeclared` or `UndeclaredWParams`.
+#[macro_export]
+macro_rules! declare_parse_type_and_style {
+	($var_type:expr, $var_style:expr, $parser:expr) => {
+		let mut unexpected_char = false;
+		let mut specifier_error: Option<&'static str> = None;
+		let type_and_style = $parser.parse_type_and_style(&mut unexpected_char, &mut specifier_error);
+		$var_style = type_and_style.0;
+		$var_type = type_and_style.1;
 		if specifier_error.is_some() {
 			return DeclarationResult::Err("Specifier Error", specifier_error.unwrap(), $parser.index - 1, $parser.index);
 		} else if unexpected_char {

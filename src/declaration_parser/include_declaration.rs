@@ -15,6 +15,7 @@ use crate::expression::variable_type::{ Type, VarStyle };
 
 use crate::declaration_parser::declaration::{ Declaration, DeclarationResult };
 use crate::declaration_parser::parser::Parser;
+use crate::declaration_parser::cpp_transpiler::CPPTranspiler;
 
 type IncludeDeclarationResult = DeclarationResult<IncludeDeclaration>;
 
@@ -33,6 +34,15 @@ pub enum IncludeType {
 impl Declaration<IncludeDeclaration> for IncludeDeclaration {
 	fn out_of_space_error_msg() -> &'static str {
 		return "unexpected end of include";
+	}
+}
+
+impl CPPTranspiler for IncludeDeclaration {
+	fn to_cpp(&self) -> String {
+		return match self.inc_type {
+			IncludeType::Local => format!("#include \"{}\"", self.path),
+			IncludeType::Header => format!("#include <{}>", self.path)
+		}
 	}
 }
 
@@ -83,6 +93,10 @@ impl IncludeDeclaration {
 			inc_type: inc_type,
 			line: initial_line
 		});
+	}
+
+	pub fn is_declaration(parser: &mut Parser) -> bool {
+		return Self::is_include_declaration(parser.content, parser.index);
 	}
 
 	pub fn is_include_declaration(content: &str, index: usize) -> bool {

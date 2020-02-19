@@ -19,6 +19,7 @@ use crate::expression::variable_type::{ VariableType, Type, VarStyle, VarProps }
 
 use crate::declaration_parser::declaration::{ Declaration, DeclarationResult };
 use crate::declaration_parser::parser::Parser;
+use crate::declaration_parser::cpp_transpiler::CPPTranspiler;
 
 type VariableDeclarationResult = DeclarationResult<VariableDeclaration>;
 
@@ -33,6 +34,12 @@ pub struct VariableDeclaration {
 impl Declaration<VariableDeclaration> for VariableDeclaration {
 	fn out_of_space_error_msg() -> &'static str {
 		return "unexpected end of variable";
+	}
+}
+
+impl CPPTranspiler for VariableDeclaration {
+	fn to_cpp(&self) -> String {
+		return "".to_string();
 	}
 }
 
@@ -84,18 +91,14 @@ impl VariableDeclaration {
 			delcare_increment!(parser);
 			declare_parse_whitespace!(parser);
 			declare_parse_type!(var_type, parser);
+			declare_parse_whitespace!(parser);
+			declare_parse_required_next_char!('=', next_char, parser);
 		} else if next_char == '=' {
 			var_type = Type::Inferred;
 			delcare_increment!(parser);
 		} else {
 			return VariableDeclarationResult::Err("Unexpected Symbol", "unexpected symbol", parser.index - 1, parser.index);
 		}
-
-		// Parse Whitespace
-		declare_parse_whitespace!(parser);
-
-		// Parse Assignment
-		declare_parse_required_next_char!('=', next_char, parser);
 
 		// Parse Expression
 		let start = parser.index;
@@ -115,6 +118,10 @@ impl VariableDeclaration {
 			start_index: start,
 			end_index: end
 		});
+	}
+
+	pub fn is_declaration(parser: &mut Parser) -> bool {
+		return Self::is_var_declaration(parser.content, parser.index);
 	}
 
 	pub fn is_var_declaration(content: &str, index: usize) -> bool {

@@ -15,6 +15,7 @@ use crate::expression::variable_type::{ Type, VarStyle };
 
 use crate::declaration_parser::declaration::{ Declaration, DeclarationResult };
 use crate::declaration_parser::parser::Parser;
+use crate::declaration_parser::cpp_transpiler::CPPTranspiler;
 
 type ImportDeclarationResult = DeclarationResult<ImportDeclaration>;
 
@@ -26,6 +27,12 @@ pub struct ImportDeclaration {
 impl Declaration<ImportDeclaration> for ImportDeclaration {
 	fn out_of_space_error_msg() -> &'static str {
 		return "unexpected end of import";
+	}
+}
+
+impl CPPTranspiler for ImportDeclaration {
+	fn to_cpp(&self) -> String {
+		return "".to_string();
 	}
 }
 
@@ -51,6 +58,10 @@ impl ImportDeclaration {
 			path: import_path,
 			line: initial_line
 		});
+	}
+
+	pub fn is_declaration(parser: &mut Parser) -> bool {
+		return Self::is_import_declaration(parser.content, parser.index);
 	}
 
 	pub fn is_import_declaration(content: &str, index: usize) -> bool {

@@ -209,7 +209,7 @@ fn get_output_dirs(arguments: &BTreeMap<String,Vec<String>>) -> Option<Vec<Strin
 fn transpile_source_file(file: &str, output_dirs: &Vec<String>, config_data: &ConfigData) -> bool {
 	let content = std::fs::read_to_string(file).expect("Could not read source file.");
 	let mut parser = Parser::new(content.as_str());
-	let module_declaration = ModuleDeclaration::new(&parser);
+	let module_declaration = ModuleDeclaration::new(&mut parser, file);
 	return true;
 }
 
@@ -235,6 +235,8 @@ fn main() {
 		}
 	}
 
+	return;
+
 	//let mut ender = ExpressionEnder { until_chars: Vec::new(), end_index: 0, end_char: ' ' };
 	//let test = Expression::new("++!&&a(!~dfjks.jfdk[32.help],12,ew)()+sd", &operators_data, &mut ender);
 	ExpressionParser::new("++&&&a++++ -  b", Position::new("test.tasty".to_string(), Some(1), 0, None), data, None);
@@ -253,7 +255,7 @@ fn main() {
 	let mut parser = Parser::new(c);
 	let result = crate::declaration_parser::variable_declaration::VariableDeclaration::new(&mut parser);
 	if result.is_error() {
-		result.print_error("tast2.tasty".to_string(), c);
+		result.print_error("tast2.tasty".to_string(), Some(c));
 		return;
 	}
 	let rr = result.as_ref().unwrap();
@@ -270,7 +272,7 @@ fn main() {
 	parser2.index = 16;
 	let result2 = AttributeDeclaration::new(&mut parser2);
 	if result2.is_error() {
-		result2.print_error("atttribute.tasty".to_string(), attribute_content);
+		result2.print_error("atttribute.tasty".to_string(), Some(attribute_content));
 		return;
 	}
 	let rr2 = result2.as_ref().unwrap();
@@ -284,7 +286,7 @@ fn main() {
 	parser3.index = 0;
 	let result3 = IncludeDeclaration::new(&mut parser3);
 	if result3.is_error() {
-		result3.print_error("include.tasty".to_string(), include_content);
+		result3.print_error("include.tasty".to_string(), Some(include_content));
 		return;
 	}
 	let rr3 = result3.as_ref().unwrap();
@@ -298,7 +300,7 @@ fn main() {
 	parser4.index = 0;
 	let result4 = ImportDeclaration::new(&mut parser4);
 	if result4.is_error() {
-		result4.print_error("include.tasty".to_string(), import_content);
+		result4.print_error("include.tasty".to_string(), Some(import_content));
 		return;
 	}
 	let rr4 = result4.as_ref().unwrap();
@@ -306,17 +308,21 @@ fn main() {
 	println!("{}", rr4.path);
 
 	// FUNCTION
-	let func_content = "static inline fn test(copy a: vector<unsigned char>, ptr b: Bla);";
+	let func_content = "static inline fn test(copy a: vector<unsigned char>, ptr b: Bla) -> unsigned int { return 0; }";
 	let mut parser5 = Parser::new(func_content);
 	parser5.index = 0;
 	let result5 = FunctionDeclaration::new(&mut parser5, FunctionDeclarationType::ModuleLevel);
 	if result5.is_error() {
-		result5.print_error("include.tasty".to_string(), func_content);
+		result5.print_error("include.tasty".to_string(), Some(func_content));
 		return;
 	}
 	let rr5 = result5.as_ref().unwrap();
 	println!("---- Function ----");
 	println!("{}", rr5.name);
+	println!(",");
+	println!("{}", rr5.return_type.var_style.get_name());
+	println!("{}", rr5.return_type.var_type.to_cpp());
+	println!(",");
 	for prop in &rr5.props {
 		println!("{}", prop.get_name());
 	}
@@ -326,6 +332,7 @@ fn main() {
 		println!("{}", param.0.var_type.to_cpp());
 		println!("{}", param.1);
 	}
+	if rr5.start_index.is_some() { println!("RESULT: {}", &func_content[rr5.start_index.unwrap()..rr5.end_index.unwrap()]); }
 /*
 	let mut index: usize = 0;
 	let pos = Position::new("test2.tasty".to_string(), Some(1), 0, None);

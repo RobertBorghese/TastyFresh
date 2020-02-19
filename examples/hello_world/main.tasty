@@ -1,7 +1,5 @@
 include system iostream;
 
-assume std is a namespace;
-
 fn main() -> int {
 	std.cout << "Hello, World!" << std.endl;
 

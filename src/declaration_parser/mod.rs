@@ -10,8 +10,10 @@
 pub mod parser;
 pub mod declaration;
 pub mod module_declaration;
+pub mod assume_declaration;
 pub mod variable_declaration;
 pub mod function_declaration;
 pub mod attribute_declaration;
 pub mod include_declaration;
 pub mod import_declaration;
+pub mod cpp_transpiler;

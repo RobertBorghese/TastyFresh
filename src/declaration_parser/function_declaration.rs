@@ -13,6 +13,7 @@ use crate::{
 	declare_parse_expr_until_next_char,
 	declare_parse_expr_until_either_char,
 	declare_parse_type,
+	declare_parse_type_and_style,
 	delcare_increment
 };
 
@@ -22,6 +23,7 @@ use crate::expression::function_type::FunStyle;
 
 use crate::declaration_parser::declaration::{ Declaration, DeclarationResult };
 use crate::declaration_parser::parser::Parser;
+use crate::declaration_parser::cpp_transpiler::CPPTranspiler;
 
 type FunctionDeclarationResult = DeclarationResult<FunctionDeclaration>;
 
@@ -29,10 +31,10 @@ pub struct FunctionDeclaration {
 	pub name: String,
 	pub props: Vec<FunStyle>,
 	pub parameters: Vec<(VariableType, String, usize, usize)>,
-	pub return_type: Option<VariableType>,
+	pub return_type: VariableType,
 	pub line: usize,
-	pub start_index: usize,
-	pub end_index: usize
+	pub start_index: Option<usize>,
+	pub end_index: Option<usize>
 }
 
 pub enum FunctionDeclarationType {
@@ -44,6 +46,12 @@ pub enum FunctionDeclarationType {
 impl Declaration<FunctionDeclaration> for FunctionDeclaration {
 	fn out_of_space_error_msg() -> &'static str {
 		return "unexpected end of function";
+	}
+}
+
+impl CPPTranspiler for FunctionDeclaration {
+	fn to_cpp(&self) -> String {
+		return "".to_string();
 	}
 }
 
@@ -189,13 +197,15 @@ impl FunctionDeclaration {
 
 		let return_type = {
 			if parser.get_curr() == '-' {
+				delcare_increment!(parser);
 				declare_parse_required_next_char!('>', next_char, parser);
 				declare_parse_whitespace!(parser);
 				let var_type: Type;
-				declare_parse_type!(var_type, parser);
+				let var_style: VarStyle;
+				declare_parse_type_and_style!(var_type, var_style, parser);
 				VariableType {
 					var_type: var_type,
-					var_style: VarStyle::Copy,
+					var_style: var_style,
 					var_properties: Vec::new()
 				}
 			} else {
@@ -207,9 +217,21 @@ impl FunctionDeclaration {
 			}
 		};
 
+		declare_parse_whitespace!(parser);
+
+		let mut start_index: Option<usize> = None;
+		let mut end_index: Option<usize> = None;
+
 		match declare_type {
 			FunctionDeclarationType::ModuleLevel | FunctionDeclarationType::ClassLevel => {
-
+				let mut next_char = ' ';
+				declare_parse_required_next_char!('{', next_char, parser);
+				println!("CURR: {}", parser.get_curr());
+				start_index = Some(parser.index);
+				println!("I AM HERE : {} ", parser.index);
+				declare_parse_expr_until_next_char!('}', parser);
+				println!("NOW I AM HERE");
+				end_index = Some(parser.index);
 			},
 			FunctionDeclarationType::Assumption => {
 				let mut next_char = ' ';
@@ -221,11 +243,15 @@ impl FunctionDeclaration {
 			name: function_name,
 			props: func_props,
 			parameters: parameters,
-			return_type: Some(return_type),
+			return_type: return_type,
 			line: initial_line,
-			start_index: 0,
-			end_index: 0
+			start_index: start_index,
+			end_index: end_index
 		});
+	}
+
+	pub fn is_declaration(parser: &mut Parser) -> bool {
+		return Self::is_func_declaration(parser.content, parser.index);
 	}
 
 	pub fn is_func_declaration(content: &str, index: usize) -> bool {

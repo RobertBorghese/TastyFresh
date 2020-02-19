@@ -36,20 +36,22 @@ pub fn print_code_error(title: &str, message: &str, position: &Position, custom_
 		let mut i = 0;
 		loop {
 			if i >= file_chars.len() {
+				if i <= start {
+					start -= line_start;
+					end -= line_start;
+				}
 				break;
 			}
 			if file_chars[i] == '\n' {
-				if i >= end {
+				if i > end {
 					break;
 				}
 				line += 1;
 				line_start = i;
 			}
-			if i >= start {
-				if i == start {
-					start -= line_start;
-					end -= line_start;
-				}
+			if i == start {
+				start -= line_start;
+				end -= line_start;
 			}
 			i += 1;
 		}
@@ -64,7 +66,7 @@ pub fn print_code_error(title: &str, message: &str, position: &Position, custom_
 		if file_chars[i] == '\n' {
 			temp_line += 1;
 		}
-		if temp_line == line {
+		if temp_line == line && file_chars[i] != '\n' {
 			line_content.push(file_chars[i]);
 		} else if temp_line > line {
 			break;
