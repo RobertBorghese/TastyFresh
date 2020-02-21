@@ -42,7 +42,7 @@ impl<'a> Parser<'a> {
 	}
 
 	/// Resets the parser at the specified index and line.
-	pub fn reset(new_index: usize, new_line: usize) {
+	pub fn reset(&mut self, new_index: usize, new_line: usize) {
 		self.index = new_index;
 		self.line = new_line;
 		self.out_of_space = false;
