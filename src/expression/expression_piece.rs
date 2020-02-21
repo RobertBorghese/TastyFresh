@@ -63,7 +63,6 @@ impl ExpressionPiece {
 							for i in 0..3 { parser.parts.remove(part_index); }
 						} else {
 							print_code_error("Expected Expression", "expected expressions to surrond this operator", position, None);
-							//println!("Expected expression at {}:{}:{}", position.file, position.line, position.end.unwrap_or(0));
 							error = true;
 							break;
 						}
@@ -80,11 +79,15 @@ impl ExpressionPiece {
 		}
 
 		if !error {
-			match &parser.parts[0] {
-				ExpressionPiece::Expression(expr) => {
-					println!("Expression: {}", expr.to_string(&parser.config_data.operators));
+			if parser.parts.len() > 0 {
+				match &parser.parts[0] {
+					ExpressionPiece::Expression(expr) => {
+						println!("Expression: {}", expr.to_string(&parser.config_data.operators));
+					}
+					_ => ()
 				}
-				_ => ()
+			} else {
+				println!("COULD NOT PRINT EXPR!! ");
 			}
 		}
 	}

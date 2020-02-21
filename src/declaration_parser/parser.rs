@@ -7,6 +7,11 @@
 
 use crate::expression::variable_type::{ Type, VarStyle };
 use crate::expression::value_type::{ NumberType, StringType };
+use crate::expression::expression_parser::{ ExpressionParser, ExpressionEndReason };
+
+use crate::config_management::ConfigData;
+
+use crate::context_management::position::Position;
 
 /// Stores information about the parser.
 ///
@@ -34,6 +39,13 @@ impl<'a> Parser<'a> {
 			line: 1,
 			out_of_space: false
 		}
+	}
+
+	/// Resets the parser at the specified index and line.
+	pub fn reset(new_index: usize, new_line: usize) {
+		self.index = new_index;
+		self.line = new_line;
+		self.out_of_space = false;
 	}
 
 	/// Increments the index of the parser.
@@ -125,7 +137,7 @@ impl<'a> Parser<'a> {
 	pub fn is_space(&self, is_newline: &mut bool) -> bool {
 		let c = self.get_curr();
 		*is_newline = c == '\n';
-		return *is_newline || c == ' ' || c == '\t';
+		return *is_newline || c == ' ' || c == '\t' || c == '\r';
 	}
 
 	/// Brings the parser to the next, non-whitespace `char`.
@@ -163,6 +175,7 @@ impl<'a> Parser<'a> {
 			self.parse_until('\n');
 			self.increment();
 			self.line += 1;
+			self.increment();
 			return true;
 		} else if self.check_ahead("/*") {
 			loop {
@@ -171,6 +184,7 @@ impl<'a> Parser<'a> {
 					break;
 				}
 			}
+			self.increment();
 			return true;
 		}
 		return false;
@@ -272,11 +286,23 @@ impl<'a> Parser<'a> {
 		return true;
 	}
 
-	/// Attempts to parse the upcoming content as a String.
+	/// Checks if the immediate content is a valid `string` literal.
 	///
 	/// # Return
 	///
-	/// Returns `true` if a String is parsed successfully; otherwise `false`.
+	/// Returns `true` if the content is a `string` literal; otherwise `false`.
+	pub fn check_for_string(&mut self) -> bool {
+		let old_index = self.index;
+		let result = self.parse_string();
+		self.index = old_index;
+		return result;
+	}
+
+	/// Attempts to parse the upcoming content as a `string` literal.
+	///
+	/// # Return
+	///
+	/// Returns `true` if a `string` is parsed successfully; otherwise `false`.
 	pub fn parse_string(&mut self) -> bool {
 		if self.check_for_end() { return false; }
 		let mut is_raw = false;
@@ -303,6 +329,8 @@ impl<'a> Parser<'a> {
 						}
 						if self.get_curr() == '"' {
 							break;
+						} else {
+							self.index -= 1;
 						}
 					}
 				}
@@ -312,11 +340,11 @@ impl<'a> Parser<'a> {
 		return true;
 	}
 
-	/// Attempts to parse the String prefix up until the first `"`.
+	/// Attempts to parse the `string` prefix up until the first `"`.
 	///
 	/// # Return
 	///
-	/// Returns `true` if a String prefix is parsed successfully; otherwise `false`.
+	/// Returns `true` if a `string` prefix is parsed successfully; otherwise `false`.
 	pub fn parse_string_prefix(&mut self, is_raw: &mut bool) -> bool {
 		match self.get_curr() {
 			'"' => {},
@@ -389,6 +417,23 @@ impl<'a> Parser<'a> {
 			}
 		}
 		return true;
+	}
+
+	/// Parses the next content as a Tasty Fresh expression.
+	///
+	/// # Arguments
+	///
+	/// * `file_name` - The name of the file displayed in errors.
+	/// * `config_data` - The necessary configuration data for the transpiler.
+	///
+	/// # Return
+	///
+	/// Returns the configuration data that's taken ownership of.
+	pub fn parse_expression(&mut self, file_name: String, config_data: &ConfigData) -> ExpressionEndReason {
+		let expr_parser = ExpressionParser::new(self, Position::new(file_name, Some(self.line), self.index, None), config_data, None);
+		self.index = expr_parser.position.index;
+		self.line += expr_parser.position.line_offset;
+		return expr_parser.end_data.reason;
 	}
 
 	/// Parses the next content as a Tasty Fresh type.

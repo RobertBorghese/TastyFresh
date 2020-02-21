@@ -15,6 +15,8 @@ use crate::config_management::operator_data::{ Operator, OperatorDataStructure }
 use crate::context_management::print_code_error;
 use crate::context_management::position::Position;
 
+use crate::declaration_parser::parser::Parser;
+
 use std::convert::TryInto;
 
 use num::*;
@@ -23,37 +25,46 @@ use std::rc::Rc;
 
 /// Parses an expression represented as a String.
 /// The properties are used throughout the parsing process implemented below.
-pub struct ExpressionParser {
+pub struct ExpressionParser<'a> {
 	pub expression: Expression,
 
 	pub position: ExpressionParserPosition,
 
 	pub expr_str: String,
-	pub expr_chars: Vec<char>,
 
 	pub parts: Vec<ExpressionPiece>,
-	pub end_data: ExpressionEnder,
+	pub end_data: ExpressionEnd,
 
-	pub config_data: ConfigData
+	pub config_data: &'a ConfigData
 }
 
 /// Tracks the positional information of the parser.
 pub struct ExpressionParserPosition {
-	line_offset: i32,
-	line_start: i32,
-	index: i32,
-	start_position: Position
+	pub line_offset: usize,
+	pub line_start: usize,
+	pub index: usize,
+	pub start_position: Position
 }
 
 /// Stores important data to be retrieved after the parser ends.
-pub struct ExpressionEnder {
-	until_chars: Vec<char>,
-	end_index: i32,
-	end_char: char
+pub struct ExpressionEnd {
+	pub until_chars: Vec<char>,
+	pub end_index: usize,
+	pub reason: ExpressionEndReason
+}
+
+/// Stores important data to be retrieved after the parser ends.
+#[derive(PartialEq)]
+pub enum ExpressionEndReason {
+	Unknown,
+	ReachedChar(char),
+	EndOfContent,
+	EndOfExpression,
+	NoValueError
 }
 
 /// Represents the different states of the parser.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 enum ParseState {
 	Prefix,
 	Value,
@@ -68,29 +79,27 @@ impl Expression {
 	}
 }
 
-impl ExpressionParser {
-	pub fn new(expr_str: &str, start_position: Position, config_data: ConfigData, end_chars: Option<Vec<char>>) -> ExpressionParser {
+impl<'a> ExpressionParser<'a> {
+	pub fn new(parser: &mut Parser, start_position: Position, config_data: &'a ConfigData, end_chars: Option<Vec<char>>) -> ExpressionParser<'a> {
 		let mut result = ExpressionParser {
-			expr_str: expr_str.to_string(),
-			expr_chars: expr_str.chars().collect(),
+			expr_str: parser.content.to_string(),
 			position: ExpressionParserPosition {
 				line_offset: 0,
 				line_start: 0,
-				index: 0,
+				index: start_position.start,
 				start_position: start_position
 			},
 			expression: Expression::Invalid,
 			parts: Vec::new(),
 			config_data: config_data,
-			end_data: ExpressionEnder {
+			end_data: ExpressionEnd {
 				until_chars: end_chars.unwrap_or(Vec::new()),
 				end_index: 0,
-				end_char: ' '
+				reason: ExpressionEndReason::Unknown
 			}
 		};
-		result.parse_expr_str();
+		result.parse_expr_str(parser);
 		ExpressionPiece::parse_expr_parts(&mut result);
-		//result.parse_expr_parts();
 		return result;
 	}
 
@@ -98,179 +107,186 @@ impl ExpressionParser {
 		return &self.config_data.operators[op_type][index];
 	}
 
-	fn parse_expr_str(&mut self) {
-		let parse_end_id = ParseState::End as i32;
+	fn parse_expr_str(&mut self, parser: &mut Parser) {
 		let mut state = ParseState::Prefix;
-		let mut stale_index = 0;
-		let mut stale_index_count = 0;
 		loop {
-			if !self.index_within_bounds() {
-				self.end_data.end_index = self.position.index;
+			if !self.index_within_bounds(parser) {
 				break;
 			}
-			if self.check_for_end_char() {
+			if self.check_for_end_char(parser) {
 				break;
 			}
-			let old_state_id = state.clone() as i32;
-			self.parse(&mut state);
-			let state_id = state as i32;
-			if state_id == parse_end_id {
+			self.parse(&mut state, parser);
+			if state == ParseState::End {
 				break;
-			}
-			if old_state_id != state_id {
-				if stale_index != self.position.index {
-					stale_index = self.position.index;
-				} else {
-					stale_index_count += 1;
-				}
-			}
-			if stale_index_count > 20 {
-				panic!(format!("Unable to parse {} at position {}!", self.expr_str, self.position.index));
 			}
 		}
 	}
 
-	fn check_for_end_char(&mut self) -> bool {
-		self.position.index += self.parse_next_whitespace();
-		let curr_char = self.expr_chars[self.position.index.to_usize().unwrap()];
+	fn check_for_end_char(&mut self, parser: &mut Parser) -> bool {
+		parser.index += self.parse_next_whitespace(parser);
+		let curr_char = parser.get_curr();
 		if self.end_data.until_chars.contains(&curr_char) {
-			self.end_data.end_index = self.position.index;
-			self.end_data.end_char = curr_char;
+			self.end_data.end_index = parser.index;
+			self.set_end_reason(ExpressionEndReason::ReachedChar(curr_char));
 			return true;
 		}
 		return false;
 	}
 
-	fn parse(&mut self, state: &mut ParseState) {
+	fn set_end_reason(&mut self, reason: ExpressionEndReason) -> bool {
+		if self.end_data.reason == ExpressionEndReason::Unknown {
+			self.end_data.reason = reason;
+			return true;
+		}
+		return false;
+	}
+
+	fn parse(&mut self, state: &mut ParseState, parser: &mut Parser) {
 		match state {
 			ParseState::Prefix => {
-				if !self.parse_next_prefix_operator() {
+				if !self.parse_next_prefix_operator(parser) {
 					*state = ParseState::Value;
 				}
 			},
 			ParseState::Value => {
-				if !self.parse_value() {
-					panic!(format!("Could not parse value at position {}!", self.position.index));
+				if !self.parse_value(parser) {
+					self.set_end_reason(ExpressionEndReason::NoValueError);
+					*state = ParseState::End;
 				} else {
 					*state = ParseState::Suffix;
 				}
 			},
 			ParseState::Suffix => {
-				if !self.parse_next_suffix_operator() {
+				if !self.parse_next_suffix_operator(parser) {
 					*state = ParseState::Infix;
 				}
 			},
 			ParseState::Infix => {
-				if !self.parse_next_infix_operator() {
+				println!("INFIX: {} {}", parser.get_curr(), parser.chars[parser.index + 1]);
+				if self.parse_next_infix_operator(parser) {
 					*state = ParseState::Prefix;
+				} else {
+					self.set_end_reason(ExpressionEndReason::EndOfExpression);
+					*state = ParseState::End;
 				}
 			}
 			ParseState::End => {}
 		}
 	}
 
-	fn generate_pos(&self, start: i32, end: i32) -> Position {
+	fn generate_pos(&self, start: usize, end: Option<usize>) -> Position {
 		let pos_start = {
 			if self.position.line_offset == 0 {
-				start.to_usize().unwrap() + self.position.start_position.start
+				start + self.position.start_position.start
 			} else {
-				(start - self.position.line_start).to_usize().unwrap()
+				start - self.position.line_start
 			}
 		};
 		let pos_end = {
-			if end == -1 {
+			if end.is_none() {
 				None
 			} else if self.position.line_offset == 0 {
-				Some(end.to_usize().unwrap() + self.position.start_position.start)
+				Some(end.unwrap() + self.position.start_position.start)
 			} else {
-				Some((end - self.position.line_start).to_usize().unwrap())
+				Some(end.unwrap() - self.position.line_start)
 			}
 		};
 		return Position::new(
 			self.position.start_position.file.clone(),
-			Some(self.position.start_position.line.unwrap_or(1) + self.position.line_offset.to_usize().unwrap()),
-			pos_start.to_usize().unwrap(),
+			Some(self.position.start_position.line.unwrap_or(1) + self.position.line_offset),
+			pos_start,
 			pos_end
 		);
 	}
 
-	fn add_prefix_op(&mut self, op: usize, start: i32, end: i32) {
-		self.parts.push(ExpressionPiece::Prefix(op, self.generate_pos(start, end)));
+	fn add_prefix_op(&mut self, op: usize, start: usize, end: usize) {
+		self.parts.push(ExpressionPiece::Prefix(op, self.generate_pos(start, Some(end))));
 	}
 
-	fn add_value(&mut self, val: String, start: i32, end: i32) {
-		self.parts.push(ExpressionPiece::Value(val, self.generate_pos(start, end)));
+	fn add_value(&mut self, val: String, start: usize, end: usize) {
+		println!("Added value: {}", val);
+		self.parts.push(ExpressionPiece::Value(val, self.generate_pos(start, Some(end))));
 	}
 
-	fn add_suffix_op(&mut self, op: usize, start: i32, end: i32) {
-		self.parts.push(ExpressionPiece::Suffix(op, self.generate_pos(start, end)));
+	fn add_suffix_op(&mut self, op: usize, start: usize, end: usize) {
+		self.parts.push(ExpressionPiece::Suffix(op, self.generate_pos(start, Some(end))));
 	}
 
-	fn add_infix_op(&mut self, op: usize, start: i32, end: i32) {
-		self.parts.push(ExpressionPiece::Infix(op, self.generate_pos(start, end)));
+	fn add_infix_op(&mut self, op: usize, start: usize, end: usize) {
+		println!("Added infix: {}", op);
+		self.parts.push(ExpressionPiece::Infix(op, self.generate_pos(start, Some(end))));
 	}
 
-	fn add_encapsulated_values(&mut self, expressions: Vec<Expression>, start: i32, end: i32) {
-		self.parts.push(ExpressionPiece::EncapsulatedValues(Rc::new(expressions), self.generate_pos(start, end)));
+	fn add_encapsulated_values(&mut self, expressions: Vec<Expression>, start: usize, end: usize) {
+		self.parts.push(ExpressionPiece::EncapsulatedValues(Rc::new(expressions), self.generate_pos(start, Some(end))));
 	}
 
-	fn add_function_params(&mut self, expressions: Vec<Expression>, start: i32, end: i32) {
-		self.parts.push(ExpressionPiece::FunctionParameters(Rc::new(expressions), self.generate_pos(start, end)));
+	fn add_function_params(&mut self, expressions: Vec<Expression>, start: usize, end: usize) {
+		self.parts.push(ExpressionPiece::FunctionParameters(Rc::new(expressions), self.generate_pos(start, Some(end))));
 	}
 
-	fn add_array_access_params(&mut self, expressions: Vec<Expression>, start: i32, end: i32) {
-		self.parts.push(ExpressionPiece::ArrayAccessParameters(Rc::new(expressions), self.generate_pos(start, end)));
+	fn add_array_access_params(&mut self, expressions: Vec<Expression>, start: usize, end: usize) {
+		self.parts.push(ExpressionPiece::ArrayAccessParameters(Rc::new(expressions), self.generate_pos(start, Some(end))));
 	}
 
-	fn add_ternary_internals(&mut self, expressions: Vec<Expression>, start: i32, end: i32) {
-		self.parts.push(ExpressionPiece::TernaryCondition(Rc::new(expressions), self.generate_pos(start, end)));
-	}
-/*
-	fn add_expressions(&mut self, op: String, expr: Vec<Expression>) {
-		//self.expression.components.push(ExpressionComponents::Test2(op, expr));
-	}
-*/
-
-	fn str_len(&self) -> i32 {
-		return self.expr_str.len().try_into().unwrap();
+	fn add_ternary_internals(&mut self, expressions: Vec<Expression>, start: usize, end: usize) {
+		self.parts.push(ExpressionPiece::TernaryCondition(Rc::new(expressions), self.generate_pos(start, Some(end))));
 	}
 
-	fn index_within_bounds(&self) -> bool {
-		if self.position.index >= self.str_len() {
+	fn str_len(&self) -> usize {
+		return self.expr_str.len();
+	}
+
+	fn index_within_bounds(&mut self, parser: &mut Parser) -> bool {
+		if parser.index >= self.str_len() {
+			self.end_data.end_index = parser.index;
+			self.set_end_reason(ExpressionEndReason::EndOfContent);
 			return false;
 		}
 		return true;
 	}
 
-	fn parse_next_whitespace(&mut self) -> i32 {
+	fn parse_next_whitespace(&mut self, parser: &mut Parser) -> usize {
 		let mut space_offset = 0;
-		let mut next_char = self.expr_chars[(self.position.index + space_offset).to_usize().unwrap()];
-		while next_char == ' ' || next_char == '\t' || next_char == '\n' {
-			space_offset += 1;
-			if next_char == '\n' {
-				self.position.line_offset += 1;
-			}
-			next_char = self.expr_chars[(self.position.index + space_offset).to_usize().unwrap()];
+		if parser.index >= parser.chars.len() {
+			return 0;
 		}
+		let old_index = parser.index;
+		let old_line = parser.line;
+		parser.parse_whitespace();
+
+		space_offset = parser.index - old_index;
+		self.position.line_offset += parser.line - old_line;
+
+		parser.line = old_line;
+		parser.index = old_index;
 		return space_offset;
 	}
 
-	fn parse_value(&mut self) -> bool {
-		if !self.index_within_bounds() { return false; }
-		let space_offset = self.parse_next_whitespace();
-		let value_start = self.position.index + space_offset;
+	fn parse_value(&mut self, parser: &mut Parser) -> bool {
+		if !self.index_within_bounds(parser) { return false; }
+		let space_offset = self.parse_next_whitespace(parser);
+		let value_start = parser.index + space_offset;
+		parser.index = value_start;
 		let mut offset = 0;
-		let first_char = self.expr_chars[(value_start).to_usize().unwrap()];
+		let first_char = parser.chars[value_start];
 		if first_char == '(' {
-			self.position.index += space_offset + 1;
-			return self.parse_internal_expressions(')', true);
+			parser.index += space_offset + 1;
+			return self.parse_internal_expressions(')', true, parser);
 		} else {
 			loop {
 				let mut finish = false;
 				if value_start + offset >= self.str_len() {
 					finish = true;
+				} else if parser.check_for_string() {
+					let old_index = parser.index;
+					parser.parse_string();
+					offset = parser.index - old_index + 1;
+					parser.index = old_index;
+					finish = true;
 				} else {
-					let cc = self.expr_chars[(value_start + offset).to_usize().unwrap()];
+					let cc = parser.chars[value_start + offset];
 					if !cc.is_alphanumeric() {
 						finish = true;
 					}
@@ -281,7 +297,7 @@ impl ExpressionParser {
 						break;
 					}
 					self.add_value(substr, value_start, value_start + offset);
-					self.position.index += offset;
+					parser.index += offset;
 					return true;
 				}
 				offset += 1;
@@ -290,16 +306,15 @@ impl ExpressionParser {
 		return false;
 	}
 
-	fn gen_substr(&self, left: i32, right: i32) -> String {
-		return self.expr_str.as_str()[(left.to_usize().unwrap()..right.to_usize().unwrap())].to_string();
+	fn gen_substr(&self, left: usize, right: usize) -> String {
+		return self.expr_str.as_str()[(left..right)].to_string();
 	}
 
-	fn parse_next_operator(&mut self, op_type: &str) -> bool {
-		if !self.index_within_bounds() { return false; }
-		let space_offset = self.parse_next_whitespace();
-		let operator_start = self.position.index + space_offset;
+	fn parse_next_operator(&mut self, op_type: &str, parser: &mut Parser) -> bool {
+		if !self.index_within_bounds(parser) { return false; }
+		let space_offset = self.parse_next_whitespace(parser);
+		let operator_start = parser.index + space_offset;
 		let mut offset = 0;
-		//let mut possible_operators: Vec<String>;
 		let mut possible_operators: Vec<usize>;
 		loop {
 			let substr = self.gen_substr(operator_start, operator_start + offset);
@@ -333,18 +348,18 @@ impl ExpressionParser {
 				"infix" => self.add_infix_op(op, operator_start, operator_start + offset),
 				_ => {}
 			}
-			self.position.index += offset + space_offset;
+			parser.index += offset + space_offset;
 			return true;
 		}
 		return false;
 	}
 
-	fn parse_next_prefix_operator(&mut self) -> bool {
-		return self.parse_next_operator("prefix");
+	fn parse_next_prefix_operator(&mut self, parser: &mut Parser) -> bool {
+		return self.parse_next_operator("prefix", parser);
 	}
 
-	fn parse_next_infix_operator(&mut self) -> bool {
-		return self.parse_next_operator("infix");
+	fn parse_next_infix_operator(&mut self, parser: &mut Parser) -> bool {
+		return self.parse_next_operator("infix", parser);
 	}
 
 	fn is_group_char(&self, c: char) -> bool {
@@ -359,59 +374,62 @@ impl ExpressionParser {
 		}
 	}
 
-	fn parse_next_suffix_operator(&mut self) -> bool {
-		let space_offset = self.parse_next_whitespace();
-		let start_char = self.expr_chars[(self.position.index + space_offset).to_usize().unwrap()];
+	fn parse_next_suffix_operator(&mut self, parser: &mut Parser) -> bool {
+		let space_offset = self.parse_next_whitespace(parser);
+		let start_char = parser.chars[parser.index + space_offset];
 		if self.is_group_char(start_char) {
-			self.position.index += space_offset + 1;
-			return self.parse_suffix_internal_expressions(start_char);
+			parser.index += space_offset + 1;
+			return self.parse_suffix_internal_expressions(start_char, parser);
 		}
-		return self.parse_next_operator("suffix");
+		return self.parse_next_operator("suffix", parser);
 	}
 
-	fn parse_suffix_internal_expressions(&mut self, start_char: char) -> bool {
+	fn parse_suffix_internal_expressions(&mut self, start_char: char, parser: &mut Parser) -> bool {
 		let end_char = self.get_end_char(start_char);
 		let full_operator = format!("{}{}", start_char, end_char);
-		let space_offset = self.parse_next_whitespace();
-		let real_second_char = self.expr_chars[(self.position.index + space_offset).to_usize().unwrap()];
+		let space_offset = self.parse_next_whitespace(parser);
+		let real_second_char = parser.chars[parser.index + space_offset];
 		if real_second_char == end_char {
 			let empty = Vec::new();
 			match end_char {
-				')' => self.add_function_params(empty, self.position.index, self.position.index + space_offset),
-				']' => self.add_array_access_params(empty, self.position.index, self.position.index + space_offset),
+				')' => self.add_function_params(empty, parser.index, parser.index + space_offset),
+				']' => self.add_array_access_params(empty, parser.index, parser.index + space_offset),
 				_ => {}
 			}
-			self.position.index += space_offset + 1;
+			parser.index += space_offset + 1;
 		} else {
-			return self.parse_internal_expressions(end_char, false);
+			return self.parse_internal_expressions(end_char, false, parser);
 		}
 		return false;
 	}
 
-	fn parse_internal_expressions(&mut self, end_char: char, is_value: bool) -> bool {
+	fn parse_internal_expressions(&mut self, end_char: char, is_value: bool, parser: &mut Parser) -> bool {
 		let mut expressions = Vec::new();
-		let start_pos = self.position.index;
+		let start_pos = parser.index;
 		loop {
 			let chars = vec!(end_char, ',');
-			let config_data = std::mem::replace(&mut self.config_data, ConfigData::new());
-			let expr = &self.expr_str.as_str()[self.position.index.to_usize().unwrap()..];
-			let parser = ExpressionParser::new(expr, self.generate_pos(self.position.index, -1), config_data, Some(chars));
-			self.config_data = parser.config_data;
-			expressions.push(parser.expression);
-			self.position.index += parser.end_data.end_index + 1;
-			if parser.end_data.end_char == end_char {
+			if self.index_within_bounds(parser) {
+				let expr_parser = ExpressionParser::new(parser, self.generate_pos(parser.index, None), self.config_data, Some(chars));
+				expressions.push(expr_parser.expression);
+				parser.index += expr_parser.end_data.end_index + 1;
+				if let ExpressionEndReason::ReachedChar(c) = expr_parser.end_data.reason {
+					if end_char == c {
+						break;
+					}
+				}
+			} else {
 				break;
 			}
 		}
 		match end_char {
 			')' => {
 				if is_value {
-					self.add_encapsulated_values(expressions, start_pos, self.position.index);
+					self.add_encapsulated_values(expressions, start_pos, parser.index);
 				} else {
-					self.add_function_params(expressions, start_pos, self.position.index);
+					self.add_function_params(expressions, start_pos, parser.index);
 				}
 			},
-			']' => self.add_array_access_params(expressions, start_pos, self.position.index),
+			']' => self.add_array_access_params(expressions, start_pos, parser.index),
 			_ => {}
 		}
 		return true;

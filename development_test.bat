@@ -1,0 +1,1 @@
+cargo run -- --src:examples/hello_world

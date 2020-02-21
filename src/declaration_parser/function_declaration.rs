@@ -226,11 +226,8 @@ impl FunctionDeclaration {
 			FunctionDeclarationType::ModuleLevel | FunctionDeclarationType::ClassLevel => {
 				let mut next_char = ' ';
 				declare_parse_required_next_char!('{', next_char, parser);
-				println!("CURR: {}", parser.get_curr());
 				start_index = Some(parser.index);
-				println!("I AM HERE : {} ", parser.index);
 				declare_parse_expr_until_next_char!('}', parser);
-				println!("NOW I AM HERE");
 				end_index = Some(parser.index);
 			},
 			FunctionDeclarationType::Assumption => {

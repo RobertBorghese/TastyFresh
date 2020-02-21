@@ -44,12 +44,12 @@ mod module_component;
 #[macro_use]
 extern crate lazy_static;
 
-use expression::expression_parser::ExpressionParser;
+use expression::expression_parser::{ ExpressionParser, ExpressionEndReason };
 
 use context_management::position::Position;
 
 use declaration_parser::parser::Parser;
-use declaration_parser::module_declaration::ModuleDeclaration;
+use declaration_parser::module_declaration::{ ModuleDeclaration, DeclarationType };
 use declaration_parser::attribute_declaration::AttributeDeclaration;
 use declaration_parser::include_declaration::IncludeDeclaration;
 use declaration_parser::import_declaration::ImportDeclaration;
@@ -210,6 +210,21 @@ fn transpile_source_file(file: &str, output_dirs: &Vec<String>, config_data: &Co
 	let content = std::fs::read_to_string(file).expect("Could not read source file.");
 	let mut parser = Parser::new(content.as_str());
 	let module_declaration = ModuleDeclaration::new(&mut parser, file);
+	for declaration in module_declaration.declarations {
+		match declaration {
+			DeclarationType::Function(d) => {
+				if d.start_index.is_some() && d.end_index.is_some() {
+					parser.reset(d.line, d.start_index.unwrap());
+					parser.parse_whitespace();
+					let reason = parser.parse_expression(file.to_string(), config_data);
+				}
+			},
+			DeclarationType::Variable(d) => {
+			},
+			_ => {
+			}
+		}
+	}
 	return true;
 }
 
@@ -235,15 +250,21 @@ fn main() {
 		}
 	}
 
-	return;
 
 	//let mut ender = ExpressionEnder { until_chars: Vec::new(), end_index: 0, end_char: ' ' };
 	//let test = Expression::new("++!&&a(!~dfjks.jfdk[32.help],12,ew)()+sd", &operators_data, &mut ender);
-	ExpressionParser::new("++&&&a++++ -  b", Position::new("test.tasty".to_string(), Some(1), 0, None), data, None);
+	let temp_expr_content = "(++&&&a++++ - a";
+	let mut parser = Parser::new(temp_expr_content);
+	let bla = ExpressionParser::new(&mut parser, Position::new("test.tasty".to_string(), Some(1), 0, None), &data, None);
+	println!("{}", match bla.end_data.reason {
+		ExpressionEndReason::EndOfExpression => "enx od epxression",
+		_ => "other"
+	});
 	//"++!&&a(!~dfjks.jfdk[32.help],12,ew)()+sd"
 	//" + ++ !& ^^^& (!~dfjks.  jfdk[32.help]  ,  12, ew) () + sd"
 	//println!("{:?}", test.components);
 
+	return;
 	//content: &str, index: &mut usize, position: Position, line_offset: &mut usize
 
 	//let files = list_all_files(".".to_string(), "tasty".to_string());
