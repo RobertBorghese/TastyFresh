@@ -36,6 +36,7 @@ mod config_management;
 mod context_management;
 mod declaration_parser;
 mod expression;
+mod scope_parser;
 
 mod file_system;
 mod module;
@@ -54,6 +55,10 @@ use declaration_parser::attribute_declaration::AttributeDeclaration;
 use declaration_parser::include_declaration::IncludeDeclaration;
 use declaration_parser::import_declaration::ImportDeclaration;
 use declaration_parser::function_declaration::{ FunctionDeclaration, FunctionDeclarationType };
+
+use declaration_parser::variable_declaration::VariableDeclaration;
+
+use scope_parser::return_parser::ReturnParser;
 
 use config_management::ConfigData;
 
@@ -214,9 +219,48 @@ fn transpile_source_file(file: &str, output_dirs: &Vec<String>, config_data: &Co
 		match declaration {
 			DeclarationType::Function(d) => {
 				if d.start_index.is_some() && d.end_index.is_some() {
-					parser.reset(d.line, d.start_index.unwrap());
-					parser.parse_whitespace();
-					let reason = parser.parse_expression(file.to_string(), config_data);
+					parser.reset(d.start_index.unwrap(), d.line);
+
+					loop {
+						parser.parse_whitespace();
+						if parser.out_of_space {
+							break;
+						}
+						if ReturnParser::is_declaration(&parser) {
+							let mut result = ReturnParser::new(&mut parser, file.to_string(), config_data);
+							if result.is_error() {
+								result.print_error(file.to_string(), Some(parser.content));
+								break;
+							} else {
+								println!("Parsed return statement!");
+								println!("Return Expression: {}", result.unwrap_and_move().expression.to_string(&config_data.operators));
+							}
+						} else if VariableDeclaration::is_declaration(&mut parser) {
+							let mut result = VariableDeclaration::new(&mut parser);
+							if result.is_error() {
+								result.print_error(file.to_string(), Some(parser.content));
+								break;
+							} else {
+								let var_declare = result.unwrap_and_move();
+								println!("Parsed varibable initializeation! {}", &parser.content[var_declare.start_index..var_declare.end_index]);
+							}
+						} else {
+							println!("POS: {}", parser.index);
+							let mut reason = ExpressionEndReason::Unknown;
+							let expr = parser.parse_expression(file.to_string(), config_data, &mut reason);
+							if reason != ExpressionEndReason::EndOfExpression {
+								break;
+							} else {
+								println!("POS 2: {}", parser.index);
+								parser.parse_whitespace();
+								println!("POS 3: {}", parser.index);
+								println!("Parsed random expression! at charL {}", parser.get_curr());
+								if parser.get_curr() == ';' {
+									parser.increment();
+								}
+							}
+						}
+					}
 				}
 			},
 			DeclarationType::Variable(d) => {
@@ -227,6 +271,14 @@ fn transpile_source_file(file: &str, output_dirs: &Vec<String>, config_data: &Co
 	}
 	return true;
 }
+/*if <$DeclarationClass>::is_declaration($parser) {
+			let mut result = <$DeclarationClass>::new($parser);
+			if result.is_error() {
+				result.print_error($file_name.to_string(), Some($parser.content));
+			} else {
+				$declarations.push(DeclarationType::$DeclarationType(result.unwrap_and_move()));
+			}
+		}*/
 
 /// The main function of Tasty Fresh.
 fn main() {
@@ -253,13 +305,17 @@ fn main() {
 
 	//let mut ender = ExpressionEnder { until_chars: Vec::new(), end_index: 0, end_char: ' ' };
 	//let test = Expression::new("++!&&a(!~dfjks.jfdk[32.help],12,ew)()+sd", &operators_data, &mut ender);
-	let temp_expr_content = "(++&&&a++++ - a";
+
+	/*
+	let temp_expr_content = "(++&&&a++++ - a);";
 	let mut parser = Parser::new(temp_expr_content);
 	let bla = ExpressionParser::new(&mut parser, Position::new("test.tasty".to_string(), Some(1), 0, None), &data, None);
 	println!("{}", match bla.end_data.reason {
 		ExpressionEndReason::EndOfExpression => "enx od epxression",
 		_ => "other"
 	});
+	*/
+
 	//"++!&&a(!~dfjks.jfdk[32.help],12,ew)()+sd"
 	//" + ++ !& ^^^& (!~dfjks.  jfdk[32.help]  ,  12, ew) () + sd"
 	//println!("{:?}", test.components);

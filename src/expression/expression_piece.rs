@@ -20,15 +20,21 @@ pub enum ExpressionPiece {
 	Value(String, Position),
 	Suffix(usize, Position),
 	Infix(usize, Position),
-	EncapsulatedValues(Rc<Vec<Expression>>, Position),
-	FunctionParameters(Rc<Vec<Expression>>, Position),
-	ArrayAccessParameters(Rc<Vec<Expression>>, Position),
-	TernaryCondition(Rc<Vec<Expression>>, Position)
+	EncapsulatedValues(Rc<Vec<Rc<Expression>>>, Position),
+	FunctionParameters(Rc<Vec<Rc<Expression>>>, Position),
+	ArrayAccessParameters(Rc<Vec<Rc<Expression>>>, Position),
+	TernaryCondition(Rc<Vec<Rc<Expression>>>, Position)
 }
 
 impl ExpressionPiece {
-	pub fn parse_expr_parts(parser: &mut ExpressionParser) {
+	pub fn parse_expr_parts(parser: &mut ExpressionParser) -> Rc<Expression> {
 		let mut error = false;
+		if parser.parts.len() == 1 {
+			match Self::get_expression_from_piece(&parser.parts[0]) {
+				Some(expr) => parser.parts[0] = ExpressionPiece::Expression(expr),
+				None => return Rc::new(Expression::Invalid) // TODO: error
+			}
+		}
 		while parser.parts.len() > 1 {
 			let next_op_index = Self::get_next_operator(parser);
 			if next_op_index.is_some() && next_op_index.unwrap() < parser.parts.len() {
@@ -80,9 +86,10 @@ impl ExpressionPiece {
 
 		if !error {
 			if parser.parts.len() > 0 {
-				match &parser.parts[0] {
+				match parser.parts.remove(0) {
 					ExpressionPiece::Expression(expr) => {
 						println!("Expression: {}", expr.to_string(&parser.config_data.operators));
+						return expr;
 					}
 					_ => ()
 				}
@@ -90,6 +97,7 @@ impl ExpressionPiece {
 				println!("COULD NOT PRINT EXPR!! ");
 			}
 		}
+		return Rc::new(Expression::Invalid);
 	}
 
 	fn parse_prefix(parser: &ExpressionParser, part_index: &usize, operator_id: &usize) -> Option<ExpressionPiece> {

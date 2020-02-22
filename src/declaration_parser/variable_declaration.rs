@@ -120,7 +120,7 @@ impl VariableDeclaration {
 		});
 	}
 
-	pub fn is_declaration(parser: &mut Parser) -> bool {
+	pub fn is_declaration(parser: &Parser) -> bool {
 		return Self::is_var_declaration(parser.content, parser.index);
 	}
 

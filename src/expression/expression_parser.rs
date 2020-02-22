@@ -26,7 +26,7 @@ use std::rc::Rc;
 /// Parses an expression represented as a String.
 /// The properties are used throughout the parsing process implemented below.
 pub struct ExpressionParser<'a> {
-	pub expression: Expression,
+	pub expression: Rc<Expression>,
 
 	pub position: ExpressionParserPosition,
 
@@ -89,7 +89,7 @@ impl<'a> ExpressionParser<'a> {
 				index: start_position.start,
 				start_position: start_position
 			},
-			expression: Expression::Invalid,
+			expression: Rc::new(Expression::Invalid),
 			parts: Vec::new(),
 			config_data: config_data,
 			end_data: ExpressionEnd {
@@ -99,7 +99,7 @@ impl<'a> ExpressionParser<'a> {
 			}
 		};
 		result.parse_expr_str(parser);
-		ExpressionPiece::parse_expr_parts(&mut result);
+		result.expression = ExpressionPiece::parse_expr_parts(&mut result);
 		return result;
 	}
 
@@ -163,7 +163,6 @@ impl<'a> ExpressionParser<'a> {
 				}
 			},
 			ParseState::Infix => {
-				println!("INFIX: {} {}", parser.get_curr(), parser.chars[parser.index + 1]);
 				if self.parse_next_infix_operator(parser) {
 					*state = ParseState::Prefix;
 				} else {
@@ -201,6 +200,7 @@ impl<'a> ExpressionParser<'a> {
 	}
 
 	fn add_prefix_op(&mut self, op: usize, start: usize, end: usize) {
+		println!("Added prefix: {}", op);
 		self.parts.push(ExpressionPiece::Prefix(op, self.generate_pos(start, Some(end))));
 	}
 
@@ -210,6 +210,7 @@ impl<'a> ExpressionParser<'a> {
 	}
 
 	fn add_suffix_op(&mut self, op: usize, start: usize, end: usize) {
+		println!("Added suffix: {}", op);
 		self.parts.push(ExpressionPiece::Suffix(op, self.generate_pos(start, Some(end))));
 	}
 
@@ -218,19 +219,19 @@ impl<'a> ExpressionParser<'a> {
 		self.parts.push(ExpressionPiece::Infix(op, self.generate_pos(start, Some(end))));
 	}
 
-	fn add_encapsulated_values(&mut self, expressions: Vec<Expression>, start: usize, end: usize) {
+	fn add_encapsulated_values(&mut self, expressions: Vec<Rc<Expression>>, start: usize, end: usize) {
 		self.parts.push(ExpressionPiece::EncapsulatedValues(Rc::new(expressions), self.generate_pos(start, Some(end))));
 	}
 
-	fn add_function_params(&mut self, expressions: Vec<Expression>, start: usize, end: usize) {
+	fn add_function_params(&mut self, expressions: Vec<Rc<Expression>>, start: usize, end: usize) {
 		self.parts.push(ExpressionPiece::FunctionParameters(Rc::new(expressions), self.generate_pos(start, Some(end))));
 	}
 
-	fn add_array_access_params(&mut self, expressions: Vec<Expression>, start: usize, end: usize) {
+	fn add_array_access_params(&mut self, expressions: Vec<Rc<Expression>>, start: usize, end: usize) {
 		self.parts.push(ExpressionPiece::ArrayAccessParameters(Rc::new(expressions), self.generate_pos(start, Some(end))));
 	}
 
-	fn add_ternary_internals(&mut self, expressions: Vec<Expression>, start: usize, end: usize) {
+	fn add_ternary_internals(&mut self, expressions: Vec<Rc<Expression>>, start: usize, end: usize) {
 		self.parts.push(ExpressionPiece::TernaryCondition(Rc::new(expressions), self.generate_pos(start, Some(end))));
 	}
 

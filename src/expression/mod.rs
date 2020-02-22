@@ -27,9 +27,9 @@ pub enum Expression {
 	Suffix(Rc<Expression>, usize, ValueType),
 	Infix(Rc<Expression>, Rc<Expression>, usize, ValueType),
 	Ternary(Rc<Expression>, Rc<Expression>, Rc<Expression>, usize, ValueType),
-	Expressions(Rc<Vec<Expression>>, ValueType),
-	FunctionCall(Rc<Vec<Expression>>, ValueType),
-	ArrayAccess(Rc<Vec<Expression>>, ValueType)
+	Expressions(Rc<Vec<Rc<Expression>>>, ValueType),
+	FunctionCall(Rc<Vec<Rc<Expression>>>, ValueType),
+	ArrayAccess(Rc<Vec<Rc<Expression>>>, ValueType)
 }
 
 impl Expression {

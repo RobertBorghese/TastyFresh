@@ -5,6 +5,7 @@
  * parsing text.
  **********************************************************/
 
+use crate::expression::Expression;
 use crate::expression::variable_type::{ Type, VarStyle };
 use crate::expression::value_type::{ NumberType, StringType };
 use crate::expression::expression_parser::{ ExpressionParser, ExpressionEndReason };
@@ -12,6 +13,8 @@ use crate::expression::expression_parser::{ ExpressionParser, ExpressionEndReaso
 use crate::config_management::ConfigData;
 
 use crate::context_management::position::Position;
+
+use std::rc::Rc;
 
 /// Stores information about the parser.
 ///
@@ -429,11 +432,11 @@ impl<'a> Parser<'a> {
 	/// # Return
 	///
 	/// Returns the configuration data that's taken ownership of.
-	pub fn parse_expression(&mut self, file_name: String, config_data: &ConfigData) -> ExpressionEndReason {
+	pub fn parse_expression(&mut self, file_name: String, config_data: &ConfigData, reason: &mut ExpressionEndReason) -> Rc<Expression> {
 		let expr_parser = ExpressionParser::new(self, Position::new(file_name, Some(self.line), self.index, None), config_data, None);
-		self.index = expr_parser.position.index;
 		self.line += expr_parser.position.line_offset;
-		return expr_parser.end_data.reason;
+		*reason = expr_parser.end_data.reason;
+		return expr_parser.expression;
 	}
 
 	/// Parses the next content as a Tasty Fresh type.
