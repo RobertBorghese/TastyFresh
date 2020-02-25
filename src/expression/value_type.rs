@@ -17,7 +17,8 @@ pub enum ValueType {
 	StringLiteral(String, StringType)
 }
 */
-
+/*
+#[derive(Clone)]
 pub enum ValueType {
 	Unknown,
 	Null,
@@ -43,10 +44,11 @@ impl ValueType {
 			type_params: None,
 			properties: Vec::new(),
 			functions: Vec::new()
-		})
+		});
 	}
-}
+}*/
 
+#[derive(Clone)]
 pub enum NumberType {
 	Byte,
 	UByte,
@@ -60,7 +62,8 @@ pub enum NumberType {
 	ULongLong,  // ull
 	Float,      // f
 	Double,
-	LongDouble  // l
+	LongDouble, // l
+	UnknownNumber
 }
 
 impl NumberType {
@@ -78,11 +81,132 @@ impl NumberType {
 			NumberType::ULongLong => "unsigned long long",
 			NumberType::Float => "float",
 			NumberType::Double => "double",
-			NumberType::LongDouble => "long double"
+			NumberType::LongDouble => "long double",
+			NumberType::UnknownNumber => "int (unknown)"
 		}
+	}
+
+	pub fn from_value_text(value: &str) -> NumberType {
+		let mut offset = 0;
+		return Self::parse_value_for_type(value, false, &mut offset);
+	}
+
+	pub fn parse_value_for_type(value: &str, infinite: bool, offset: &mut usize) -> NumberType {
+		let mut unsigned = false;
+		let mut long = 0;
+		let mut float = false;
+		let mut dot = false;
+
+		let mut suffix = false;
+
+		let mut bits = false;
+		let mut hex = false;
+
+		let mut complete_number = true;
+		let mut real_number = true;
+
+		let mut index = -1;
+		let mut rindex = value.len() + 1;
+		for c in value.chars() {
+			*offset += 1;
+			index += 1;
+			rindex -= 1;
+
+			if index == 1 {
+				if c == 'b' {
+					bits = true;
+					continue;
+				} else if c == 'x' {
+					hex = true;
+					continue;
+				}
+			}
+			if c == '.' {
+				if !dot && !suffix {
+					dot = true;
+					continue;
+				} else {
+					if dot { complete_number = true; }
+					else { complete_number = false; }
+					real_number = false;
+					break;
+				}
+			}
+			if dot && c == 'f' {
+				float = true;
+				suffix = true;
+				if !infinite && rindex > 1 {
+					real_number = false;
+					break;
+				}
+				continue;
+			}
+			if c == 'l' {
+				long += 1;
+				suffix = true;
+				if long > 2 || (dot && long > 1) {
+					real_number = false;
+					break;
+				}
+				continue;
+			}
+			if c == 'u' {
+				if unsigned || dot {
+					real_number = false;
+					break;
+				}
+				unsigned = true;
+				suffix = true;
+				continue;
+			}
+			if suffix
+				|| (bits && hex)
+				|| (bits && !hex && c != '1' && c != '0')
+				|| (!bits && hex && !c.is_ascii_hexdigit())
+				|| (!bits && !hex && !c.is_ascii_digit())
+			{
+					real_number = false;
+					break;
+			}
+		}
+
+		if !real_number {
+			return NumberType::UnknownNumber;
+		}
+
+		return {
+			if long == 2 {
+				if unsigned {
+					NumberType::ULongLong
+				} else {
+					NumberType::LongLong
+				}
+			} else if long == 1 {
+				if dot {
+					NumberType::LongDouble
+				} else if unsigned {
+					NumberType::ULong
+				} else {
+					NumberType::Long
+				}
+			} else {
+				if dot {
+					if float {
+						NumberType::Float
+					} else {
+						NumberType::Double
+					}
+				} else if unsigned {
+					NumberType::UInt
+				} else {
+					NumberType::Int
+				}
+			}
+		};
 	}
 }
 
+#[derive(Clone)]
 pub enum StringType {
 	ConstCharArray,
 	MutlilineConstCharArray,
@@ -99,19 +223,22 @@ impl StringType {
 	}
 }
 
+#[derive(Clone)]
 pub struct ClassType {
 	pub name: String,
-	pub type_params: Option<Vec<ValueType>>,
+	pub type_params: Option<Vec<VariableType>>,
 	pub properties: Vec<Property>,
 	pub functions: Vec<Function>
 }
 
+#[derive(Clone)]
 pub struct Property {
 	pub name: String,
 	pub prop_type: VariableType,
 	pub default_value: Option<String>
 }
 
+#[derive(Clone)]
 pub struct Function {
 	pub name: String,
 	pub parameters: Vec<Property>,

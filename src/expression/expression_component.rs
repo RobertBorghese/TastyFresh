@@ -6,13 +6,13 @@
  **********************************************************/
 
 use crate::expression::Expression;
-use crate::expression::value_type::ValueType;
+use crate::expression::variable_type::VariableType;
 
 pub enum ExpressionComponent {
 	Test(String),
 	Test2(String, Vec<Expression>),
 	Expression(Expression),
-	Value(String, ValueType),
+	Value(String, VariableType),
 	PrefixOperator(String, Expression, i32),
 	SuffixOperator(String, Expression, i32),
 	InfixOperator(String, Expression, Expression, i32)

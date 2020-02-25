@@ -96,7 +96,7 @@ impl IncludeDeclaration {
 	}
 
 	pub fn is_declaration(parser: &mut Parser) -> bool {
-		return Self::is_include_declaration(parser.content, parser.index);
+		return Self::is_include_declaration(&parser.content, parser.index);
 	}
 
 	pub fn is_include_declaration(content: &str, index: usize) -> bool {

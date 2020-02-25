@@ -20,6 +20,8 @@ use crate::declaration_parser::declaration::{ Declaration, DeclarationResult };
 use crate::declaration_parser::parser::Parser;
 use crate::declaration_parser::cpp_transpiler::CPPTranspiler;
 
+use crate::context_management::typing_context::Context;
+
 use std::rc::Rc;
 
 type ReturnParserResult = DeclarationResult<ReturnParser>;
@@ -42,7 +44,7 @@ impl CPPTranspiler for ReturnParser {
 }
 
 impl ReturnParser {
-	pub fn new(parser: &mut Parser, file_name: String, config_data: &ConfigData) -> ReturnParserResult {
+	pub fn new(parser: &mut Parser, file_name: String, config_data: &ConfigData, context: &mut Context) -> ReturnParserResult {
 		let initial_line = parser.line;
 
 		let mut return_keyword = "".to_string();
@@ -60,7 +62,7 @@ impl ReturnParser {
 	}*/
 
 		let mut reason = ExpressionEndReason::Unknown;
-		let expression = parser.parse_expression(file_name, config_data, &mut reason);
+		let expression = parser.parse_expression(file_name, config_data, Some(context), &mut reason);
 
 		match reason {
 			ExpressionEndReason::Unknown => return ReturnParserResult::Err("Unknown Error", "unknown expression parsing error", parser.index - 1, parser.index),
@@ -105,7 +107,7 @@ impl ReturnParser {
 	}
 
 	pub fn is_declaration(parser: &Parser) -> bool {
-		return Self::is_return_declaration(parser.content, parser.index);
+		return Self::is_return_declaration(&parser.content, parser.index);
 	}
 
 	pub fn is_return_declaration(content: &str, index: usize) -> bool {

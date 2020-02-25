@@ -14,6 +14,8 @@ use crate::config_management::ConfigData;
 
 use crate::context_management::position::Position;
 
+use crate::context_management::typing_context::Context;
+
 use std::rc::Rc;
 
 /// Stores information about the parser.
@@ -25,19 +27,20 @@ use std::rc::Rc;
 /// * `index` - The index of the `char` the parser is currently parsing.
 /// * `line` - This is incremented whenever a new line character (`\n`) is encountered.
 /// * `out_of_space` - This is set to `true` if the parser hits the end of `chars`.
-pub struct Parser<'a> {
-	pub content: &'a str,
+pub struct Parser {
+	pub content: String,
 	pub chars: Vec<char>,
 	pub index: usize,
 	pub line: usize,
 	pub out_of_space: bool
 }
 
-impl<'a> Parser<'a> {
-	pub fn new(content: &'a str) -> Parser {
+impl Parser {
+	pub fn new(content: String) -> Parser {
+		let chars = (&content).chars().collect();
 		return Parser {
 			content: content,
-			chars: content.chars().collect(),
+			chars: chars,
 			index: 0,
 			line: 1,
 			out_of_space: false
@@ -289,6 +292,19 @@ impl<'a> Parser<'a> {
 		return true;
 	}
 
+	/// Checks if the immediate content is a valid `int`, `float`, `double`, or `long` literal.
+	///
+	/// # Return
+	///
+	/// Returns `true` if the content is a number literal; otherwise `false`.
+	pub fn check_for_number(&mut self, offset: &mut usize) -> bool {
+		if !self.get_curr().is_ascii_digit() {
+			return false;
+		}
+		NumberType::parse_value_for_type(&self.content[self.index..], true, offset);
+		return *offset > 0;
+	}
+
 	/// Checks if the immediate content is a valid `string` literal.
 	///
 	/// # Return
@@ -432,8 +448,8 @@ impl<'a> Parser<'a> {
 	/// # Return
 	///
 	/// Returns the configuration data that's taken ownership of.
-	pub fn parse_expression(&mut self, file_name: String, config_data: &ConfigData, reason: &mut ExpressionEndReason) -> Rc<Expression> {
-		let expr_parser = ExpressionParser::new(self, Position::new(file_name, Some(self.line), self.index, None), config_data, None);
+	pub fn parse_expression(&mut self, file_name: String, config_data: &ConfigData, context: Option<&mut Context>, reason: &mut ExpressionEndReason) -> Rc<Expression> {
+		let expr_parser = ExpressionParser::new(self, Position::new(file_name, Some(self.line), self.index, None), config_data, &context, None);
 		self.line += expr_parser.position.line_offset;
 		*reason = expr_parser.end_data.reason;
 		return expr_parser.expression;

@@ -17,6 +17,8 @@ use crate::{
 
 use crate::expression::variable_type::{ VariableType, Type, VarStyle, VarProps };
 
+use crate::expression::value_type::{ Function, Property };
+
 use crate::declaration_parser::declaration::{ Declaration, DeclarationResult };
 use crate::declaration_parser::parser::Parser;
 use crate::declaration_parser::cpp_transpiler::CPPTranspiler;
@@ -52,7 +54,7 @@ impl VariableDeclaration {
 
 		// Parse Variable Properties and Style
 		let mut name = "".to_string();
-		while Self::is_var_declaration(parser.content, parser.index) {
+		while Self::is_var_declaration(&parser.content, parser.index) {
 			name = "".to_string();
 			declare_parse_ascii!(name, parser);
 			if VarProps::properties().contains(&name.as_str()) {
@@ -112,7 +114,7 @@ impl VariableDeclaration {
 			var_type: VariableType {
 				var_type: var_type,
 				var_style: var_style,
-				var_properties: var_props
+				var_properties: Some(var_props)
 			},
 			line: initial_line,
 			start_index: start,
@@ -121,7 +123,7 @@ impl VariableDeclaration {
 	}
 
 	pub fn is_declaration(parser: &Parser) -> bool {
-		return Self::is_var_declaration(parser.content, parser.index);
+		return Self::is_var_declaration(&parser.content, parser.index);
 	}
 
 	pub fn is_var_declaration(content: &str, index: usize) -> bool {

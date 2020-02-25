@@ -58,11 +58,13 @@ use declaration_parser::function_declaration::{ FunctionDeclaration, FunctionDec
 
 use declaration_parser::variable_declaration::VariableDeclaration;
 
-use scope_parser::return_parser::ReturnParser;
+use scope_parser::ScopeExpression;
 
 use config_management::ConfigData;
 
 use file_system::get_all_tasty_files;
+
+use context_management::typing_context::Context;
 
 use std::env;
 use std::env::Args;
@@ -200,6 +202,39 @@ fn get_output_dirs(arguments: &BTreeMap<String,Vec<String>>) -> Option<Vec<Strin
 	return Some(output_dirs);
 }
 
+/// Parses the input source file into its declaration data.
+///
+/// # Arguments
+///
+/// * `file` - The relative or absolute path to the source file.
+/// * `output_dirs` - The list of output directories to write the C++ files to.
+/// * `config_data` - The configuration data for the transpiler.
+/// * `module_contexts` - A reference to store the file declarations within.
+///
+/// # Return
+///
+/// The `ModuleDeclaration` for the file is returned.
+fn parse_source_file(file: &str, output_dirs: &Vec<String>, config_data: &ConfigData, module_contexts: &mut BTreeMap<String,Context>, parser: &mut Parser) -> ModuleDeclaration {
+	let content = std::fs::read_to_string(file).expect("Could not read source file.");
+	*parser = Parser::new(content);
+	let mut context = Context::new(true);
+	let module_declaration = ModuleDeclaration::new(parser, file);
+	for declaration in &module_declaration.declarations {
+		match declaration {
+			DeclarationType::Function(d) => {
+				context.add_function(d.name.clone(), d.to_function(&parser.content));
+			},
+			DeclarationType::Variable(d) => {
+				context.add_variable(d.name.clone(), d.var_type.clone());
+			},
+			_ => {
+			}
+		}
+	}
+	module_contexts.insert(file.to_string(), context);
+	return module_declaration;
+}
+
 /// Transpiles the input source file into C++ and outputs it to the provided `output_dirs`.
 ///
 /// # Arguments
@@ -211,56 +246,19 @@ fn get_output_dirs(arguments: &BTreeMap<String,Vec<String>>) -> Option<Vec<Strin
 /// # Return
 ///
 /// If successful, `true` is returned; otherwise `false`.
-fn transpile_source_file(file: &str, output_dirs: &Vec<String>, config_data: &ConfigData) -> bool {
-	let content = std::fs::read_to_string(file).expect("Could not read source file.");
-	let mut parser = Parser::new(content.as_str());
-	let module_declaration = ModuleDeclaration::new(&mut parser, file);
-	for declaration in module_declaration.declarations {
+fn transpile_source_file(file: &str, output_dirs: &Vec<String>, config_data: &ConfigData, module_contexts: &BTreeMap<String,Context>, module_declaration: &ModuleDeclaration, parser: &mut Parser) -> bool {
+	let mut context = Context::new(false);
+	context.add(module_contexts.get(file).unwrap());
+	for declaration in &module_declaration.declarations {
 		match declaration {
+			DeclarationType::Import(d) => {
+				//let path = d.path;
+				context.add(module_contexts.get(&d.path).unwrap());
+			}
 			DeclarationType::Function(d) => {
 				if d.start_index.is_some() && d.end_index.is_some() {
-					parser.reset(d.start_index.unwrap(), d.line);
-
-					loop {
-						parser.parse_whitespace();
-						if parser.out_of_space {
-							break;
-						}
-						if ReturnParser::is_declaration(&parser) {
-							let mut result = ReturnParser::new(&mut parser, file.to_string(), config_data);
-							if result.is_error() {
-								result.print_error(file.to_string(), Some(parser.content));
-								break;
-							} else {
-								println!("Parsed return statement!");
-								println!("Return Expression: {}", result.unwrap_and_move().expression.to_string(&config_data.operators));
-							}
-						} else if VariableDeclaration::is_declaration(&mut parser) {
-							let mut result = VariableDeclaration::new(&mut parser);
-							if result.is_error() {
-								result.print_error(file.to_string(), Some(parser.content));
-								break;
-							} else {
-								let var_declare = result.unwrap_and_move();
-								println!("Parsed varibable initializeation! {}", &parser.content[var_declare.start_index..var_declare.end_index]);
-							}
-						} else {
-							println!("POS: {}", parser.index);
-							let mut reason = ExpressionEndReason::Unknown;
-							let expr = parser.parse_expression(file.to_string(), config_data, &mut reason);
-							if reason != ExpressionEndReason::EndOfExpression {
-								break;
-							} else {
-								println!("POS 2: {}", parser.index);
-								parser.parse_whitespace();
-								println!("POS 3: {}", parser.index);
-								println!("Parsed random expression! at charL {}", parser.get_curr());
-								if parser.get_curr() == ';' {
-									parser.increment();
-								}
-							}
-						}
-					}
+					let scope = ScopeExpression::new(parser, d.start_index.unwrap(), d.line, file, config_data, &mut context);
+					println!("C++ CODE: \n\n{}", scope.to_string(&config_data.operators));
 				}
 			},
 			DeclarationType::Variable(d) => {
@@ -271,14 +269,6 @@ fn transpile_source_file(file: &str, output_dirs: &Vec<String>, config_data: &Co
 	}
 	return true;
 }
-/*if <$DeclarationClass>::is_declaration($parser) {
-			let mut result = <$DeclarationClass>::new($parser);
-			if result.is_error() {
-				result.print_error($file_name.to_string(), Some($parser.content));
-			} else {
-				$declarations.push(DeclarationType::$DeclarationType(result.unwrap_and_move()));
-			}
-		}*/
 
 /// The main function of Tasty Fresh.
 fn main() {
@@ -296,12 +286,23 @@ fn main() {
 
 	let data = config_management::read_config_files();
 
-	for files in source_files {
+	let mut file_contexts = BTreeMap::new();
+	let mut file_declarations = BTreeMap::new();
+	let mut file_parsers = BTreeMap::new();
+
+	for files in &source_files {
 		for f in files.1 {
-			transpile_source_file(&f, &output_dirs, &data);
+			let mut parser: Parser = Parser::new("".to_string());
+			file_declarations.insert(f.clone(), parse_source_file(&f, &output_dirs, &data, &mut file_contexts, &mut parser));
+			file_parsers.insert(f, parser);
 		}
 	}
 
+	for files in &source_files {
+		for f in files.1 {
+			transpile_source_file(&f, &output_dirs, &data, &file_contexts, file_declarations.get_mut(f).unwrap(), file_parsers.get_mut(f).unwrap());
+		}
+	}
 
 	//let mut ender = ExpressionEnder { until_chars: Vec::new(), end_index: 0, end_char: ' ' };
 	//let test = Expression::new("++!&&a(!~dfjks.jfdk[32.help],12,ew)()+sd", &operators_data, &mut ender);
@@ -316,6 +317,8 @@ fn main() {
 	});
 	*/
 
+	println!("{}", expression::value_type::NumberType::from_value_text("31.2l").to_cpp());
+
 	//"++!&&a(!~dfjks.jfdk[32.help],12,ew)()+sd"
 	//" + ++ !& ^^^& (!~dfjks.  jfdk[32.help]  ,  12, ew) () + sd"
 	//println!("{:?}", test.components);
@@ -329,7 +332,7 @@ fn main() {
 
 	// VARIABLE INIT
 	let c = "const static copy a: int = 32;";
-	let mut parser = Parser::new(c);
+	let mut parser = Parser::new(c.to_string());
 	let result = crate::declaration_parser::variable_declaration::VariableDeclaration::new(&mut parser);
 	if result.is_error() {
 		result.print_error("tast2.tasty".to_string(), Some(c));
@@ -337,7 +340,7 @@ fn main() {
 	}
 	let rr = result.as_ref().unwrap();
 	println!("---- Initialize ----");
-	for a in &rr.var_type.var_properties { println!("{}", a.get_name()); }
+	for a in &rr.var_type.var_properties.unwrap_or(Vec::new()) { println!("{}", a.get_name()); }
 	println!("{}", rr.var_type.var_style.get_name());
 	println!("{}", rr.var_type.var_type.to_cpp());
 	println!("{}", rr.name);
@@ -345,7 +348,7 @@ fn main() {
 
 	// ATTRIBUTE
 	let attribute_content = " fdjs fdsjkldfs @Test(fds fdksleqw 21l dsfd, 999)";
-	let mut parser2 = Parser::new(attribute_content);
+	let mut parser2 = Parser::new(attribute_content.to_string());
 	parser2.index = 16;
 	let result2 = AttributeDeclaration::new(&mut parser2);
 	if result2.is_error() {
@@ -359,7 +362,7 @@ fn main() {
 
 	// INCLUDE
 	let include_content = "include local hjkj/sdfdsf\\qrewre.h;";
-	let mut parser3 = Parser::new(include_content);
+	let mut parser3 = Parser::new(include_content.to_string());
 	parser3.index = 0;
 	let result3 = IncludeDeclaration::new(&mut parser3);
 	if result3.is_error() {
@@ -373,7 +376,7 @@ fn main() {
 
 	// IMPORT
 	let import_content = "import test/bla;";
-	let mut parser4 = Parser::new(import_content);
+	let mut parser4 = Parser::new(import_content.to_string());
 	parser4.index = 0;
 	let result4 = ImportDeclaration::new(&mut parser4);
 	if result4.is_error() {
@@ -386,7 +389,7 @@ fn main() {
 
 	// FUNCTION
 	let func_content = "static inline fn test(copy a: vector<unsigned char>, ptr b: Bla) -> unsigned int { return 0; }";
-	let mut parser5 = Parser::new(func_content);
+	let mut parser5 = Parser::new(func_content.to_string());
 	parser5.index = 0;
 	let result5 = FunctionDeclaration::new(&mut parser5, FunctionDeclarationType::ModuleLevel);
 	if result5.is_error() {

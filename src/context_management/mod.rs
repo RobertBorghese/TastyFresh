@@ -6,6 +6,7 @@
  **********************************************************/
 
 pub mod position;
+pub mod typing_context;
 
 use position::Position;
 

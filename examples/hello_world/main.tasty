@@ -1,10 +1,16 @@
 include system iostream;
 
+copy glob = 32;
+
 fn main() -> int {
 	std.cout << "Hello, World!" << std.endl;
 
-	copy a = 32;
+	copy a = 31.2l;
 	std.cout << "The value of \"a\" is: " << a << "!" << std.endl;
+
+	std.cout << "The value of \"glob\" is: " << glob << "!" << std.endl;
+
+	borrow b = "Putting char array in variable \"b\"";
 
 	return 0;
 }

@@ -7,7 +7,6 @@
 
 use crate::expression::Expression;
 use crate::expression::expression_piece::ExpressionPiece;
-use crate::expression::value_type::ValueType;
 
 use crate::config_management::ConfigData;
 use crate::config_management::operator_data::{ Operator, OperatorDataStructure };
@@ -16,6 +15,8 @@ use crate::context_management::print_code_error;
 use crate::context_management::position::Position;
 
 use crate::declaration_parser::parser::Parser;
+
+use crate::context_management::typing_context::Context;
 
 use std::convert::TryInto;
 
@@ -80,7 +81,7 @@ impl Expression {
 }
 
 impl<'a> ExpressionParser<'a> {
-	pub fn new(parser: &mut Parser, start_position: Position, config_data: &'a ConfigData, end_chars: Option<Vec<char>>) -> ExpressionParser<'a> {
+	pub fn new(parser: &mut Parser, start_position: Position, config_data: &'a ConfigData, context: &Option<&mut Context>, end_chars: Option<Vec<char>>) -> ExpressionParser<'a> {
 		let mut result = ExpressionParser {
 			expr_str: parser.content.to_string(),
 			position: ExpressionParserPosition {
@@ -98,8 +99,8 @@ impl<'a> ExpressionParser<'a> {
 				reason: ExpressionEndReason::Unknown
 			}
 		};
-		result.parse_expr_str(parser);
-		result.expression = ExpressionPiece::parse_expr_parts(&mut result);
+		result.parse_expr_str(parser, context);
+		result.expression = ExpressionPiece::parse_expr_parts(&mut result, context);
 		return result;
 	}
 
@@ -107,7 +108,7 @@ impl<'a> ExpressionParser<'a> {
 		return &self.config_data.operators[op_type][index];
 	}
 
-	fn parse_expr_str(&mut self, parser: &mut Parser) {
+	fn parse_expr_str(&mut self, parser: &mut Parser, context: &Option<&mut Context>) {
 		let mut state = ParseState::Prefix;
 		loop {
 			if !self.index_within_bounds(parser) {
@@ -116,7 +117,7 @@ impl<'a> ExpressionParser<'a> {
 			if self.check_for_end_char(parser) {
 				break;
 			}
-			self.parse(&mut state, parser);
+			self.parse(&mut state, parser, context);
 			if state == ParseState::End {
 				break;
 			}
@@ -142,7 +143,7 @@ impl<'a> ExpressionParser<'a> {
 		return false;
 	}
 
-	fn parse(&mut self, state: &mut ParseState, parser: &mut Parser) {
+	fn parse(&mut self, state: &mut ParseState, parser: &mut Parser, context: &Option<&mut Context>) {
 		match state {
 			ParseState::Prefix => {
 				if !self.parse_next_prefix_operator(parser) {
@@ -150,7 +151,7 @@ impl<'a> ExpressionParser<'a> {
 				}
 			},
 			ParseState::Value => {
-				if !self.parse_value(parser) {
+				if !self.parse_value(parser, context) {
 					self.set_end_reason(ExpressionEndReason::NoValueError);
 					*state = ParseState::End;
 				} else {
@@ -158,7 +159,7 @@ impl<'a> ExpressionParser<'a> {
 				}
 			},
 			ParseState::Suffix => {
-				if !self.parse_next_suffix_operator(parser) {
+				if !self.parse_next_suffix_operator(parser, context) {
 					*state = ParseState::Infix;
 				}
 			},
@@ -265,7 +266,7 @@ impl<'a> ExpressionParser<'a> {
 		return space_offset;
 	}
 
-	fn parse_value(&mut self, parser: &mut Parser) -> bool {
+	fn parse_value(&mut self, parser: &mut Parser, context: &Option<&mut Context>) -> bool {
 		if !self.index_within_bounds(parser) { return false; }
 		let space_offset = self.parse_next_whitespace(parser);
 		let value_start = parser.index + space_offset;
@@ -274,11 +275,15 @@ impl<'a> ExpressionParser<'a> {
 		let first_char = parser.chars[value_start];
 		if first_char == '(' {
 			parser.index += space_offset + 1;
-			return self.parse_internal_expressions(')', true, parser);
+			return self.parse_internal_expressions(')', true, parser, context);
 		} else {
 			loop {
 				let mut finish = false;
+				let mut number_offset = 0;
 				if value_start + offset >= self.str_len() {
+					finish = true;
+				} else if parser.check_for_number(&mut number_offset) {
+					offset += number_offset - 1;
 					finish = true;
 				} else if parser.check_for_string() {
 					let old_index = parser.index;
@@ -375,17 +380,17 @@ impl<'a> ExpressionParser<'a> {
 		}
 	}
 
-	fn parse_next_suffix_operator(&mut self, parser: &mut Parser) -> bool {
+	fn parse_next_suffix_operator(&mut self, parser: &mut Parser, context: &Option<&mut Context>) -> bool {
 		let space_offset = self.parse_next_whitespace(parser);
 		let start_char = parser.chars[parser.index + space_offset];
 		if self.is_group_char(start_char) {
 			parser.index += space_offset + 1;
-			return self.parse_suffix_internal_expressions(start_char, parser);
+			return self.parse_suffix_internal_expressions(start_char, parser, context);
 		}
 		return self.parse_next_operator("suffix", parser);
 	}
 
-	fn parse_suffix_internal_expressions(&mut self, start_char: char, parser: &mut Parser) -> bool {
+	fn parse_suffix_internal_expressions(&mut self, start_char: char, parser: &mut Parser, context: &Option<&mut Context>) -> bool {
 		let end_char = self.get_end_char(start_char);
 		let full_operator = format!("{}{}", start_char, end_char);
 		let space_offset = self.parse_next_whitespace(parser);
@@ -399,18 +404,18 @@ impl<'a> ExpressionParser<'a> {
 			}
 			parser.index += space_offset + 1;
 		} else {
-			return self.parse_internal_expressions(end_char, false, parser);
+			return self.parse_internal_expressions(end_char, false, parser, context);
 		}
 		return false;
 	}
 
-	fn parse_internal_expressions(&mut self, end_char: char, is_value: bool, parser: &mut Parser) -> bool {
+	fn parse_internal_expressions(&mut self, end_char: char, is_value: bool, parser: &mut Parser, context: &Option<&mut Context>) -> bool {
 		let mut expressions = Vec::new();
 		let start_pos = parser.index;
 		loop {
 			let chars = vec!(end_char, ',');
 			if self.index_within_bounds(parser) {
-				let expr_parser = ExpressionParser::new(parser, self.generate_pos(parser.index, None), self.config_data, Some(chars));
+				let expr_parser = ExpressionParser::new(parser, self.generate_pos(parser.index, None), self.config_data, context, Some(chars));
 				expressions.push(expr_parser.expression);
 				parser.index += expr_parser.end_data.end_index + 1;
 				if let ExpressionEndReason::ReachedChar(c) = expr_parser.end_data.reason {

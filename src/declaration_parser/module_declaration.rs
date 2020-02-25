@@ -36,7 +36,7 @@ macro_rules! parse_declaration {
 		if <$DeclarationClass>::is_declaration($parser) {
 			let mut result = <$DeclarationClass>::new($parser);
 			if result.is_error() {
-				result.print_error($file_name.to_string(), Some($parser.content));
+				result.print_error($file_name.to_string(), Some(&$parser.content));
 			} else {
 				$declarations.push(DeclarationType::$DeclarationType(result.unwrap_and_move()));
 			}
@@ -56,7 +56,7 @@ impl ModuleDeclaration {
 			if FunctionDeclaration::is_declaration(parser) {
 				let mut result = FunctionDeclaration::new(parser, FunctionDeclarationType::ModuleLevel);
 				if result.is_error() {
-					result.print_error(file_name.to_string(), Some(parser.content));
+					result.print_error(file_name.to_string(), Some(&parser.content));
 				} else {
 					declarations.push(DeclarationType::Function(result.unwrap_and_move()));
 				}

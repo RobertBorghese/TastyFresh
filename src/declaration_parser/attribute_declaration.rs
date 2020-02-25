@@ -89,7 +89,7 @@ impl AttributeDeclaration {
 	}
 
 	pub fn is_declaration(parser: &mut Parser) -> bool {
-		return Self::is_attribute_declaration(parser.content, parser.index);
+		return Self::is_attribute_declaration(&parser.content, parser.index);
 	}
 
 	pub fn is_attribute_declaration(content: &str, index: usize) -> bool {

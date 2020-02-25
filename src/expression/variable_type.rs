@@ -12,12 +12,32 @@ lazy_static! {
 	pub static ref VARIABLE_PROPS: Vec<&'static str> = vec!("const", "constexpr", "constinit", "extern", "mutable", "static", "thread_local", "volatile");
 }
 
+#[derive(Clone)]
 pub struct VariableType {
 	pub var_type: Type,
 	pub var_style: VarStyle,
-	pub var_properties: Vec<VarProps> 
+	pub var_properties: Option<Vec<VarProps>> 
 }
 
+impl VariableType {
+	pub fn inferred() -> VariableType {
+		return VariableType {
+			var_type: Type::Inferred,
+			var_style: VarStyle::Copy,
+			var_properties: None
+		};
+	}
+
+	pub fn copy(var_type: Type) -> VariableType {
+		return VariableType {
+			var_type: var_type,
+			var_style: VarStyle::Copy,
+			var_properties: None
+		};
+	}
+}
+
+#[derive(Clone)]
 pub enum Type {
 	Unknown(String),
 	Void,
@@ -78,6 +98,7 @@ impl Type {
 	}
 }
 
+#[derive(Clone)]
 pub enum VarStyle {
 	Unknown,
 	Copy,
@@ -123,6 +144,30 @@ impl VarStyle {
 		}
 	}
 
+	pub fn to_cpp(&self, var_type: &Type) -> String {
+		return match self {
+			VarStyle::Unknown => "".to_string(),
+			VarStyle::Copy => var_type.to_cpp(),
+			VarStyle::Ref => format!("{}&", var_type.to_cpp()),
+			VarStyle::Borrow => {
+				if let Type::String(str_type) = var_type {
+					if let StringType::ConstCharArray = str_type {
+						format!("{}&", var_type.to_cpp())
+					} else {
+						format!("const {}&", var_type.to_cpp())
+					}
+				} else {
+					format!("const {}&", var_type.to_cpp())
+				}
+			},
+			VarStyle::Move => format!("{}&&", var_type.to_cpp()),
+			VarStyle::Ptr => format!("{}*", var_type.to_cpp()),
+			VarStyle::AutoPtr => format!("std::shared_ptr<{}>", var_type.to_cpp()),
+			VarStyle::UniquePtr => format!("std::unique_ptr<{}>", var_type.to_cpp()),
+			VarStyle::ClassPtr => format!("{}*", var_type.to_cpp())
+		}
+	}
+
 	pub fn is_unknown(&self) -> bool {
 		return match self {
 			VarStyle::Unknown => true,
@@ -142,6 +187,7 @@ impl VarStyle {
 	}
 }
 
+#[derive(Clone)]
 pub enum VarProps {
 	Unknown,
 	Const,

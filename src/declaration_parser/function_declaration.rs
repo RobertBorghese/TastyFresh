@@ -19,6 +19,8 @@ use crate::{
 
 use crate::expression::variable_type::{ VariableType, Type, VarStyle, VarProps };
 
+use crate::expression::value_type::{ Function, Property };
+
 use crate::expression::function_type::FunStyle;
 
 use crate::declaration_parser::declaration::{ Declaration, DeclarationResult };
@@ -30,7 +32,7 @@ type FunctionDeclarationResult = DeclarationResult<FunctionDeclaration>;
 pub struct FunctionDeclaration {
 	pub name: String,
 	pub props: Vec<FunStyle>,
-	pub parameters: Vec<(VariableType, String, usize, usize)>,
+	pub parameters: Vec<(VariableType, String, Option<usize>, Option<usize>)>,
 	pub return_type: VariableType,
 	pub line: usize,
 	pub start_index: Option<usize>,
@@ -64,7 +66,7 @@ impl FunctionDeclaration {
 		// Parse Function Properties and Style
 		let mut successfully_parsed = false;
 		let mut name = "".to_string();
-		while Self::is_func_declaration(parser.content, parser.index) {
+		while Self::is_func_declaration(&parser.content, parser.index) {
 			name = "".to_string();
 			declare_parse_ascii!(name, parser);
 			if FunStyle::styles().contains(&name.as_str()) {
@@ -169,24 +171,24 @@ impl FunctionDeclaration {
 					has_value = true;
 				}
 
-				let mut start = parser.index;
+				let mut start = Some(parser.index);
 				let mut result = ' ';
 				declare_parse_expr_until_either_char!(',', ')', result, parser);
-				let mut end = parser.index;
+				let mut end = Some(parser.index);
 				if result != ')' && result != ',' {
 					return Self::out_of_space(parser.index);
 				}
 				if result != ')' { delcare_increment!(parser); }
 
 				if !has_value {
-					start = 0;
-					end = 0;
+					start = None;
+					end = None;
 				}
 
 				parameters.push((VariableType {
 					var_type: var_type,
 					var_style: param_type,
-					var_properties: Vec::new()
+					var_properties:None
 				}, param_name, start, end));
 			}
 		}
@@ -206,13 +208,13 @@ impl FunctionDeclaration {
 				VariableType {
 					var_type: var_type,
 					var_style: var_style,
-					var_properties: Vec::new()
+					var_properties: None
 				}
 			} else {
 				VariableType {
 					var_type: Type::Void,
 					var_style: VarStyle::Copy,
-					var_properties: Vec::new()
+					var_properties: None
 				}
 			}
 		};
@@ -248,7 +250,7 @@ impl FunctionDeclaration {
 	}
 
 	pub fn is_declaration(parser: &mut Parser) -> bool {
-		return Self::is_func_declaration(parser.content, parser.index);
+		return Self::is_func_declaration(&parser.content, parser.index);
 	}
 
 	pub fn is_func_declaration(content: &str, index: usize) -> bool {
@@ -260,5 +262,26 @@ impl FunctionDeclaration {
 			}
 		}
 		return declare.starts_with("fn ");
+	}
+
+	pub fn to_function(&self, content: &str) -> Function {
+		let mut params = Vec::new();
+		for param in self.parameters.clone() {
+			params.push(Property {
+				name: param.1,
+				prop_type: param.0,
+				default_value: if param.2.is_some() && param.3.is_some() {
+					Some(content[param.2.unwrap()..param.3.unwrap()].to_string())
+				} else {
+					None
+				}
+			});
+		}
+
+		return Function {
+			name: self.name.clone(),
+			parameters: params,
+			return_type: self.return_type.clone()
+		}
 	}
 }
