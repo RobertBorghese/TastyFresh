@@ -6,14 +6,13 @@
  **********************************************************/
 
 use crate::expression::Expression;
-use crate::expression::variable_type::{ Type, VarStyle };
+use crate::expression::variable_type::{ VariableType, Type, VarStyle };
 use crate::expression::value_type::{ NumberType, StringType };
 use crate::expression::expression_parser::{ ExpressionParser, ExpressionEndReason };
 
 use crate::config_management::ConfigData;
 
 use crate::context_management::position::Position;
-
 use crate::context_management::typing_context::Context;
 
 use std::rc::Rc;
@@ -448,8 +447,8 @@ impl Parser {
 	/// # Return
 	///
 	/// Returns the configuration data that's taken ownership of.
-	pub fn parse_expression(&mut self, file_name: String, config_data: &ConfigData, context: Option<&mut Context>, reason: &mut ExpressionEndReason) -> Rc<Expression> {
-		let expr_parser = ExpressionParser::new(self, Position::new(file_name, Some(self.line), self.index, None), config_data, &context, None);
+	pub fn parse_expression(&mut self, file_name: String, config_data: &ConfigData, mut context: Option<&mut Context>, reason: &mut ExpressionEndReason) -> Rc<Expression> {
+		let expr_parser = ExpressionParser::new(self, Position::new(file_name, Some(self.line), self.index, None), config_data, &mut context, None);
 		self.line += expr_parser.position.line_offset;
 		*reason = expr_parser.end_data.reason;
 		return expr_parser.expression;
@@ -631,7 +630,7 @@ impl Parser {
 				if self.parse_whitespace_and_check_space() { return Type::Inferred; }
 
 				// Parse Type Parameter
-				type_params.push(self.parse_type(unexpected_character, conflicting_specifiers));
+				type_params.push(VariableType::from_type_style(self.parse_type_and_style(unexpected_character, conflicting_specifiers)));
 
 				// Check for Errors
 				if self.out_of_space || *unexpected_character || conflicting_specifiers.is_some() { return Type::Inferred; }

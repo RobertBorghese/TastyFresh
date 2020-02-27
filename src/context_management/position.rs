@@ -5,6 +5,7 @@
  * Includes a file, line number, start index, and end index.
  **********************************************************/
 
+#[derive(Clone)]
 pub struct Position {
 	pub file: String,
 	pub line: Option<usize>,

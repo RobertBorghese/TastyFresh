@@ -238,9 +238,24 @@ pub struct Property {
 	pub default_value: Option<String>
 }
 
+impl Property {
+	pub fn to_cpp(&self) -> String {
+		return match &self.default_value {
+			Some(value) => format!("{} {} = {}", self.prop_type.to_cpp(), self.name, value),
+			None => format!("{} {}", self.prop_type.to_cpp(), self.name)
+		}
+	}
+}
+
 #[derive(Clone)]
 pub struct Function {
 	pub name: String,
 	pub parameters: Vec<Property>,
 	pub return_type: VariableType
+}
+
+impl Function {
+	pub fn to_cpp(&self) -> String {
+		format!("{} {}({})", self.return_type.to_cpp(), self.name, self.parameters.iter().map(|param| param.to_cpp()).collect::<Vec<String>>().join(", "))
+	}
 }

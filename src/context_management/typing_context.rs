@@ -82,16 +82,3 @@ impl Context {
 		}
 	}
 }
-/*
-Variables
-Functions
-Classes
-Namespaces
-
-from 
-
-Current Module
-Other Modules
-This
-Scope(s) (back ones are closer)
-*/

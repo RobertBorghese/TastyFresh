@@ -123,9 +123,9 @@ impl<T> DeclarationResult<T> {
 		return self;
 	}
 
-	pub fn print_error(&self, file: String, custom_content: Option<&str>) {
+	pub fn print_error(&self, file: String, file_content: &str) {
 		match self {
-			DeclarationResult::Err(title, message, start, end) => print_code_error(title, message, &Position::new(file, None, *start, Some(*end)), custom_content),
+			DeclarationResult::Err(title, message, start, end) => print_code_error(title, message, &Position::new(file, None, *start, Some(*end)), file_content),
 			_ => panic!("Result is not an error.")
 		}
 	}

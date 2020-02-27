@@ -39,8 +39,6 @@ mod expression;
 mod scope_parser;
 
 mod file_system;
-mod module;
-mod module_component;
 
 #[macro_use]
 extern crate lazy_static;
@@ -69,6 +67,9 @@ use context_management::typing_context::Context;
 use std::env;
 use std::env::Args;
 use std::collections::BTreeMap;
+
+use std::path::Path;
+use std::ffi::OsStr;
 
 use regex::Regex;
 
@@ -196,8 +197,11 @@ fn get_output_dirs(arguments: &BTreeMap<String,Vec<String>>) -> Option<Vec<Strin
 			}
 		},
 		None => {
-			return Some(Vec::new());
+			return Some(vec![".".to_string()]);
 		}
+	}
+	if output_dirs.is_empty() {
+		output_dirs.push(".".to_string());
 	}
 	return Some(output_dirs);
 }
@@ -249,6 +253,7 @@ fn parse_source_file(file: &str, output_dirs: &Vec<String>, config_data: &Config
 fn transpile_source_file(file: &str, output_dirs: &Vec<String>, config_data: &ConfigData, module_contexts: &BTreeMap<String,Context>, module_declaration: &ModuleDeclaration, parser: &mut Parser) -> bool {
 	let mut context = Context::new(false);
 	context.add(module_contexts.get(file).unwrap());
+	let mut output_lines = Vec::new();
 	for declaration in &module_declaration.declarations {
 		match declaration {
 			DeclarationType::Import(d) => {
@@ -256,9 +261,23 @@ fn transpile_source_file(file: &str, output_dirs: &Vec<String>, config_data: &Co
 				context.add(module_contexts.get(&d.path).unwrap());
 			}
 			DeclarationType::Function(d) => {
+				let mut func_content: Option<String> = None;
 				if d.start_index.is_some() && d.end_index.is_some() {
 					let scope = ScopeExpression::new(parser, d.start_index.unwrap(), d.line, file, config_data, &mut context);
-					println!("C++ CODE: \n\n{}", scope.to_string(&config_data.operators));
+					func_content = Some(scope.to_string(&config_data.operators, d.line, 1, &mut context));
+				}
+				let mut line = d.line;
+				insert_output_line(&mut output_lines, &d.to_function(&file).to_cpp(), line);
+				if func_content.is_some() {
+					let re = Regex::new("(?:\n|\n\r)").unwrap();
+					insert_output_line(&mut output_lines, " {", line);
+					for func_line in re.split(&func_content.unwrap()) {
+						insert_output_line(&mut output_lines, func_line, line);
+						line += 1;
+					}
+					insert_output_line(&mut output_lines, "}", line);
+				} else {
+					insert_output_line(&mut output_lines, ";", line);
 				}
 			},
 			DeclarationType::Variable(d) => {
@@ -267,7 +286,25 @@ fn transpile_source_file(file: &str, output_dirs: &Vec<String>, config_data: &Co
 			}
 		}
 	}
+	let output_content = output_lines.join("\n");
+	for dir in output_dirs {
+		let path = Path::new(dir).join(file);
+		let path_str = path.to_str();
+		if path_str.is_some() {
+			let path_str_unwrap = path_str.unwrap();
+			std::fs::write(path_str_unwrap[..(path_str_unwrap.len() - path.extension().and_then(OsStr::to_str).unwrap_or("").len())].to_string() + "cpp", &output_content);
+		} else {
+			println!("\nCOULD NOT WRITE TO FILE: {}", format!("{}{}", dir, file));
+		}
+	}
 	return true;
+}
+
+fn insert_output_line(output_lines: &mut Vec<String>, line: &str, line_number: usize) {
+	while line_number >= output_lines.len() {
+		output_lines.push("".to_string());
+	}
+	output_lines[line_number] += line;
 }
 
 /// The main function of Tasty Fresh.
@@ -335,7 +372,7 @@ fn main() {
 	let mut parser = Parser::new(c.to_string());
 	let result = crate::declaration_parser::variable_declaration::VariableDeclaration::new(&mut parser);
 	if result.is_error() {
-		result.print_error("tast2.tasty".to_string(), Some(c));
+		result.print_error("tast2.tasty".to_string(), c);
 		return;
 	}
 	let rr = result.as_ref().unwrap();
@@ -352,7 +389,7 @@ fn main() {
 	parser2.index = 16;
 	let result2 = AttributeDeclaration::new(&mut parser2);
 	if result2.is_error() {
-		result2.print_error("atttribute.tasty".to_string(), Some(attribute_content));
+		result2.print_error("atttribute.tasty".to_string(), attribute_content);
 		return;
 	}
 	let rr2 = result2.as_ref().unwrap();
@@ -366,7 +403,7 @@ fn main() {
 	parser3.index = 0;
 	let result3 = IncludeDeclaration::new(&mut parser3);
 	if result3.is_error() {
-		result3.print_error("include.tasty".to_string(), Some(include_content));
+		result3.print_error("include.tasty".to_string(), include_content);
 		return;
 	}
 	let rr3 = result3.as_ref().unwrap();
@@ -380,7 +417,7 @@ fn main() {
 	parser4.index = 0;
 	let result4 = ImportDeclaration::new(&mut parser4);
 	if result4.is_error() {
-		result4.print_error("include.tasty".to_string(), Some(import_content));
+		result4.print_error("include.tasty".to_string(), import_content);
 		return;
 	}
 	let rr4 = result4.as_ref().unwrap();
@@ -393,7 +430,7 @@ fn main() {
 	parser5.index = 0;
 	let result5 = FunctionDeclaration::new(&mut parser5, FunctionDeclarationType::ModuleLevel);
 	if result5.is_error() {
-		result5.print_error("include.tasty".to_string(), Some(func_content));
+		result5.print_error("include.tasty".to_string(), func_content);
 		return;
 	}
 	let rr5 = result5.as_ref().unwrap();

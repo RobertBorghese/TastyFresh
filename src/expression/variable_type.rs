@@ -5,7 +5,7 @@
  * within Tasty Fresh.
  **********************************************************/
 
-use crate::expression::value_type::{ NumberType, StringType, ClassType };
+use crate::expression::value_type::{ NumberType, StringType, ClassType, Function };
 
 lazy_static! {
 	pub static ref STYLE_TYPES: Vec<&'static str> = vec!("copy", "ref", "borrow", "move", "ptr", "autoptr", "uniqueptr", "classptr");
@@ -20,6 +20,18 @@ pub struct VariableType {
 }
 
 impl VariableType {
+	pub fn to_cpp(&self) -> String {
+		return self.var_style.to_cpp(&self.var_type);
+	}
+
+	pub fn from_type_style(info: (VarStyle, Type)) -> VariableType {
+		return VariableType {
+			var_type: info.1,
+			var_style: info.0,
+			var_properties: None
+		};
+	}
+
 	pub fn inferred() -> VariableType {
 		return VariableType {
 			var_type: Type::Inferred,
@@ -35,6 +47,45 @@ impl VariableType {
 			var_properties: None
 		};
 	}
+
+	pub fn namespace() -> VariableType {
+		return VariableType {
+			var_type: Type::Inferred,
+			var_style: VarStyle::Namespace,
+			var_properties: None
+		};
+	}
+
+	pub fn is_namespace(&self) -> bool {
+		if let VarStyle::Namespace = self.var_style {
+			return true;
+		}
+		return false;
+	}
+
+	pub fn boolean() -> VariableType {
+		return VariableType {
+			var_type: Type::Boolean,
+			var_style: VarStyle::Copy,
+			var_properties: None
+		};
+	}
+
+	pub fn class(cls: ClassType) -> VariableType {
+		return VariableType {
+			var_type: Type::Class(cls),
+			var_style: VarStyle::Copy,
+			var_properties: None
+		};
+	}
+
+	pub fn function(func: Function) -> VariableType {
+		return VariableType {
+			var_type: Type::Function(Box::new(func)),
+			var_style: VarStyle::Copy,
+			var_properties: None
+		};
+	}
 }
 
 #[derive(Clone)]
@@ -45,10 +96,24 @@ pub enum Type {
 	Number(NumberType),
 	String(StringType),
 	Class(ClassType),
+	Function(Box<Function>),
 	Inferred,
 	Undeclared(Vec<String>),
-	UndeclaredWParams(Vec<String>, Vec<Type>)
+	UndeclaredWParams(Vec<String>, Vec<VariableType>)
 }
+
+/*#[derive(Clone)]
+pub struct Property {
+	pub name: String,
+	pub prop_type: VariableType,
+	pub default_value: Option<String>
+}
+
+#[derive(Clone)]
+pub struct Function {
+	pub name: String,
+	pub parameters: Vec<Property>,
+	*/
 
 impl Type {
 	pub fn to_cpp(&self) -> String {
@@ -59,6 +124,17 @@ impl Type {
 			Type::Number(num_type) => num_type.to_cpp().to_string(),
 			Type::String(string_type) => string_type.to_cpp().to_string(),
 			Type::Class(class_type) => class_type.name.clone(),
+			Type::Function(func) => {
+				let params = &func.parameters;
+				let mut params_output = "".to_string();
+				for i in 0..params.len() {
+					params_output += &params[i].prop_type.to_cpp();
+					if i < params.len() - 1 {
+						params_output += ", ";
+					}
+				}
+				format!("std::function<{}({})>", func.return_type.to_cpp(), params_output)
+			}
 			Type::Inferred => "auto".to_string(),
 			Type::Undeclared(names) => {
 				let mut result = "".to_string();
@@ -101,6 +177,7 @@ impl Type {
 #[derive(Clone)]
 pub enum VarStyle {
 	Unknown,
+	Namespace,
 	Copy,
 	Ref,
 	Borrow,
@@ -132,7 +209,6 @@ impl VarStyle {
 
 	pub fn get_name(&self) -> &str {
 		return match self {
-			VarStyle::Unknown => "",
 			VarStyle::Copy => "copy",
 			VarStyle::Ref => "ref",
 			VarStyle::Borrow => "borrow",
@@ -140,13 +216,14 @@ impl VarStyle {
 			VarStyle::Ptr => "ptr",
 			VarStyle::AutoPtr => "autoptr",
 			VarStyle::UniquePtr => "uniqueptr",
-			VarStyle::ClassPtr => "classptr"
+			VarStyle::ClassPtr => "classptr",
+			VarStyle::Namespace => "namespace",
+			VarStyle::Unknown => "unknown"
 		}
 	}
 
 	pub fn to_cpp(&self, var_type: &Type) -> String {
 		return match self {
-			VarStyle::Unknown => "".to_string(),
 			VarStyle::Copy => var_type.to_cpp(),
 			VarStyle::Ref => format!("{}&", var_type.to_cpp()),
 			VarStyle::Borrow => {
@@ -164,7 +241,8 @@ impl VarStyle {
 			VarStyle::Ptr => format!("{}*", var_type.to_cpp()),
 			VarStyle::AutoPtr => format!("std::shared_ptr<{}>", var_type.to_cpp()),
 			VarStyle::UniquePtr => format!("std::unique_ptr<{}>", var_type.to_cpp()),
-			VarStyle::ClassPtr => format!("{}*", var_type.to_cpp())
+			VarStyle::ClassPtr => format!("{}*", var_type.to_cpp()),
+			_ => var_type.to_cpp()
 		}
 	}
 
@@ -184,6 +262,13 @@ impl VarStyle {
 
 	pub fn module_only(&self) -> bool {
 		return false;
+	}
+
+	pub fn is_namespace(&self) -> bool {
+		return match self {
+			VarStyle::Namespace => true,
+			_ => false
+		}
 	}
 }
 

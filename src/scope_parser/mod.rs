@@ -43,7 +43,7 @@ impl ScopeExpression {
 			if ReturnParser::is_declaration(parser) {
 				let mut result = ReturnParser::new(parser, file.to_string(), config_data, context);
 				if result.is_error() {
-					result.print_error(file.to_string(), Some(&parser.content));
+					result.print_error(file.to_string(), &parser.content);
 					break;
 				} else {
 					parser.parse_whitespace();
@@ -55,7 +55,7 @@ impl ScopeExpression {
 			} else if VariableDeclaration::is_declaration(parser) {
 				let mut result = VariableDeclaration::new(parser);
 				if result.is_error() {
-					result.print_error(file.to_string(), Some(&parser.content));
+					result.print_error(file.to_string(), &parser.content);
 					break;
 				} else {
 					let mut var_declare = result.unwrap_and_move();
@@ -92,30 +92,45 @@ impl ScopeExpression {
 		return ScopeExpression::Scope(scope_exprs);
 	}
 
-	pub fn to_string(&self, operators: &OperatorDataStructure) -> String {
+	pub fn to_string(&self, operators: &OperatorDataStructure, line_offset: usize, tab_offset: usize, context: &mut Context) -> String {
 		return match self {
 			ScopeExpression::Scope(exprs) => {
-				let mut result = "".to_string();
+				let mut lines = Vec::new();
 				for e in exprs {
-					result += &(e.to_string(operators) + "\n");
+					let line = (e.to_string(operators, line_offset, tab_offset, context));
+					let line_number = e.get_expression().unwrap().get_line_number() - line_offset;
+					while line_number >= lines.len() {
+						lines.push(Vec::new());
+					}
+					lines[line_number].push(line);
 				}
-				result
+				let tabs = String::from_utf8(vec![b'\t'; tab_offset]).unwrap_or("".to_string());
+				let mut content = Vec::new();
+				for l in lines {
+					content.push(tabs.clone() + &l.join(" "));
+				}
+				content.join("\n")
 			},
 			ScopeExpression::Expression(expr) => {
-				format!("{};", expr.to_string(operators))
+				format!("{};", expr.to_string(operators, context))
 			},
 			ScopeExpression::VariableDeclaration(declaration, expr) => {
 				let var_type = &declaration.var_type;
-				format!("{} {} = {};", var_type.var_style.to_cpp(&var_type.var_type), declaration.name, expr.to_string(operators))
+				println!("DELCARE TYPE: {}", var_type.var_style.get_name());
+				format!("{} {} = {};", var_type.to_cpp(), declaration.name, expr.to_string(operators, context))
 			},
 			ScopeExpression::Return(expr) => {
-				format!("return {};", expr.to_string(operators))
+				format!("return {};", expr.to_string(operators, context))
 			}
 		}
 	}
-}/*pub enum ScopeExpression {
-	Expression(Rc<Expression>),
-	Scope(Vec<ScopeExpression>),
-	VariableDeclaration(VariableDeclaration, Rc<Expression>),
-	Return(Rc<Expression>)
-}*/
+
+	pub fn get_expression(&self) -> Option<Rc<Expression>> {
+		return match self {
+			ScopeExpression::Expression(expr) => Some(Rc::clone(expr)),
+			ScopeExpression::VariableDeclaration(_, expr) => Some(Rc::clone(expr)),
+			ScopeExpression::Return(expr) => Some(Rc::clone(expr)),
+			_ => None
+		};
+	}
+}

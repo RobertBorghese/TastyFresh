@@ -81,7 +81,7 @@ impl Expression {
 }
 
 impl<'a> ExpressionParser<'a> {
-	pub fn new(parser: &mut Parser, start_position: Position, config_data: &'a ConfigData, context: &Option<&mut Context>, end_chars: Option<Vec<char>>) -> ExpressionParser<'a> {
+	pub fn new(parser: &mut Parser, start_position: Position, config_data: &'a ConfigData, context: &mut Option<&mut Context>, end_chars: Option<Vec<char>>) -> ExpressionParser<'a> {
 		let mut result = ExpressionParser {
 			expr_str: parser.content.to_string(),
 			position: ExpressionParserPosition {
@@ -100,7 +100,7 @@ impl<'a> ExpressionParser<'a> {
 			}
 		};
 		result.parse_expr_str(parser, context);
-		result.expression = ExpressionPiece::parse_expr_parts(&mut result, context);
+		result.expression = ExpressionPiece::parse_expr_parts(&mut result, context, &parser.content);
 		return result;
 	}
 
@@ -108,7 +108,7 @@ impl<'a> ExpressionParser<'a> {
 		return &self.config_data.operators[op_type][index];
 	}
 
-	fn parse_expr_str(&mut self, parser: &mut Parser, context: &Option<&mut Context>) {
+	fn parse_expr_str(&mut self, parser: &mut Parser, context: &mut Option<&mut Context>) {
 		let mut state = ParseState::Prefix;
 		loop {
 			if !self.index_within_bounds(parser) {
@@ -143,7 +143,7 @@ impl<'a> ExpressionParser<'a> {
 		return false;
 	}
 
-	fn parse(&mut self, state: &mut ParseState, parser: &mut Parser, context: &Option<&mut Context>) {
+	fn parse(&mut self, state: &mut ParseState, parser: &mut Parser, context: &mut Option<&mut Context>) {
 		match state {
 			ParseState::Prefix => {
 				if !self.parse_next_prefix_operator(parser) {
@@ -266,7 +266,7 @@ impl<'a> ExpressionParser<'a> {
 		return space_offset;
 	}
 
-	fn parse_value(&mut self, parser: &mut Parser, context: &Option<&mut Context>) -> bool {
+	fn parse_value(&mut self, parser: &mut Parser, context: &mut Option<&mut Context>) -> bool {
 		if !self.index_within_bounds(parser) { return false; }
 		let space_offset = self.parse_next_whitespace(parser);
 		let value_start = parser.index + space_offset;
@@ -380,7 +380,7 @@ impl<'a> ExpressionParser<'a> {
 		}
 	}
 
-	fn parse_next_suffix_operator(&mut self, parser: &mut Parser, context: &Option<&mut Context>) -> bool {
+	fn parse_next_suffix_operator(&mut self, parser: &mut Parser, context: &mut Option<&mut Context>) -> bool {
 		let space_offset = self.parse_next_whitespace(parser);
 		let start_char = parser.chars[parser.index + space_offset];
 		if self.is_group_char(start_char) {
@@ -390,7 +390,7 @@ impl<'a> ExpressionParser<'a> {
 		return self.parse_next_operator("suffix", parser);
 	}
 
-	fn parse_suffix_internal_expressions(&mut self, start_char: char, parser: &mut Parser, context: &Option<&mut Context>) -> bool {
+	fn parse_suffix_internal_expressions(&mut self, start_char: char, parser: &mut Parser, context: &mut Option<&mut Context>) -> bool {
 		let end_char = self.get_end_char(start_char);
 		let full_operator = format!("{}{}", start_char, end_char);
 		let space_offset = self.parse_next_whitespace(parser);
@@ -409,7 +409,7 @@ impl<'a> ExpressionParser<'a> {
 		return false;
 	}
 
-	fn parse_internal_expressions(&mut self, end_char: char, is_value: bool, parser: &mut Parser, context: &Option<&mut Context>) -> bool {
+	fn parse_internal_expressions(&mut self, end_char: char, is_value: bool, parser: &mut Parser, context: &mut Option<&mut Context>) -> bool {
 		let mut expressions = Vec::new();
 		let start_pos = parser.index;
 		loop {

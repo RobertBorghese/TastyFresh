@@ -14,7 +14,7 @@ use crate::expression::variable_type::{ VariableType, Type, VarStyle };
 
 use crate::context_management::print_code_error;
 use crate::context_management::position::Position;
-use crate::context_management::typing_context::Context;
+use crate::context_management::typing_context::{ Context, ContextType };
 
 use std::rc::Rc;
 
@@ -47,7 +47,7 @@ impl ExpressionPiece {
 		};
 	}
 
-	pub fn parse_expr_parts(parser: &mut ExpressionParser, context: &Option<&mut Context>) -> Rc<Expression> {
+	pub fn parse_expr_parts(parser: &mut ExpressionParser, context: &mut Option<&mut Context>, file_content: &str) -> Rc<Expression> {
 		let mut error = false;
 		if parser.parts.len() == 1 {
 			match Self::get_expression_from_piece(&parser.parts[0], context) {
@@ -59,36 +59,39 @@ impl ExpressionPiece {
 			let next_op_index = Self::get_next_operator(parser);
 			if next_op_index.is_some() && next_op_index.unwrap() < parser.parts.len() {
 				let part_index = next_op_index.unwrap();
-				match &parser.parts[part_index] {
+				match parser.parts.remove(part_index) {
 					ExpressionPiece::Prefix(index, position) => {
-						let expr = Self::parse_prefix(parser, &part_index, index, context);
-						if expr.is_some() {
-							parser.parts.insert(part_index, expr.unwrap());
-							for i in 0..2 { parser.parts.remove(part_index + 1); }
+						let expr_and_pos = Self::parse_prefix(parser, &part_index, index, context, position);
+						if expr_and_pos.0.is_some() {
+							parser.parts.insert(part_index, expr_and_pos.0.unwrap());
+							for i in 0..1 { parser.parts.remove(part_index + 1); }
 						} else {
-							println!("Expected expression at {}:{}:{}", position.file, position.line.unwrap_or(1), position.end.unwrap_or(0));
+							let pos = expr_and_pos.1.unwrap();
+							print_code_error("Expected Expression", "expected expression before this operator", &pos, file_content);
 							error = true;
 							break;
 						}
 					},
 					ExpressionPiece::Suffix(index, position) => {
-						let expr = Self::parse_suffix(parser, &part_index, index, context);
-						if expr.is_some() {
-							parser.parts.insert(part_index - 1, expr.unwrap());
-							for i in 0..2 { parser.parts.remove(part_index); }
+						let expr_and_pos = Self::parse_suffix(parser, &part_index, index, context, position);
+						if expr_and_pos.0.is_some() {
+							parser.parts.insert(part_index - 1, expr_and_pos.0.unwrap());
+							for i in 0..1 { parser.parts.remove(part_index); }
 						} else {
-							println!("Expected expression at {}:{}:{}", position.file, position.line.unwrap_or(1), position.start);
+							let pos = expr_and_pos.1.unwrap();
+							print_code_error("Expected Expression", "expected expression after this operator", &pos, file_content);
 							error = true;
 							break;
 						}
 					},
 					ExpressionPiece::Infix(index, position) => {
-						let expr = Self::parse_infix(parser, &part_index, index, context);
-						if expr.is_some() {
-							parser.parts.insert(part_index - 1, expr.unwrap());
-							for i in 0..3 { parser.parts.remove(part_index); }
+						let expr_and_pos = Self::parse_infix(parser, &part_index, index, context, position);
+						if expr_and_pos.0.is_some() {
+							parser.parts.insert(part_index - 1, expr_and_pos.0.unwrap());
+							for i in 0..2 { parser.parts.remove(part_index); }
 						} else {
-							print_code_error("Expected Expression", "expected expressions to surrond this operator", position, None);
+							let pos = expr_and_pos.1.unwrap();
+							print_code_error("Expected Expression", "expected expressions to surrond this operator", &pos, file_content);
 							error = true;
 							break;
 						}
@@ -108,7 +111,10 @@ impl ExpressionPiece {
 			if parser.parts.len() > 0 {
 				match parser.parts.remove(0) {
 					ExpressionPiece::Expression(expr) => {
-						println!("Expression: {}", expr.to_string(&parser.config_data.operators));
+						if context.is_some() {
+							let c = context.as_mut().unwrap();
+							println!("Expression: {}", expr.to_string(&parser.config_data.operators, c));
+						}
 						return expr;
 					}
 					_ => ()
@@ -120,41 +126,41 @@ impl ExpressionPiece {
 		return Rc::new(Expression::Invalid);
 	}
 
-	fn parse_prefix(parser: &ExpressionParser, part_index: &usize, operator_id: &usize, context: &Option<&mut Context>) -> Option<ExpressionPiece> {
-		let result = Self::get_expression_from_piece(&parser.parts[part_index + 1], context);
+	fn parse_prefix(parser: &ExpressionParser, part_index: &usize, operator_id: usize, context: &Option<&mut Context>, position: Position) -> (Option<ExpressionPiece>,Option<Position>) {
+		let result = Self::get_expression_from_piece(&parser.parts[*part_index], context);
 		if result.is_some() {
-			return Some(ExpressionPiece::Expression(Rc::new(Expression::Prefix(result.unwrap(), *operator_id, VariableType::inferred()))));
+			return (Some(ExpressionPiece::Expression(Rc::new(Expression::Prefix(result.unwrap(), operator_id, VariableType::inferred(), position)))), None);
 		}
-		return None;
+		return (None, Some(position));
 	}
 
-	fn parse_suffix(parser: &ExpressionParser, part_index: &usize, operator_id: &usize, context: &Option<&mut Context>) -> Option<ExpressionPiece> {
+	fn parse_suffix(parser: &ExpressionParser, part_index: &usize, operator_id: usize, context: &Option<&mut Context>, position: Position) -> (Option<ExpressionPiece>,Option<Position>) {
 		let result = Self::get_expression_from_piece(&parser.parts[part_index - 1], context);
 		if result.is_some() {
-			return Some(ExpressionPiece::Expression(Rc::new(Expression::Suffix(result.unwrap(), *operator_id, VariableType::inferred()))));
+			return (Some(ExpressionPiece::Expression(Rc::new(Expression::Suffix(result.unwrap(), operator_id, VariableType::inferred(), position)))), None);
 		}
-		return None;
+		return (None, Some(position));
 	}
 
-	fn parse_infix(parser: &ExpressionParser, part_index: &usize, operator_id: &usize, context: &Option<&mut Context>) -> Option<ExpressionPiece> {
+	fn parse_infix(parser: &ExpressionParser, part_index: &usize, operator_id: usize, context: &Option<&mut Context>, position: Position) -> (Option<ExpressionPiece>,Option<Position>) {
 		let left_result = Self::get_expression_from_piece(&parser.parts[part_index - 1], context);
-		let right_result = Self::get_expression_from_piece(&parser.parts[part_index + 1], context);
+		let right_result = Self::get_expression_from_piece(&parser.parts[*part_index], context);
 		if left_result.is_some() && right_result.is_some() {
-			return Some(ExpressionPiece::Expression(Rc::new(Expression::Infix(left_result.unwrap(), right_result.unwrap(), *operator_id, VariableType::inferred()))));
+			return (Some(ExpressionPiece::Expression(Rc::new(Expression::Infix(left_result.unwrap(), right_result.unwrap(), operator_id, VariableType::inferred(), position)))), None);
 		}
-		return None;
+		return (None, Some(position));
 	}
 
 	fn get_expression_from_piece(piece: &ExpressionPiece, context: &Option<&mut Context>) -> Option<Rc<Expression>> {
 		return match piece {
 			ExpressionPiece::Value(value, position) => {
-				Some(Rc::new(Expression::Value(value.clone(), Self::infer_type_from_value_string(&value, context))))
+				Some(Rc::new(Expression::Value(value.clone(), Self::infer_type_from_value_string(&value, context), position.clone())))
 			},
 			ExpressionPiece::Expression(expr) => {
 				Some(Rc::clone(expr))
 			},
 			ExpressionPiece::EncapsulatedValues(expressions, position) => {
-				Some(Rc::new(Expression::Expressions(Rc::clone(expressions), piece.get_encapsulated_type().unwrap_or(VariableType::inferred()))))
+				Some(Rc::new(Expression::Expressions(Rc::clone(expressions), piece.get_encapsulated_type().unwrap_or(VariableType::inferred()), position.clone())))
 			},
 			_ => None
 		};
@@ -169,6 +175,19 @@ impl ExpressionPiece {
 			return VariableType::copy(Self::infer_number_type(value));
 		} else if Self::check_if_string(value) {
 			return VariableType::copy(Type::String(StringType::ConstCharArray));
+		} else if value == "true" || value == "false" {
+			return VariableType::boolean();
+		} else if context.is_some() {
+			let c = context.as_ref().unwrap();
+			let ct = c.get_item(value);
+			if ct.is_some() {
+				return match ct.unwrap() {
+					ContextType::Variable(variable_type) => variable_type,
+					ContextType::Function(function) => VariableType::function(function),
+					ContextType::Class(class_type) => VariableType::class(class_type),
+					ContextType::Namespace(content) => VariableType::namespace()
+				}
+			}
 		}
 		return VariableType::inferred();
 	}
