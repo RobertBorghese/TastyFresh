@@ -73,17 +73,30 @@ pub fn print_code_error(title: &str, message: &str, position: &Position, file_co
 
 	let line_text = (line + 1).to_string();
 	let line_digits = line_text.len();
-	let spaces = create_spacing(line_digits);
+	let spaces = repeat_char(b' ', line_digits);
 
 	output += format!("{} |\n", spaces).as_str();
 	output += format!("{} |    {}\n", line_text, line_content).as_str();
-	output += format!("{} |    {}{} {}\n", spaces, create_spacing(start), repeat_char(b'^', end - start), message).as_str();
+	output += format!("{} |    {}{} {}\n", spaces, create_spacing(start, &line_content), repeat_char(b'^', end - start), message).as_str();
 
 	println!("{}\n\n", output);
 }
 
-fn create_spacing(count: usize) -> String {
-	return repeat_char(b' ', count);
+fn create_spacing(count: usize, line_content: &str) -> String {
+	let mut result = "".to_string();
+	let mut index = 0;
+	for c in line_content.chars() {
+		result.push(if c == '\t' {
+			'\t'
+		} else {
+			' '
+		});
+		index += 1;
+		if index >= count {
+			break;
+		}
+	}
+	return result;
 }
 
 fn repeat_char(c: u8, count: usize) -> String {

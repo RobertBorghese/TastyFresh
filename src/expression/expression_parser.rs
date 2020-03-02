@@ -64,6 +64,18 @@ pub enum ExpressionEndReason {
 	NoValueError
 }
 
+impl ExpressionEndReason {
+	pub fn to_string(&self) -> String {
+		return match self {
+			ExpressionEndReason::Unknown => "Unknown Reason".to_string(),
+			ExpressionEndReason::ReachedChar(c) => format!("Reached Char: {}", c),
+			ExpressionEndReason::EndOfContent => "End of Content".to_string(),
+			ExpressionEndReason::EndOfExpression => "End of Expression".to_string(),
+			ExpressionEndReason::NoValueError => "No Value Error".to_string(),
+		}
+	}
+}
+
 /// Represents the different states of the parser.
 #[derive(Copy, Clone, PartialEq)]
 enum ParseState {
@@ -224,6 +236,10 @@ impl<'a> ExpressionParser<'a> {
 		self.parts.push(ExpressionPiece::EncapsulatedValues(Rc::new(expressions), self.generate_pos(start, Some(end))));
 	}
 
+	fn add_initilizer_list(&mut self, expressions: Vec<Rc<Expression>>, start: usize, end: usize) {
+		self.parts.push(ExpressionPiece::InitializerList(Rc::new(expressions), self.generate_pos(start, Some(end))));
+	}
+
 	fn add_function_params(&mut self, expressions: Vec<Rc<Expression>>, start: usize, end: usize) {
 		self.parts.push(ExpressionPiece::FunctionParameters(Rc::new(expressions), self.generate_pos(start, Some(end))));
 	}
@@ -274,39 +290,46 @@ impl<'a> ExpressionParser<'a> {
 		let mut offset = 0;
 		let first_char = parser.chars[value_start];
 		if first_char == '(' {
-			parser.index += space_offset + 1;
+			parser.index += 1;
 			return self.parse_internal_expressions(')', true, parser, context);
+		} else if first_char == '{' {
+			parser.index += 1;
+			return self.parse_internal_expressions('}', true, parser, context);
 		} else {
-			loop {
-				let mut finish = false;
-				let mut number_offset = 0;
-				if value_start + offset >= self.str_len() {
-					finish = true;
-				} else if parser.check_for_number(&mut number_offset) {
-					offset += number_offset - 1;
-					finish = true;
-				} else if parser.check_for_string() {
-					let old_index = parser.index;
-					parser.parse_string();
-					offset = parser.index - old_index + 1;
-					parser.index = old_index;
-					finish = true;
-				} else {
-					let cc = parser.chars[value_start + offset];
-					if !cc.is_alphanumeric() {
+			let mut finish = false;
+			let mut number_offset = 0;
+			if parser.check_for_number(&mut number_offset) {
+				offset += number_offset - 1;
+				finish = true;
+			} else if parser.check_for_string() {
+				let old_index = parser.index;
+				parser.parse_string();
+				offset = parser.index - old_index + 1;
+				parser.index = old_index;
+				finish = true;
+			} else {
+				loop {
+					if value_start + offset >= self.str_len() {
 						finish = true;
+					} else {
+						let cc = parser.chars[value_start + offset];
+						if !cc.is_alphanumeric() {
+							finish = true;
+						}
 					}
-				}
-				if finish {
-					let substr = self.gen_substr(value_start, value_start + offset).to_string();
-					if substr.is_empty() {
+					if finish {
 						break;
 					}
+					offset += 1;
+				}
+			}
+			if finish {
+				let substr = self.gen_substr(value_start, value_start + offset).to_string();
+				if !substr.is_empty() {
 					self.add_value(substr, value_start, value_start + offset);
 					parser.index += offset;
 					return true;
 				}
-				offset += 1;
 			}
 		}
 		return false;
@@ -376,6 +399,7 @@ impl<'a> ExpressionParser<'a> {
 		return match c {
 			'(' => ')',
 			'[' => ']',
+			'{' => '}',
 			_ => ' '
 		}
 	}
@@ -412,12 +436,15 @@ impl<'a> ExpressionParser<'a> {
 	fn parse_internal_expressions(&mut self, end_char: char, is_value: bool, parser: &mut Parser, context: &mut Option<&mut Context>) -> bool {
 		let mut expressions = Vec::new();
 		let start_pos = parser.index;
+		let mut final_line_offset = 0;
 		loop {
 			let chars = vec!(end_char, ',');
 			if self.index_within_bounds(parser) {
 				let expr_parser = ExpressionParser::new(parser, self.generate_pos(parser.index, None), self.config_data, context, Some(chars));
 				expressions.push(expr_parser.expression);
-				parser.index += expr_parser.end_data.end_index + 1;
+				parser.index += 1;//expr_parser.end_data.end_index + 1;
+				final_line_offset = parser.line + expr_parser.position.line_offset;
+				//parser.line = init_line + expr_parser.position.line_offset;
 				if let ExpressionEndReason::ReachedChar(c) = expr_parser.end_data.reason {
 					if end_char == c {
 						break;
@@ -430,12 +457,16 @@ impl<'a> ExpressionParser<'a> {
 		match end_char {
 			')' => {
 				if is_value {
+					if !expressions.is_empty() {
+						parser.line += final_line_offset - expressions.last().as_ref().unwrap().get_line_number().unwrap_or(final_line_offset);
+					}
 					self.add_encapsulated_values(expressions, start_pos, parser.index);
 				} else {
 					self.add_function_params(expressions, start_pos, parser.index);
 				}
 			},
 			']' => self.add_array_access_params(expressions, start_pos, parser.index),
+			'}' => self.add_initilizer_list(expressions, start_pos, parser.index),
 			_ => {}
 		}
 		return true;

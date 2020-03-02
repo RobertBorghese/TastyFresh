@@ -188,7 +188,8 @@ impl FunctionDeclaration {
 				parameters.push((VariableType {
 					var_type: var_type,
 					var_style: param_type,
-					var_properties:None
+					var_properties: None,
+					var_optional: false
 				}, param_name, start, end));
 			}
 		}
@@ -208,13 +209,15 @@ impl FunctionDeclaration {
 				VariableType {
 					var_type: var_type,
 					var_style: var_style,
-					var_properties: None
+					var_properties: None,
+					var_optional: false
 				}
 			} else {
 				VariableType {
 					var_type: Type::Void,
 					var_style: VarStyle::Copy,
-					var_properties: None
+					var_properties: None,
+					var_optional: false
 				}
 			}
 		};

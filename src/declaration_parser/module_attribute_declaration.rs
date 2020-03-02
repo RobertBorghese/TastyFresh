@@ -1,5 +1,5 @@
 /**********************************************************
- * --- Variable Declaration ---
+ * --- Module Attribute Declaration ---
  *
  * Represents a variable declaration prior to being parsed.
  **********************************************************/
@@ -21,32 +21,26 @@ use crate::declaration_parser::declaration::{ Declaration, DeclarationResult };
 use crate::declaration_parser::parser::Parser;
 use crate::declaration_parser::cpp_transpiler::CPPTranspiler;
 
-type AttributeDeclarationResult = DeclarationResult<AttributeDeclaration>;
+type ModuleAttributeDeclarationResult = DeclarationResult<ModuleAttributeDeclaration>;
 
-pub struct AttributeDeclaration {
+pub struct ModuleAttributeDeclaration {
 	pub name: String,
 	pub parameters: Option<Vec<(usize, usize)>>,
 	pub line: usize
 }
 
-impl Declaration<AttributeDeclaration> for AttributeDeclaration {
+impl Declaration<ModuleAttributeDeclaration> for ModuleAttributeDeclaration {
 	fn out_of_space_error_msg() -> &'static str {
 		return "unexpected end of attribute";
 	}
 }
 
-impl CPPTranspiler for AttributeDeclaration {
-	fn to_cpp(&self) -> String {
-		return "".to_string();
-	}
-}
-
-impl AttributeDeclaration {
-	pub fn new(parser: &mut Parser) -> AttributeDeclarationResult {
+impl ModuleAttributeDeclaration {
+	pub fn new(parser: &mut Parser) -> ModuleAttributeDeclarationResult {
 		let initial_line = parser.line;
 
 		let mut next_char = parser.get_curr();
-		if next_char != '@' {
+		if next_char != '#' {
 			return Self::unexpected_character(parser.index);
 		}
 		parser.increment();
@@ -81,7 +75,7 @@ impl AttributeDeclaration {
 			parser.increment();
 		}
 
-		return AttributeDeclarationResult::Ok(AttributeDeclaration {
+		return ModuleAttributeDeclarationResult::Ok(ModuleAttributeDeclaration {
 			name: attribute_name,
 			parameters: parameters,
 			line: initial_line
@@ -94,6 +88,6 @@ impl AttributeDeclaration {
 
 	pub fn is_attribute_declaration(content: &str, index: usize) -> bool {
 		let declare = &content[index..];
-		return declare.starts_with("@");
+		return declare.starts_with("#");
 	}
 }

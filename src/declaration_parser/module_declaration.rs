@@ -11,6 +11,7 @@ use crate::expression::variable_type::{ Type, VarStyle };
 use crate::declaration_parser::declaration::{ Declaration, DeclarationResult };
 use crate::declaration_parser::parser::Parser;
 
+use crate::declaration_parser::module_attribute_declaration::ModuleAttributeDeclaration;
 use crate::declaration_parser::assume_declaration::AssumeDeclaration;
 use crate::declaration_parser::attribute_declaration::AttributeDeclaration;
 use crate::declaration_parser::function_declaration::{ FunctionDeclaration, FunctionDeclarationType };
@@ -19,12 +20,12 @@ use crate::declaration_parser::include_declaration::IncludeDeclaration;
 use crate::declaration_parser::variable_declaration::VariableDeclaration;
 
 pub enum DeclarationType {
-	Assume(AssumeDeclaration),
-	Attribute(AttributeDeclaration),
-	Function(FunctionDeclaration),
-	Import(ImportDeclaration),
-	Include(IncludeDeclaration),
-	Variable(VariableDeclaration)
+	ModuleAttribute(ModuleAttributeDeclaration),
+	Assume(AssumeDeclaration, Option<Vec<AttributeDeclaration>>),
+	Function(FunctionDeclaration, Option<Vec<AttributeDeclaration>>),
+	Import(ImportDeclaration, Option<Vec<AttributeDeclaration>>),
+	Include(IncludeDeclaration, Option<Vec<AttributeDeclaration>>),
+	Variable(VariableDeclaration, Option<Vec<AttributeDeclaration>>)
 }
 
 pub struct ModuleDeclaration {
@@ -32,14 +33,20 @@ pub struct ModuleDeclaration {
 }
 
 macro_rules! parse_declaration {
-	($DeclarationClass:ty, $DeclarationType:ident, $parser:expr, $file_name:expr, $declarations:expr) => {
+	($DeclarationClass:ty, $DeclarationType:ident, $parser:expr, $file_name:expr, $declarations:expr, $attributes:expr) => {
 		if <$DeclarationClass>::is_declaration($parser) {
 			let mut result = <$DeclarationClass>::new($parser);
 			if result.is_error() {
 				result.print_error($file_name.to_string(), &$parser.content);
 			} else {
-				$declarations.push(DeclarationType::$DeclarationType(result.unwrap_and_move()));
+				$declarations.push(DeclarationType::$DeclarationType(result.unwrap_and_move(), if $attributes.is_empty() {
+					None
+				} else {
+					Some(std::mem::replace(&mut $attributes, Vec::new()))
+				}));
 			}
+			$attributes.clear();
+			continue;
 		}
 	}
 }
@@ -47,36 +54,67 @@ macro_rules! parse_declaration {
 impl ModuleDeclaration {
 	pub fn new(parser: &mut Parser, file_name: &str) -> ModuleDeclaration {
 		let mut declarations = Vec::new();
+		let mut attributes = Vec::new();
+
+		while !parser.out_of_space {
+			parser.parse_whitespace();
+
+			if ModuleAttributeDeclaration::is_declaration(parser) {
+				let mut result = ModuleAttributeDeclaration::new(parser);
+				if result.is_error() {
+					result.print_error(file_name.to_string(), &parser.content);
+				} else {
+					declarations.push(DeclarationType::ModuleAttribute(result.unwrap_and_move()));
+				}
+			} else {
+				break;
+			}
+
+			if !parser.out_of_space { parser.increment(); }
+		}
 
 		while !parser.out_of_space {
 			parser.parse_whitespace();
 
 			let initial_index = parser.index;
 
+			if AttributeDeclaration::is_declaration(parser) {
+				let mut result = AttributeDeclaration::new(parser);
+				if result.is_error() {
+					result.print_error(file_name.to_string(), &parser.content);
+				} else {
+					attributes.push(result.unwrap_and_move());
+				}
+				continue;
+			}
+
 			if FunctionDeclaration::is_declaration(parser) {
 				let mut result = FunctionDeclaration::new(parser, FunctionDeclarationType::ModuleLevel);
 				if result.is_error() {
 					result.print_error(file_name.to_string(), &parser.content);
 				} else {
-					declarations.push(DeclarationType::Function(result.unwrap_and_move()));
+					declarations.push(DeclarationType::Function(result.unwrap_and_move(), if attributes.is_empty() {
+						None
+					} else {
+						Some(std::mem::replace(&mut attributes, Vec::new()))
+					}));
 				}
+				attributes.clear();
+				continue;
 			}
 
-			parse_declaration!(AssumeDeclaration, Assume, parser, file_name, declarations);
-			parse_declaration!(AttributeDeclaration, Attribute, parser, file_name, declarations);
-			parse_declaration!(ImportDeclaration, Import, parser, file_name, declarations);
-			parse_declaration!(IncludeDeclaration, Include, parser, file_name, declarations);
-			parse_declaration!(VariableDeclaration, Variable, parser, file_name, declarations);
+			parse_declaration!(AssumeDeclaration, Assume, parser, file_name, declarations, attributes);
+			parse_declaration!(ImportDeclaration, Import, parser, file_name, declarations, attributes);
+			parse_declaration!(IncludeDeclaration, Include, parser, file_name, declarations, attributes);
+			parse_declaration!(VariableDeclaration, Variable, parser, file_name, declarations, attributes);
 
 			if !parser.out_of_space { parser.increment(); }
 
 			if parser.index == initial_index {
-				println!("BROKEN");
+				println!("BROKEN declaration_parser/module_declaration/74");
 				break;
 			}
 		}
-
-		println!("{} - {}", file_name, declarations.len());
 
 		return ModuleDeclaration {
 			declarations: declarations

@@ -12,11 +12,12 @@ lazy_static! {
 	pub static ref VARIABLE_PROPS: Vec<&'static str> = vec!("const", "constexpr", "constinit", "extern", "mutable", "static", "thread_local", "volatile");
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct VariableType {
 	pub var_type: Type,
 	pub var_style: VarStyle,
-	pub var_properties: Option<Vec<VarProps>> 
+	pub var_properties: Option<Vec<VarProps>>,
+	pub var_optional: bool
 }
 
 impl VariableType {
@@ -24,19 +25,50 @@ impl VariableType {
 		return self.var_style.to_cpp(&self.var_type);
 	}
 
-	pub fn from_type_style(info: (VarStyle, Type)) -> VariableType {
+	pub fn from_type_style(info: (VarStyle, Type, bool)) -> VariableType {
 		return VariableType {
 			var_type: info.1,
 			var_style: info.0,
-			var_properties: None
+			var_properties: None,
+			var_optional: info.2
 		};
+	}
+
+	pub fn default_value(&self) -> Option<&'static str> {
+		let is_ptr = self.var_style.is_ptr();
+		if is_ptr.is_none() {
+			return None;
+		} else {
+			if is_ptr.unwrap() {
+				return Some("nullptr");
+			} else {
+				return self.var_type.default_value();
+			}
+		}
 	}
 
 	pub fn inferred() -> VariableType {
 		return VariableType {
 			var_type: Type::Inferred,
 			var_style: VarStyle::Copy,
-			var_properties: None
+			var_properties: None,
+			var_optional: false
+		};
+	}
+
+	pub fn is_inferred(&self) -> bool {
+		if let Type::Inferred = self.var_type {
+			return true;
+		}
+		return false;
+	}
+
+	pub fn initializer_list(var_type: VariableType) -> VariableType {
+		return VariableType {
+			var_type: Type::InitializerList(Box::new(var_type)),
+			var_style: VarStyle::Copy,
+			var_properties: None,
+			var_optional: false
 		};
 	}
 
@@ -44,7 +76,8 @@ impl VariableType {
 		return VariableType {
 			var_type: var_type,
 			var_style: VarStyle::Copy,
-			var_properties: None
+			var_properties: None,
+			var_optional: false
 		};
 	}
 
@@ -52,7 +85,8 @@ impl VariableType {
 		return VariableType {
 			var_type: Type::Inferred,
 			var_style: VarStyle::Namespace,
-			var_properties: None
+			var_properties: None,
+			var_optional: false
 		};
 	}
 
@@ -67,7 +101,8 @@ impl VariableType {
 		return VariableType {
 			var_type: Type::Boolean,
 			var_style: VarStyle::Copy,
-			var_properties: None
+			var_properties: None,
+			var_optional: false
 		};
 	}
 
@@ -75,7 +110,8 @@ impl VariableType {
 		return VariableType {
 			var_type: Type::Class(cls),
 			var_style: VarStyle::Copy,
-			var_properties: None
+			var_properties: None,
+			var_optional: false
 		};
 	}
 
@@ -83,12 +119,22 @@ impl VariableType {
 		return VariableType {
 			var_type: Type::Function(Box::new(func)),
 			var_style: VarStyle::Copy,
-			var_properties: None
+			var_properties: None,
+			var_optional: false
+		};
+	}
+
+	pub fn tuple(tuple_types: Vec<VariableType>) -> VariableType {
+		return VariableType {
+			var_type: Type::Tuple(tuple_types),
+			var_style: VarStyle::Copy,
+			var_properties: None,
+			var_optional: false
 		};
 	}
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum Type {
 	Unknown(String),
 	Void,
@@ -97,6 +143,8 @@ pub enum Type {
 	String(StringType),
 	Class(ClassType),
 	Function(Box<Function>),
+	InitializerList(Box<VariableType>),
+	Tuple(Vec<VariableType>),
 	Inferred,
 	Undeclared(Vec<String>),
 	UndeclaredWParams(Vec<String>, Vec<VariableType>)
@@ -117,7 +165,7 @@ pub struct Function {
 
 impl Type {
 	pub fn to_cpp(&self) -> String {
-		match self {
+		return match self {
 			Type::Unknown(name) => name.clone(),
 			Type::Void => "void".to_string(),
 			Type::Boolean => "bool".to_string(),
@@ -134,6 +182,23 @@ impl Type {
 					}
 				}
 				format!("std::function<{}({})>", func.return_type.to_cpp(), params_output)
+			},
+			Type::InitializerList(init_type) => {
+				format!("std::initializer_list<{}>", init_type.to_cpp())
+			}
+			Type::Tuple(types) => {
+				let mut is_inferred = false;
+				for t in types {
+					if t.is_inferred() {
+						is_inferred = true;
+						break;
+					}
+				}
+				if is_inferred {
+					"auto".to_string()
+				} else {
+					format!("std::tuple<{}>", types.iter().map(|t| t.to_cpp()).collect::<Vec<String>>().join(", "))
+				}
 			}
 			Type::Inferred => "auto".to_string(),
 			Type::Undeclared(names) => {
@@ -172,9 +237,33 @@ impl Type {
 			}
 		}
 	}
+
+	pub fn is_inferred(&self) -> bool {
+		if let Type::Inferred = self {
+			return true;
+		}
+		return false;
+	}
+
+	pub fn default_value(&self) -> Option<&'static str> {
+		return match self {
+			Type::Unknown(name) => None,
+			Type::Void => None,
+			Type::Boolean => Some("false"),
+			Type::Number(num_type) => Some("0"),
+			Type::String(string_type) => Some("\"\""),
+			Type::Class(class_type) => None,
+			Type::Function(func) => Some("nullptr"),
+			Type::InitializerList(init_type) => Some("{}"),
+			Type::Tuple(types) => None,
+			Type::Inferred => None,
+			Type::Undeclared(names) => None,
+			Type::UndeclaredWParams(names, type_args) => None
+		}
+	}
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum VarStyle {
 	Unknown,
 	Namespace,
@@ -270,9 +359,24 @@ impl VarStyle {
 			_ => false
 		}
 	}
+
+	pub fn is_ptr(&self) -> Option<bool> {
+		return match self {
+			VarStyle::Copy => Some(false),
+			VarStyle::Ref => Some(false),
+			VarStyle::Borrow => Some(false),
+			VarStyle::Move => Some(false),
+			VarStyle::Ptr => Some(true),
+			VarStyle::AutoPtr => Some(true),
+			VarStyle::UniquePtr => Some(true),
+			VarStyle::ClassPtr => Some(true),
+			VarStyle::Namespace => None,
+			VarStyle::Unknown => None
+		}
+	}
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum VarProps {
 	Unknown,
 	Const,

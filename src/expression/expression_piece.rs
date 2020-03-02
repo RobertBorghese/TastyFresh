@@ -25,6 +25,7 @@ pub enum ExpressionPiece {
 	Suffix(usize, Position),
 	Infix(usize, Position),
 	EncapsulatedValues(Rc<Vec<Rc<Expression>>>, Position),
+	InitializerList(Rc<Vec<Rc<Expression>>>, Position),
 	FunctionParameters(Rc<Vec<Rc<Expression>>>, Position),
 	ArrayAccessParameters(Rc<Vec<Rc<Expression>>>, Position),
 	TernaryCondition(Rc<Vec<Rc<Expression>>>, Position)
@@ -35,11 +36,37 @@ impl ExpressionPiece {
 		return match self {
 			ExpressionPiece::EncapsulatedValues(exprs, _) => {
 				if exprs.len() > 0 {
-					Some((*exprs.last().unwrap()).get_type())
+					let mut result = Vec::new();
+					for e in exprs.iter() {
+						result.push(((**e)).get_type());
+					}
+					Some(VariableType::tuple(result))
 				} else {
 					None
 				}
 			},
+			ExpressionPiece::InitializerList(exprs, _) => {
+				if exprs.len() > 0 {
+					let mut curr: Option<VariableType> = None;
+					for e in exprs.iter() {
+						if curr.is_none() {
+							curr = Some(e.get_type().clone());
+						} else {
+							if *curr.as_ref().unwrap() != e.get_type() {
+								curr = None;
+								break;
+							}
+						}
+					}
+					if curr.is_none() {
+						None
+					} else {
+						Some(VariableType::initializer_list(curr.unwrap().clone()))
+					}
+				} else {
+					None
+				}
+			}
 			ExpressionPiece::Expression(expr) => {
 				Some(expr.get_type())
 			},
@@ -161,6 +188,9 @@ impl ExpressionPiece {
 			},
 			ExpressionPiece::EncapsulatedValues(expressions, position) => {
 				Some(Rc::new(Expression::Expressions(Rc::clone(expressions), piece.get_encapsulated_type().unwrap_or(VariableType::inferred()), position.clone())))
+			},
+			ExpressionPiece::InitializerList(expressions, position) => {
+				Some(Rc::new(Expression::InitializerList(Rc::clone(expressions), piece.get_encapsulated_type().unwrap_or(VariableType::inferred()), position.clone())))
 			},
 			_ => None
 		};

@@ -31,6 +31,15 @@ pub enum IncludeType {
 	Header
 }
 
+impl IncludeType {
+	pub fn is_local(&self) -> bool {
+		return match self {
+			IncludeType::Local => true,
+			IncludeType::Header => false
+		}
+	}
+}
+
 impl Declaration<IncludeDeclaration> for IncludeDeclaration {
 	fn out_of_space_error_msg() -> &'static str {
 		return "unexpected end of include";

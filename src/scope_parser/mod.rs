@@ -28,8 +28,8 @@ use std::rc::Rc;
 pub enum ScopeExpression {
 	Expression(Rc<Expression>),
 	Scope(Vec<ScopeExpression>),
-	VariableDeclaration(VariableDeclaration, Rc<Expression>),
-	Return(Rc<Expression>)
+	VariableDeclaration(VariableDeclaration, Option<Rc<Expression>>),
+	Return(Rc<Expression>, usize)
 }
 
 impl ScopeExpression {
@@ -49,7 +49,8 @@ impl ScopeExpression {
 					parser.parse_whitespace();
 					if parser.get_curr() == ';' {
 						parser.increment();
-						scope_exprs.push(ScopeExpression::Return(result.unwrap_and_move().expression));
+						let return_declare = result.unwrap_and_move();
+						scope_exprs.push(ScopeExpression::Return(return_declare.expression, return_declare.line));
 					}
 				}
 			} else if VariableDeclaration::is_declaration(parser) {
@@ -59,18 +60,26 @@ impl ScopeExpression {
 					break;
 				} else {
 					let mut var_declare = result.unwrap_and_move();
-					parser.reset(var_declare.start_index, var_declare.line);
-					let mut reason = ExpressionEndReason::Unknown;
-					let expr = parser.parse_expression(file.to_string(), config_data, Some(context), &mut reason);
-					if reason == ExpressionEndReason::EndOfExpression {
-						parser.parse_whitespace();
+					if var_declare.value.is_some() {
+						parser.reset(var_declare.value.as_ref().unwrap().0, var_declare.line);
+						let mut reason = ExpressionEndReason::Unknown;
+						let expr = parser.parse_expression(file.to_string(), config_data, Some(context), &mut reason);
+						if reason == ExpressionEndReason::EndOfExpression {
+							parser.parse_whitespace();
+							if parser.get_curr() == ';' {
+								parser.increment();
+								if var_declare.var_type.is_inferred() {
+									var_declare.var_type.var_type = expr.get_type().var_type;
+								}
+								context.add_variable(var_declare.name.clone(), var_declare.var_type.clone());
+								scope_exprs.push(ScopeExpression::VariableDeclaration(var_declare, Some(expr)));
+							}
+						}
+					} else {
+						context.add_variable(var_declare.name.clone(), var_declare.var_type.clone());
+						scope_exprs.push(ScopeExpression::VariableDeclaration(var_declare, None));
 						if parser.get_curr() == ';' {
 							parser.increment();
-							if let Type::Inferred = var_declare.var_type.var_type {
-								var_declare.var_type.var_type = expr.get_type().var_type;
-							}
-							context.add_variable(var_declare.name.clone(), var_declare.var_type.clone());
-							scope_exprs.push(ScopeExpression::VariableDeclaration(var_declare, expr));
 						}
 					}
 				}
@@ -98,7 +107,7 @@ impl ScopeExpression {
 				let mut lines = Vec::new();
 				for e in exprs {
 					let line = (e.to_string(operators, line_offset, tab_offset, context));
-					let line_number = e.get_expression().unwrap().get_line_number() - line_offset;
+					let line_number = e.get_line().unwrap_or(line_offset) - line_offset;
 					while line_number >= lines.len() {
 						lines.push(Vec::new());
 					}
@@ -106,8 +115,9 @@ impl ScopeExpression {
 				}
 				let tabs = String::from_utf8(vec![b'\t'; tab_offset]).unwrap_or("".to_string());
 				let mut content = Vec::new();
-				for l in lines {
-					content.push(tabs.clone() + &l.join(" "));
+				for l in &lines {
+					let sub_lines = l.join(" ").split("\n").map(|line| if line.is_empty() { "".to_string() } else { tabs.clone() + line }).collect::<Vec<String>>().join("\n");
+					content.push(sub_lines);
 				}
 				content.join("\n")
 			},
@@ -115,11 +125,9 @@ impl ScopeExpression {
 				format!("{};", expr.to_string(operators, context))
 			},
 			ScopeExpression::VariableDeclaration(declaration, expr) => {
-				let var_type = &declaration.var_type;
-				println!("DELCARE TYPE: {}", var_type.var_style.get_name());
-				format!("{} {} = {};", var_type.to_cpp(), declaration.name, expr.to_string(operators, context))
+				declaration.to_cpp(expr, operators, context)
 			},
-			ScopeExpression::Return(expr) => {
+			ScopeExpression::Return(expr, _) => {
 				format!("return {};", expr.to_string(operators, context))
 			}
 		}
@@ -128,8 +136,23 @@ impl ScopeExpression {
 	pub fn get_expression(&self) -> Option<Rc<Expression>> {
 		return match self {
 			ScopeExpression::Expression(expr) => Some(Rc::clone(expr)),
-			ScopeExpression::VariableDeclaration(_, expr) => Some(Rc::clone(expr)),
-			ScopeExpression::Return(expr) => Some(Rc::clone(expr)),
+			ScopeExpression::VariableDeclaration(_, expr) => {
+				if expr.is_some() {
+					Some(Rc::clone(expr.as_ref().unwrap()))
+				} else {
+					None
+				}
+			},
+			ScopeExpression::Return(expr, _) => Some(Rc::clone(expr)),
+			_ => None
+		};
+	}
+
+	pub fn get_line(&self) -> Option<usize> {
+		return match self {
+			ScopeExpression::Expression(expr) => expr.get_line_number(),
+			ScopeExpression::VariableDeclaration(declare, _) => Some(declare.line),
+			ScopeExpression::Return(_, line) => Some(*line),
 			_ => None
 		};
 	}

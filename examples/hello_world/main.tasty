@@ -1,8 +1,8 @@
 include system iostream;
 
-copy glob = 32;
+copy glob1 = 65; copy glob2 = 32;
 
-fn main() -> int {
+fn main() {
 	std.cout << "Hello, World!" << std.endl; std.cout << "Secnd line combo" << std.endl;
 
 	copy a = 31.2l;
@@ -14,5 +14,15 @@ fn main() -> int {
 
 	b.test = 32;
 
-	return 0;
+	copy fds = ("jfdklsfjds", 54);
+
+	autoptr fds: int;
+
+	copy bla: vector<(int, int)>;
+
+	return 123;
+}
+
+fn secondFunction() -> ptr (unsigned int, long double) {
+	return (43, 64);
 }

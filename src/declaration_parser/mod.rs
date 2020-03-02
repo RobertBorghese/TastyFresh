@@ -10,6 +10,7 @@
 pub mod parser;
 pub mod declaration;
 pub mod module_declaration;
+pub mod module_attribute_declaration;
 pub mod assume_declaration;
 pub mod variable_declaration;
 pub mod function_declaration;

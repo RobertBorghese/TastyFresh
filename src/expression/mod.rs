@@ -31,6 +31,7 @@ pub enum Expression {
 	Infix(Rc<Expression>, Rc<Expression>, usize, VariableType, Position),
 	Ternary(Rc<Expression>, Rc<Expression>, Rc<Expression>, usize, VariableType),
 	Expressions(Rc<Vec<Rc<Expression>>>, VariableType, Position),
+	InitializerList(Rc<Vec<Rc<Expression>>>, VariableType, Position),
 	FunctionCall(Rc<Vec<Rc<Expression>>>, VariableType, Position),
 	ArrayAccess(Rc<Vec<Rc<Expression>>>, VariableType, Position)
 }
@@ -47,6 +48,7 @@ impl Expression {
 				Expression::Infix(_, _, _, v, _) => v,
 				Expression::Ternary(_, _, _, _, v) => v,
 				Expression::Expressions(_, v, _) => v,
+				Expression::InitializerList(_, v, _) => v,
 				Expression::FunctionCall(_, v, _) => v,
 				Expression::ArrayAccess(_, v, _) => v,
 				Expression::Invalid => panic!("Invalid!")
@@ -54,23 +56,24 @@ impl Expression {
 		}
 	}
 
-	pub fn get_line_number(&self) -> usize {
+	pub fn get_line_number(&self) -> Option<usize> {
 		if let Expression::Invalid = self {
-			return 0;
-		} else if let Expression::Ternary(..) = self {
-			return 0;
+			return None;
+		} else if let Expression::Ternary(e, _, _, _, _) = self {
+			return e.get_line_number();
 		} else {
-			return match self {
+			return Some(match self {
 				Expression::Value(_, _, p) => p,
 				Expression::Prefix(_, _, _, p) => p,
 				Expression::Suffix(_, _, _, p) => p,
 				Expression::Infix(_, _, _, _, p) => p,
 				Expression::Ternary(_, _, _, _, _) => panic!("Ternary!"),
 				Expression::Expressions(_, _, p) => p,
+				Expression::InitializerList(_, _, p) => p,
 				Expression::FunctionCall(_, _, p) => p,
 				Expression::ArrayAccess(_, _, p) => p,
 				Expression::Invalid => panic!("Invalid!")
-			}.line.unwrap_or(0);
+			}.line.unwrap_or(0));
 		}
 	}
 
@@ -100,8 +103,38 @@ impl Expression {
 			Expression::Ternary(..) => {
 				String::from("[ternary]")
 			},
-			Expression::Expressions(..) => {
-				String::from("[expressions]")
+			Expression::Expressions(exprs, _, _) => {
+				let mut expr_list = Vec::new();
+				let mut curr_line: Option<usize> = None;
+				for e in exprs.iter() {
+					let prefix_lines = if curr_line.is_some() {
+						let curr = curr_line.unwrap();
+						let result = e.get_line_number().unwrap_or(curr) - curr;
+						curr_line = Some(e.get_line_number().unwrap_or(curr));
+						result
+					} else {
+						curr_line = Some(e.get_line_number().unwrap_or(0));
+						0
+					};
+					let prefix = if prefix_lines == 0 {
+						"".to_string()
+					} else {
+						let mut result = "".to_string();
+						for i in 0..prefix_lines {
+							result += "\n\t";
+						}
+						result
+					};
+					expr_list.push(prefix + &e.to_string(operators, context));
+				}
+				format!("std::make_tuple({})", expr_list.join(", "))
+			},
+			Expression::InitializerList(exprs, _, _) => {
+				let mut expr_list = Vec::new();
+				for e in exprs.iter() {
+					expr_list.push(e.to_string(operators, context));
+				}
+				format!("{{ {} }}", expr_list.join(", "))
 			},
 			Expression::FunctionCall(..) => {
 				String::from("[functioncall]")

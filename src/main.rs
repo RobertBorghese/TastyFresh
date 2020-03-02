@@ -43,6 +43,7 @@ mod file_system;
 #[macro_use]
 extern crate lazy_static;
 
+use expression::Expression;
 use expression::expression_parser::{ ExpressionParser, ExpressionEndReason };
 
 use context_management::position::Position;
@@ -70,6 +71,8 @@ use std::collections::BTreeMap;
 
 use std::path::Path;
 use std::ffi::OsStr;
+
+use std::rc::Rc;
 
 use regex::Regex;
 
@@ -225,10 +228,10 @@ fn parse_source_file(file: &str, output_dirs: &Vec<String>, config_data: &Config
 	let module_declaration = ModuleDeclaration::new(parser, file);
 	for declaration in &module_declaration.declarations {
 		match declaration {
-			DeclarationType::Function(d) => {
+			DeclarationType::Function(d, attributes) => {
 				context.add_function(d.name.clone(), d.to_function(&parser.content));
 			},
-			DeclarationType::Variable(d) => {
+			DeclarationType::Variable(d, attributes) => {
 				context.add_variable(d.name.clone(), d.var_type.clone());
 			},
 			_ => {
@@ -250,24 +253,37 @@ fn parse_source_file(file: &str, output_dirs: &Vec<String>, config_data: &Config
 /// # Return
 ///
 /// If successful, `true` is returned; otherwise `false`.
-fn transpile_source_file(file: &str, output_dirs: &Vec<String>, config_data: &ConfigData, module_contexts: &BTreeMap<String,Context>, module_declaration: &ModuleDeclaration, parser: &mut Parser) -> bool {
+fn transpile_source_file(file: &str, output_dirs: &Vec<String>, config_data: &ConfigData, module_contexts: &mut BTreeMap<String,Context>, module_declaration: &mut ModuleDeclaration, parser: &mut Parser) -> bool {
 	let mut context = Context::new(false);
 	context.add(module_contexts.get(file).unwrap());
 	let mut output_lines = Vec::new();
-	for declaration in &module_declaration.declarations {
+
+	let mut variable_declarations = Vec::new();
+	let mut function_declarations = Vec::new();
+	
+	for declaration in &mut module_declaration.declarations {
 		match declaration {
-			DeclarationType::Import(d) => {
-				//let path = d.path;
-				context.add(module_contexts.get(&d.path).unwrap());
-			}
-			DeclarationType::Function(d) => {
+			DeclarationType::Assume(assume, attributes) => {
+			},
+			DeclarationType::Import(import, attributes) => {
+				context.add(module_contexts.get(&import.path).unwrap());
+			},
+			DeclarationType::Include(include, attributes) => {
+				insert_output_line(&mut output_lines, format!("#include {}", if include.inc_type.is_local() {
+					format!("\"{}\"", include.path)
+				} else {
+					format!("<{}>", include.path)
+				}).as_str(), include.line);
+			},
+			DeclarationType::Function(func_data, attributes) => {
 				let mut func_content: Option<String> = None;
-				if d.start_index.is_some() && d.end_index.is_some() {
-					let scope = ScopeExpression::new(parser, d.start_index.unwrap(), d.line, file, config_data, &mut context);
-					func_content = Some(scope.to_string(&config_data.operators, d.line, 1, &mut context));
+				if func_data.start_index.is_some() && func_data.end_index.is_some() {
+					let scope = ScopeExpression::new(parser, func_data.start_index.unwrap(), func_data.line, file, config_data, &mut context);
+					func_content = Some(scope.to_string(&config_data.operators, func_data.line, 1, &mut context));
 				}
-				let mut line = d.line;
-				insert_output_line(&mut output_lines, &d.to_function(&file).to_cpp(), line);
+				let mut line = func_data.line;
+				let func_declaration = func_data.to_function(&file).to_cpp();
+				insert_output_line(&mut output_lines, &func_declaration, line);
 				if func_content.is_some() {
 					let re = Regex::new("(?:\n|\n\r)").unwrap();
 					insert_output_line(&mut output_lines, " {", line);
@@ -279,20 +295,77 @@ fn transpile_source_file(file: &str, output_dirs: &Vec<String>, config_data: &Co
 				} else {
 					insert_output_line(&mut output_lines, ";", line);
 				}
+				let mut add_to_header = true;
+				if attributes.is_some() {
+					for a in attributes.as_ref().unwrap() {
+						if a.name == "NoHeader" {
+							add_to_header = false;
+						}
+					}
+				}
+				if add_to_header {
+					function_declarations.push(format!("{};", func_declaration));
+				}
 			},
-			DeclarationType::Variable(d) => {
+			DeclarationType::Variable(var_data, attributes) => {
+				let mut reason = ExpressionEndReason::Unknown;
+				let mut expr: Option<Rc<Expression>> = None;
+				if var_data.value.is_some() {
+					parser.reset(var_data.value.unwrap().0, var_data.line);
+					expr = Some(parser.parse_expression(file.to_string(), config_data, Some(&mut context), &mut reason));
+					if var_data.var_type.is_inferred() {
+						var_data.var_type.var_type = expr.as_ref().unwrap().get_type().var_type;
+					}
+				}
+				let var_type = &var_data.var_type;
+				insert_output_line(&mut output_lines, &var_data.to_cpp(&expr, &config_data.operators, &mut context), var_data.line);
+				let mut add_to_header = true;
+				if attributes.is_some() {
+					for a in attributes.as_ref().unwrap() {
+						if a.name == "NoHeader" {
+							add_to_header = false;
+						}
+					}
+				}
+				if add_to_header {
+					variable_declarations.push(format!("{} {};", var_type.to_cpp(), var_data.name));
+				}
 			},
 			_ => {
 			}
 		}
 	}
-	let output_content = output_lines.join("\n");
+
+	let mut header_lines = Vec::new();
+	{
+		let file_path = Path::new(file);
+		let marco_name = file_path.file_stem().unwrap().to_str().unwrap().to_uppercase() + "_TASTYFILE";
+		header_lines.push("#ifndef ".to_string() + &marco_name);
+		header_lines.push("#define ".to_string() + &marco_name);
+		header_lines.push("".to_string());
+		if !variable_declarations.is_empty() {
+			for d in variable_declarations {
+				header_lines.push(d);
+			}
+			header_lines.push("".to_string());
+		}
+		if !function_declarations.is_empty() {
+			for d in function_declarations {
+				header_lines.push(d);
+			}
+			header_lines.push("".to_string());
+		}
+		header_lines.push("#endif".to_string());
+	}
+
 	for dir in output_dirs {
 		let path = Path::new(dir).join(file);
 		let path_str = path.to_str();
 		if path_str.is_some() {
 			let path_str_unwrap = path_str.unwrap();
-			std::fs::write(path_str_unwrap[..(path_str_unwrap.len() - path.extension().and_then(OsStr::to_str).unwrap_or("").len())].to_string() + "cpp", &output_content);
+			let path_base = path_str_unwrap[..(path_str_unwrap.len() - path.extension().and_then(OsStr::to_str).unwrap_or("").len())].to_string();
+			std::fs::write(path_base.clone() + "cpp", output_lines.join("\n"));
+			std::fs::write(path_base + "hpp", header_lines.join("\n"));
 		} else {
 			println!("\nCOULD NOT WRITE TO FILE: {}", format!("{}{}", dir, file));
 		}
@@ -303,6 +376,9 @@ fn transpile_source_file(file: &str, output_dirs: &Vec<String>, config_data: &Co
 fn insert_output_line(output_lines: &mut Vec<String>, line: &str, line_number: usize) {
 	while line_number >= output_lines.len() {
 		output_lines.push("".to_string());
+	}
+	if !output_lines[line_number].is_empty() {
+		output_lines[line_number] += " ";
 	}
 	output_lines[line_number] += line;
 }
@@ -337,7 +413,7 @@ fn main() {
 
 	for files in &source_files {
 		for f in files.1 {
-			transpile_source_file(&f, &output_dirs, &data, &file_contexts, file_declarations.get_mut(f).unwrap(), file_parsers.get_mut(f).unwrap());
+			transpile_source_file(&f, &output_dirs, &data, &mut file_contexts, file_declarations.get_mut(f).unwrap(), file_parsers.get_mut(f).unwrap());
 		}
 	}
 
@@ -381,7 +457,8 @@ fn main() {
 	println!("{}", rr.var_type.var_style.get_name());
 	println!("{}", rr.var_type.var_type.to_cpp());
 	println!("{}", rr.name);
-	println!("RESULT: {}", &c[rr.start_index..rr.end_index]);
+	let val = rr.value.unwrap();
+	println!("RESULT: {}", &c[val.0..val.1]);
 
 	// ATTRIBUTE
 	let attribute_content = " fdjs fdsjkldfs @Test(fds fdksleqw 21l dsfd, 999)";

@@ -41,7 +41,7 @@ impl Parser {
 			content: content,
 			chars: chars,
 			index: 0,
-			line: 1,
+			line: 0,
 			out_of_space: false
 		}
 	}
@@ -75,6 +75,25 @@ impl Parser {
 	pub fn check_ahead(&self, check: &str) -> bool {
 		let slice = &self.content[self.index..];
 		return slice.starts_with(check)
+	}
+
+	/// Checks if the next characters match the `&str` provided.
+	/// If they do, the parser is moved past the checked content.
+	///
+	/// # Arguments
+	///
+	/// * `check` - The content to check for.
+	///
+	/// # Return
+	///
+	/// If the next characters match `check`, `true` is returned; otherwise, `false`.
+	pub fn check_ahead_and_move(&mut self, check: &str) -> bool {
+		let slice = &self.content[self.index..];
+		if slice.starts_with(check) {
+			self.index += check.len();
+			return true;
+		}
+		return false;
 	}
 
 	/// Checks if the end of the content has been reached.
@@ -119,6 +138,20 @@ impl Parser {
 	/// If the `char` is a number, `true` is returned; otherwise, `false`.
 	pub fn curr_is_numeric(&self) -> bool {
 		return self.get_curr() >= 48 as char && self.get_curr() <= 57 as char;
+	}
+
+	/// Checks if the current `char` is valid in a Tasty Fresh variable name.
+	///
+	///
+	/// # Arguments
+	///
+	/// * `is_first` - If this is the first character of the variable.
+	///
+	/// # Return
+	///
+	/// If the `char` is valid, `true` is returned; otherwise, `false`.
+	pub fn curr_is_valid_var_char(&self, is_first: bool) -> bool {
+		return self.curr_is_alphabetic() || (!is_first && self.curr_is_numeric());
 	}
 
 	/// Checks if the current `char` is a hex digit character.
@@ -180,7 +213,6 @@ impl Parser {
 			self.parse_until('\n');
 			self.increment();
 			self.line += 1;
-			self.increment();
 			return true;
 		} else if self.check_ahead("/*") {
 			loop {
@@ -215,8 +247,10 @@ impl Parser {
 		if self.check_for_end() {
 			return result;
 		}
-		while self.curr_is_alphabetic() {
+		let mut first = true;
+		while self.curr_is_valid_var_char(first) {
 			result.push(self.chars[self.index]);
+			first = false;
 			if self.increment() {
 				break;
 			}
@@ -475,6 +509,33 @@ impl Parser {
 		let mut long = false;
 		let mut name_chain: Vec<String> = Vec::new();
 
+		if self.get_curr() == '(' {
+			self.increment();
+			self.parse_whitespace();
+			if self.get_curr() == ')' {
+				self.increment();
+				return Type::Void;
+			}
+			let mut tuple_types = Vec::new();
+			loop {
+				let old_index = self.index;
+				tuple_types.push(VariableType::from_type_style(self.parse_type_and_style(unexpected_character, conflicting_specifiers)));
+				if self.out_of_space || *unexpected_character {
+					break;
+				}
+				if self.get_curr() == ',' {
+					self.increment();
+				} else if self.get_curr() == ')' {
+					self.increment();
+					return Type::Tuple(tuple_types);
+				}
+				if self.index == old_index {
+					break;
+				}
+			}
+			return Type::Inferred;
+		}
+
 		// Get Type Name and Specifiers
 		'outer: loop {
 			let content = self.parse_ascii_char_name();
@@ -597,7 +658,7 @@ impl Parser {
 							name_chain.push(type_name.to_string());
 							loop {
 								self.parse_whitespace();
-								if self.check_ahead("::") || self.check_ahead(".") {
+								if self.check_ahead_and_move("::") || self.check_ahead_and_move(".") {
 									let content = self.parse_ascii_char_name();
 									if self.out_of_space { return Type::Inferred; }
 									name_chain.push(content);
@@ -669,10 +730,10 @@ impl Parser {
 	/// # Return
 	///
 	/// Returns the `VarStyle` as `Copy` by default and the `Type` as a primitive, `Inferred`, `Undeclared` or `UndeclaredWParams`.
-	pub fn parse_type_and_style(&mut self, unexpected_character: &mut bool, conflicting_specifiers: &mut Option<&'static str>) -> (VarStyle, Type) {
+	pub fn parse_type_and_style(&mut self, unexpected_character: &mut bool, conflicting_specifiers: &mut Option<&'static str>) -> (VarStyle, Type, bool) {
 		let old_index = self.index;
 		let content = self.parse_ascii_char_name();
-		if self.out_of_space { return (VarStyle::Copy, Type::Inferred); }
+		if self.out_of_space { return (VarStyle::Copy, Type::Inferred, false); }
 
 		let mut style = VarStyle::Copy;
 		if VarStyle::styles().contains(&content.as_str()) {
@@ -685,6 +746,14 @@ impl Parser {
 
 		let var_type = self.parse_type(unexpected_character, conflicting_specifiers);
 
-		return (style, var_type);
+		self.parse_whitespace();
+
+		let mut optional = false;
+		if self.get_curr() == '?' {
+			optional = true;
+			self.increment();
+		}
+
+		return (style, var_type, optional);
 	}
 }

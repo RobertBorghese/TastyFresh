@@ -48,7 +48,7 @@ impl ValueType {
 	}
 }*/
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum NumberType {
 	Byte,
 	UByte,
@@ -206,7 +206,7 @@ impl NumberType {
 	}
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum StringType {
 	ConstCharArray,
 	MutlilineConstCharArray,
@@ -223,7 +223,7 @@ impl StringType {
 	}
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct ClassType {
 	pub name: String,
 	pub type_params: Option<Vec<VariableType>>,
@@ -231,7 +231,7 @@ pub struct ClassType {
 	pub functions: Vec<Function>
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct Property {
 	pub name: String,
 	pub prop_type: VariableType,
@@ -247,7 +247,7 @@ impl Property {
 	}
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct Function {
 	pub name: String,
 	pub parameters: Vec<Property>,
