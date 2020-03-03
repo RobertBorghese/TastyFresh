@@ -24,7 +24,7 @@ use crate::expression::value_type::{ Function, Property };
 use crate::declaration_parser::declaration::{ Declaration, DeclarationResult };
 use crate::declaration_parser::parser::Parser;
 
-use crate::context_management::typing_context::Context;
+use crate::context_management::context::Context;
 
 use crate::config_management::operator_data::OperatorDataStructure;
 

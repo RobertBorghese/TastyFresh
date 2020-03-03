@@ -13,7 +13,7 @@ use crate::expression::expression_parser::{ ExpressionParser, ExpressionEndReaso
 use crate::config_management::ConfigData;
 
 use crate::context_management::position::Position;
-use crate::context_management::typing_context::Context;
+use crate::context_management::context::Context;
 
 use std::rc::Rc;
 

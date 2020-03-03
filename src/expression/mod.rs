@@ -17,7 +17,7 @@ use crate::config_management::operator_data::OperatorDataStructure;
 use crate::expression::variable_type::VariableType;
 
 use crate::context_management::position::Position;
-use crate::context_management::typing_context::Context;
+use crate::context_management::context::Context;
 
 use std::rc::Rc;
 
@@ -93,9 +93,9 @@ impl Expression {
 			},
 			Expression::Infix(expr_left, expr_right, id, _, _) => {
 				if *id <= 1 {
-					let unknown_op = "".to_string();
-					let op = if *id == 1 && expr_left.get_type().is_namespace() { "::" } else { operators["infix"][*id].name.as_ref().unwrap_or(&unknown_op) };
-					String::from(format!("{}{}{}", expr_left.to_string(operators, context), op, expr_right.to_string(operators, context)))
+					let expr_right_str = expr_right.to_string(operators, context);
+					let op = expr_left.get_type().access_operator(&expr_right_str);
+					String::from(format!("{}{}{}", expr_left.to_string(operators, context), op, expr_right_str))
 				} else {
 					String::from(format!("{} {} {}", expr_left.to_string(operators, context), operators["infix"][*id].name.as_ref().unwrap_or(&"".to_string()), expr_right.to_string(operators, context)))
 				}

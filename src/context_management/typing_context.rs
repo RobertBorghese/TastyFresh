@@ -19,22 +19,23 @@ pub enum ContextType {
 	Namespace(BTreeMap<String,ContextType>)
 }
 
-pub struct Context {
+#[derive(Clone)]
+pub struct TypingContext {
 	known_data: Vec<BTreeMap<String,ContextType>>
 }
 
-impl Context {
-	pub fn new(module_only: bool) -> Context {
+impl TypingContext {
+	pub fn new(module_only: bool) -> TypingContext {
 		let mut data = Vec::new();
 		if !module_only { data.push(Self::global_data()); }
-		let mut result = Context {
+		let mut result = TypingContext {
 			known_data: data
 		};
 		result.push_context();
 		return result;
 	}
 
-	pub fn add(&mut self, ctx: &Context) {
+	pub fn add(&mut self, ctx: &TypingContext) {
 		for data in &ctx.known_data {
 			self.known_data.push(data.clone());
 		}

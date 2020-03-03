@@ -25,7 +25,6 @@ type ModuleAttributeDeclarationResult = DeclarationResult<ModuleAttributeDeclara
 
 pub struct ModuleAttributeDeclaration {
 	pub name: String,
-	pub parameters: Option<Vec<(usize, usize)>>,
 	pub line: usize
 }
 
@@ -40,7 +39,7 @@ impl ModuleAttributeDeclaration {
 		let initial_line = parser.line;
 
 		let mut next_char = parser.get_curr();
-		if next_char != '#' {
+		if next_char != '%' {
 			return Self::unexpected_character(parser.index);
 		}
 		parser.increment();
@@ -49,35 +48,14 @@ impl ModuleAttributeDeclaration {
 		let mut attribute_name = "".to_string();
 		declare_parse_ascii!(attribute_name, parser);
 
-		// Parse Whitespace
-		declare_parse_whitespace!(parser);
-
-		let mut parameters = None;
 		next_char = parser.get_curr();
-		if next_char == '(' {
-			parser.increment();
-			let mut params = Vec::new();
-			loop {
-				let start = parser.index;
-				let mut result = ' ';
-				declare_parse_expr_until_either_char!(',', ')', result, parser);
-				if result == ')' {
-					params.push((start, parser.index));
-					break;
-				} else if result == ',' {
-					params.push((start, parser.index));
-					parser.increment();
-				} else {
-					return Self::out_of_space(parser.index);
-				}
-			}
-			parameters = Some(params);
-			parser.increment();
+		if next_char != '%' {
+			return Self::unexpected_character(parser.index);
 		}
+		parser.increment();
 
 		return ModuleAttributeDeclarationResult::Ok(ModuleAttributeDeclaration {
 			name: attribute_name,
-			parameters: parameters,
 			line: initial_line
 		});
 	}
@@ -87,7 +65,18 @@ impl ModuleAttributeDeclaration {
 	}
 
 	pub fn is_attribute_declaration(content: &str, index: usize) -> bool {
-		let declare = &content[index..];
-		return declare.starts_with("#");
+		let declare_content = &content[index..];
+		if index == 0 || content[index - 1..].starts_with("\n") {
+			if declare_content.starts_with("%") {
+				let mut was_end_char = false;
+				for c in declare_content.chars() {
+					if c == '\n' {
+						return was_end_char;
+					}
+					was_end_char = (c == '%');
+				}
+			}
+		}
+		return false;
 	}
 }

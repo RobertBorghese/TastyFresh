@@ -8,7 +8,7 @@
 use crate::expression::value_type::{ NumberType, StringType, ClassType, Function };
 
 lazy_static! {
-	pub static ref STYLE_TYPES: Vec<&'static str> = vec!("copy", "ref", "borrow", "move", "ptr", "autoptr", "uniqueptr", "classptr");
+	pub static ref STYLE_TYPES: Vec<&'static str> = vec!("copy", "ref", "borrow", "move", "ptr", "autoptr", "uniqueptr", "classptr", "ptr2", "ptr3", "ptr4", "ptr5", "ptr6", "ptr7", "ptr8", "ptr9");
 	pub static ref VARIABLE_PROPS: Vec<&'static str> = vec!("const", "constexpr", "constinit", "extern", "mutable", "static", "thread_local", "volatile");
 }
 
@@ -132,6 +132,16 @@ impl VariableType {
 			var_optional: false
 		};
 	}
+
+	pub fn access_operator(&self, access_name: &str) -> &'static str {
+		return if self.is_namespace() {
+			"::"
+		} else if self.var_style.is_ptr().unwrap_or(false) {
+			"->"
+		} else {
+			"."
+		};
+	}
 }
 
 #[derive(Clone, PartialEq)]
@@ -149,19 +159,6 @@ pub enum Type {
 	Undeclared(Vec<String>),
 	UndeclaredWParams(Vec<String>, Vec<VariableType>)
 }
-
-/*#[derive(Clone)]
-pub struct Property {
-	pub name: String,
-	pub prop_type: VariableType,
-	pub default_value: Option<String>
-}
-
-#[derive(Clone)]
-pub struct Function {
-	pub name: String,
-	pub parameters: Vec<Property>,
-	*/
 
 impl Type {
 	pub fn to_cpp(&self) -> String {
@@ -271,7 +268,7 @@ pub enum VarStyle {
 	Ref,
 	Borrow,
 	Move,
-	Ptr,
+	Ptr(usize),
 	AutoPtr,
 	UniquePtr,
 	ClassPtr
@@ -279,12 +276,19 @@ pub enum VarStyle {
 
 impl VarStyle {
 	pub fn new(name: &str) -> VarStyle {
+		if name.len() > 3 && name.starts_with("ptr") {
+			let num_str = name[3..].parse::<usize>();
+			let mut num = num_str.unwrap_or(1);
+			if num < 1 { num = 1 }
+			if num > 9 { num = 9 }
+			return VarStyle::Ptr(num);
+		}
 		return match name {
 			"copy" => VarStyle::Copy,
 			"ref" => VarStyle::Ref,
 			"borrow" => VarStyle::Borrow,
 			"move" => VarStyle::Move,
-			"ptr" => VarStyle::Ptr,
+			"ptr" => VarStyle::Ptr(1),
 			"autoptr" => VarStyle::AutoPtr,
 			"uniqueptr" => VarStyle::UniquePtr,
 			"classptr" => VarStyle::ClassPtr,
@@ -302,7 +306,9 @@ impl VarStyle {
 			VarStyle::Ref => "ref",
 			VarStyle::Borrow => "borrow",
 			VarStyle::Move => "move",
-			VarStyle::Ptr => "ptr",
+			VarStyle::Ptr(amount) => {
+				match amount { 1 => "ptr", 2 => "ptr2", 3 => "ptr3", 4 => "ptr4", 5 => "ptr5", 6 => "ptr6", 7 => "ptr7", 8 => "ptr8", 9 => "ptr9", _ => "ptr" }
+			},
 			VarStyle::AutoPtr => "autoptr",
 			VarStyle::UniquePtr => "uniqueptr",
 			VarStyle::ClassPtr => "classptr",
@@ -327,7 +333,10 @@ impl VarStyle {
 				}
 			},
 			VarStyle::Move => format!("{}&&", var_type.to_cpp()),
-			VarStyle::Ptr => format!("{}*", var_type.to_cpp()),
+			VarStyle::Ptr(amount) => {
+				let stars = if *amount < 1 { 1 } else if *amount > 9 { 9 } else { *amount };
+				format!("{}{}", var_type.to_cpp(), String::from_utf8(vec![b'*'; stars]).unwrap_or("*".to_string()))
+			},
 			VarStyle::AutoPtr => format!("std::shared_ptr<{}>", var_type.to_cpp()),
 			VarStyle::UniquePtr => format!("std::unique_ptr<{}>", var_type.to_cpp()),
 			VarStyle::ClassPtr => format!("{}*", var_type.to_cpp()),
@@ -366,7 +375,7 @@ impl VarStyle {
 			VarStyle::Ref => Some(false),
 			VarStyle::Borrow => Some(false),
 			VarStyle::Move => Some(false),
-			VarStyle::Ptr => Some(true),
+			VarStyle::Ptr(_) => Some(true),
 			VarStyle::AutoPtr => Some(true),
 			VarStyle::UniquePtr => Some(true),
 			VarStyle::ClassPtr => Some(true),

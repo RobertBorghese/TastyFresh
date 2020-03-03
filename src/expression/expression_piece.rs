@@ -14,7 +14,8 @@ use crate::expression::variable_type::{ VariableType, Type, VarStyle };
 
 use crate::context_management::print_code_error;
 use crate::context_management::position::Position;
-use crate::context_management::typing_context::{ Context, ContextType };
+use crate::context_management::context::Context;
+use crate::context_management::typing_context::ContextType;
 
 use std::rc::Rc;
 
@@ -140,7 +141,7 @@ impl ExpressionPiece {
 					ExpressionPiece::Expression(expr) => {
 						if context.is_some() {
 							let c = context.as_mut().unwrap();
-							println!("Expression: {}", expr.to_string(&parser.config_data.operators, c));
+							//println!("Expression: {}", expr.to_string(&parser.config_data.operators, c));
 						}
 						return expr;
 					}
@@ -209,7 +210,7 @@ impl ExpressionPiece {
 			return VariableType::boolean();
 		} else if context.is_some() {
 			let c = context.as_ref().unwrap();
-			let ct = c.get_item(value);
+			let ct = c.typing.get_item(value);
 			if ct.is_some() {
 				return match ct.unwrap() {
 					ContextType::Variable(variable_type) => variable_type,

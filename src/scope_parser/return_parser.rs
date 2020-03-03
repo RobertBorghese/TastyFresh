@@ -20,7 +20,7 @@ use crate::declaration_parser::declaration::{ Declaration, DeclarationResult };
 use crate::declaration_parser::parser::Parser;
 use crate::declaration_parser::cpp_transpiler::CPPTranspiler;
 
-use crate::context_management::typing_context::Context;
+use crate::context_management::context::Context;
 
 use std::rc::Rc;
 

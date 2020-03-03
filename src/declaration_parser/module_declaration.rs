@@ -69,8 +69,6 @@ impl ModuleDeclaration {
 			} else {
 				break;
 			}
-
-			if !parser.out_of_space { parser.increment(); }
 		}
 
 		while !parser.out_of_space {
@@ -111,7 +109,6 @@ impl ModuleDeclaration {
 			if !parser.out_of_space { parser.increment(); }
 
 			if parser.index == initial_index {
-				println!("BROKEN declaration_parser/module_declaration/74");
 				break;
 			}
 		}

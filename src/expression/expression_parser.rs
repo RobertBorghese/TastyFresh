@@ -16,7 +16,7 @@ use crate::context_management::position::Position;
 
 use crate::declaration_parser::parser::Parser;
 
-use crate::context_management::typing_context::Context;
+use crate::context_management::context::Context;
 
 use std::convert::TryInto;
 
@@ -213,22 +213,22 @@ impl<'a> ExpressionParser<'a> {
 	}
 
 	fn add_prefix_op(&mut self, op: usize, start: usize, end: usize) {
-		println!("Added prefix: {}", op);
+		//println!("Added prefix: {}", op);
 		self.parts.push(ExpressionPiece::Prefix(op, self.generate_pos(start, Some(end))));
 	}
 
 	fn add_value(&mut self, val: String, start: usize, end: usize) {
-		println!("Added value: {}", val);
+		//println!("Added value: {}", val);
 		self.parts.push(ExpressionPiece::Value(val, self.generate_pos(start, Some(end))));
 	}
 
 	fn add_suffix_op(&mut self, op: usize, start: usize, end: usize) {
-		println!("Added suffix: {}", op);
+		//println!("Added suffix: {}", op);
 		self.parts.push(ExpressionPiece::Suffix(op, self.generate_pos(start, Some(end))));
 	}
 
 	fn add_infix_op(&mut self, op: usize, start: usize, end: usize) {
-		println!("Added infix: {}", op);
+		//println!("Added infix: {}", op);
 		self.parts.push(ExpressionPiece::Infix(op, self.generate_pos(start, Some(end))));
 	}
 

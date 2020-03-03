@@ -21,7 +21,7 @@ use crate::scope_parser::return_parser::ReturnParser;
 use crate::config_management::ConfigData;
 use crate::config_management::operator_data::OperatorDataStructure;
 
-use crate::context_management::typing_context::Context;
+use crate::context_management::context::Context;
 
 use std::rc::Rc;
 
@@ -71,12 +71,14 @@ impl ScopeExpression {
 								if var_declare.var_type.is_inferred() {
 									var_declare.var_type.var_type = expr.get_type().var_type;
 								}
-								context.add_variable(var_declare.name.clone(), var_declare.var_type.clone());
+								context.register_type(&var_declare.var_type);
+								context.typing.add_variable(var_declare.name.clone(), var_declare.var_type.clone());
 								scope_exprs.push(ScopeExpression::VariableDeclaration(var_declare, Some(expr)));
 							}
 						}
 					} else {
-						context.add_variable(var_declare.name.clone(), var_declare.var_type.clone());
+						context.register_type(&var_declare.var_type);
+						context.typing.add_variable(var_declare.name.clone(), var_declare.var_type.clone());
 						scope_exprs.push(ScopeExpression::VariableDeclaration(var_declare, None));
 						if parser.get_curr() == ';' {
 							parser.increment();
@@ -105,13 +107,26 @@ impl ScopeExpression {
 		return match self {
 			ScopeExpression::Scope(exprs) => {
 				let mut lines = Vec::new();
+				let mut last_line_offset = 0;
+				let mut real_last_line_offset = 0;
 				for e in exprs {
 					let line = (e.to_string(operators, line_offset, tab_offset, context));
-					let line_number = e.get_line().unwrap_or(line_offset) - line_offset;
+					let real_line_number = e.get_line().unwrap_or(line_offset) - line_offset;
+					let line_number = if context.align_lines {
+						real_line_number
+					} else {
+						if real_line_number - real_last_line_offset > 1 {
+							last_line_offset + 2
+						} else {
+							last_line_offset + 1
+						}
+					};
 					while line_number >= lines.len() {
 						lines.push(Vec::new());
 					}
 					lines[line_number].push(line);
+					last_line_offset = line_number;
+					real_last_line_offset = real_line_number;
 				}
 				let tabs = String::from_utf8(vec![b'\t'; tab_offset]).unwrap_or("".to_string());
 				let mut content = Vec::new();
