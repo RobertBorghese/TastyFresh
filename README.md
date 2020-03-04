@@ -25,3 +25,30 @@ By version `1.0.0`, Tasty Fresh hopes to include:
 * Basic type inference for variable initialization and function return types.
 * Simple, yet powerful text-replacement meta-programming functions and Haxe-like abstract classes.
 * Ability to directly inject C++ code in any location.
+
+---
+
+# Examples
+
+## Basic Output
+
+*main.tasty*
+```rust
+include system iostream;
+
+fn main() {
+	std.cout << "I am a depression." << std.endl;
+}
+```
+
+*main.cpp (output)*
+
+```cpp
+#include "main.hpp"
+
+#include <iostream>
+
+void main() {
+	std::cout << "I am a depression." << std::endl;
+}
+```
