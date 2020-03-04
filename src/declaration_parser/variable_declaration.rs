@@ -157,7 +157,8 @@ impl VariableDeclaration {
 		let var_type = &self.var_type;
 		let default_value = var_type.default_value();
 		return if expr.is_some() {
-			format!("{} {} = {};", var_type.to_cpp(), self.name, expr.as_ref().unwrap().to_string(operators, context))
+			let right_str = expr.as_ref().unwrap().to_string(operators, context);
+			format!("{} {} = {};", var_type.to_cpp(), self.name, expr.as_ref().unwrap().get_type().convert_between_styles(var_type, &right_str).unwrap_or(right_str.to_string()))
 		} else if default_value.is_some() {
 			format!("{} {} = {};", var_type.to_cpp(), self.name, default_value.unwrap())
 		} else {

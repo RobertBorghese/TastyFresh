@@ -7,7 +7,7 @@
 
 use std::collections::BTreeMap;
 
-use crate::expression::variable_type::VariableType;
+use crate::expression::variable_type::{ VariableType, Type };
 
 use crate::expression::value_type::{ Function, ClassType };
 
@@ -15,7 +15,9 @@ use crate::expression::value_type::{ Function, ClassType };
 pub enum ContextType {
 	Variable(VariableType),
 	Function(Function),
+	QuantumFunction(Vec<Function>),
 	Class(ClassType),
+	PrimitiveExtension(Vec<(Type, Function)>),
 	Namespace(BTreeMap<String,ContextType>)
 }
 
@@ -71,7 +73,16 @@ impl TypingContext {
 	}
 
 	pub fn add_function(&mut self, name: String, func: Function) {
-		self.known_data.last_mut().unwrap().insert(name, ContextType::Function(func));
+		let data = self.known_data.last_mut().unwrap();
+		if data.contains_key(&name) {
+			if let ContextType::Function(old_func) = data.get(&name).unwrap() {
+				data.insert(name, ContextType::QuantumFunction(vec!(old_func.clone(), func)));
+			} else if let ContextType::QuantumFunction(funcs) = data.get_mut(&name).unwrap() {
+				funcs.push(func);
+			}
+		} else {
+			data.insert(name, ContextType::Function(func));
+		}
 	}
 
 	pub fn print_everything(&self) {

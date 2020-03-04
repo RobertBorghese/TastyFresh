@@ -52,7 +52,7 @@ pub fn parse_operators_json(path: &str) -> OperatorDataStructure {
 			};
 			if op["operator"].is_string() {
 				operator_info.name = Some(op["operator"].as_str().unwrap().to_string());
-			} else if op["operator"].is_array() {
+			}/* else if op["operator"].is_array() {
 				let mut r = Vec::new();
 				for name_comp in op["operator"].as_array().unwrap() {
 					if name_comp.is_null() {
@@ -62,7 +62,7 @@ pub fn parse_operators_json(path: &str) -> OperatorDataStructure {
 					}
 				}
 				operator_info.layout = Some(r);
-			}
+			}*/
 			if op.contains_key("priority") && op["priority"].is_number() {
 				operator_info.priority = op["priority"].as_i64().unwrap();
 			}

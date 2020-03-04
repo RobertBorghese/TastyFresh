@@ -25,11 +25,11 @@ pub enum ExpressionPiece {
 	Value(String, Position),
 	Suffix(usize, Position),
 	Infix(usize, Position),
+	Ternary(usize, Rc<Expression>, Position),
 	EncapsulatedValues(Rc<Vec<Rc<Expression>>>, Position),
 	InitializerList(Rc<Vec<Rc<Expression>>>, Position),
 	FunctionParameters(Rc<Vec<Rc<Expression>>>, Position),
-	ArrayAccessParameters(Rc<Vec<Rc<Expression>>>, Position),
-	TernaryCondition(Rc<Vec<Rc<Expression>>>, Position)
+	ArrayAccessParameters(Rc<Vec<Rc<Expression>>>, Position)
 }
 
 impl ExpressionPiece {
@@ -95,7 +95,7 @@ impl ExpressionPiece {
 							for i in 0..1 { parser.parts.remove(part_index + 1); }
 						} else {
 							let pos = expr_and_pos.1.unwrap();
-							print_code_error("Expected Expression", "expected expression before this operator", &pos, file_content);
+							print_code_error("Expected Expression", "expected expression after this operator", &pos, file_content);
 							error = true;
 							break;
 						}
@@ -107,7 +107,7 @@ impl ExpressionPiece {
 							for i in 0..1 { parser.parts.remove(part_index); }
 						} else {
 							let pos = expr_and_pos.1.unwrap();
-							print_code_error("Expected Expression", "expected expression after this operator", &pos, file_content);
+							print_code_error("Expected Expression", "expected expression before this operator", &pos, file_content);
 							error = true;
 							break;
 						}
@@ -120,6 +120,47 @@ impl ExpressionPiece {
 						} else {
 							let pos = expr_and_pos.1.unwrap();
 							print_code_error("Expected Expression", "expected expressions to surrond this operator", &pos, file_content);
+							error = true;
+							break;
+						}
+					},
+					ExpressionPiece::Ternary(index, expr, position) => {
+						let expr_and_pos = Self::parse_ternary(parser, &part_index, expr, index, context, position);
+						if expr_and_pos.0.is_some() {
+							parser.parts.insert(part_index - 1, expr_and_pos.0.unwrap());
+							for i in 0..2 { parser.parts.remove(part_index); }
+						} else {
+							let pos = expr_and_pos.1.unwrap();
+							let err_type = expr_and_pos.2.unwrap();
+							if err_type == 1 {
+								print_code_error("Must Share Type", "ternary expressions must share same type", &pos, file_content);
+							} else if err_type == 2 {
+								print_code_error("Expected Expression", "expected expressions to surrond this operator", &pos, file_content);
+							}
+							error = true;
+							break;
+						}
+					},
+					ExpressionPiece::FunctionParameters(exprs, position) => {
+						let expr_and_pos = Self::parse_function_call(parser, &part_index, exprs, context, position);
+						if expr_and_pos.0.is_some() {
+							parser.parts.insert(part_index - 1, expr_and_pos.0.unwrap());
+							for i in 0..1 { parser.parts.remove(part_index); }
+						} else {
+							let pos = expr_and_pos.1.unwrap();
+							print_code_error("Expected Expression", "expected expression before function call", &pos, file_content);
+							error = true;
+							break;
+						}
+					},
+					ExpressionPiece::ArrayAccessParameters(exprs, position) => {
+						let expr_and_pos = Self::parse_array_access(parser, &part_index, exprs, context, position);
+						if expr_and_pos.0.is_some() {
+							parser.parts.insert(part_index - 1, expr_and_pos.0.unwrap());
+							for i in 0..1 { parser.parts.remove(part_index); }
+						} else {
+							let pos = expr_and_pos.1.unwrap();
+							print_code_error("Expected Expression", "expected expression before array access", &pos, file_content);
 							error = true;
 							break;
 						}
@@ -172,9 +213,63 @@ impl ExpressionPiece {
 
 	fn parse_infix(parser: &ExpressionParser, part_index: &usize, operator_id: usize, context: &Option<&mut Context>, position: Position) -> (Option<ExpressionPiece>,Option<Position>) {
 		let left_result = Self::get_expression_from_piece(&parser.parts[part_index - 1], context);
+		let mut final_type = VariableType::inferred();
+		if left_result.is_some() && operator_id <= 4 {
+			let left_type = left_result.as_ref().unwrap().get_type();
+			let access_name = Self::get_access_from_piece(&left_type, &parser.parts[*part_index], context);
+			if access_name.is_some() {
+				let temp_type = left_type.check_accessor_content(&access_name.unwrap(), context);
+				if temp_type.is_some() {
+					final_type = temp_type.unwrap();
+				}
+			}
+		}
 		let right_result = Self::get_expression_from_piece(&parser.parts[*part_index], context);
 		if left_result.is_some() && right_result.is_some() {
-			return (Some(ExpressionPiece::Expression(Rc::new(Expression::Infix(left_result.unwrap(), right_result.unwrap(), operator_id, VariableType::inferred(), position)))), None);
+			return (Some(ExpressionPiece::Expression(Rc::new(Expression::Infix(left_result.unwrap(), right_result.unwrap(), operator_id, final_type, position)))), None);
+		}
+		return (None, Some(position));
+	}
+
+	fn parse_ternary(parser: &ExpressionParser, part_index: &usize, expr: Rc<Expression>, operator_id: usize, context: &Option<&mut Context>, position: Position) -> (Option<ExpressionPiece>,Option<Position>,Option<usize>) {
+		let left_result = Self::get_expression_from_piece(&parser.parts[part_index - 1], context);
+		let right_result = Self::get_expression_from_piece(&parser.parts[*part_index], context);
+		if left_result.is_some() && right_result.is_some() {
+			let left_type = expr.get_type();
+			let right_type = right_result.as_ref().unwrap().get_type();
+			let result_type = left_type.compare_types(&right_type);
+			if result_type.is_some() {
+				return (Some(ExpressionPiece::Expression(Rc::new(Expression::Ternary(left_result.unwrap(), expr, right_result.unwrap(), operator_id, result_type.unwrap())))), None, None);
+			} else {
+				return (None, Some(position), Some(1));
+			}
+		}
+		return (None, Some(position), Some(2));
+	}
+
+	fn parse_function_call(parser: &ExpressionParser, part_index: &usize, exprs: Rc<Vec<Rc<Expression>>>, context: &Option<&mut Context>, position: Position) -> (Option<ExpressionPiece>,Option<Position>) {
+		let result = Self::get_expression_from_piece(&parser.parts[part_index - 1], context);
+		if result.is_some() {
+			let left_expr = result.unwrap();
+			let mut left_type = left_expr.get_type();
+			if left_type.is_quantum_function() {
+				let left_type_resolved = left_type.resolve_quantum_function(Rc::clone(&exprs));
+				if left_type_resolved.is_some() {
+					left_type = left_type_resolved.unwrap();
+				} else {
+					left_type = VariableType::inferred();
+				}
+			}
+			let final_type = left_type.get_function_call_return().unwrap_or(VariableType::inferred());
+			return (Some(ExpressionPiece::Expression(Rc::new(Expression::FunctionCall(left_expr, Rc::clone(&exprs), final_type, position)))), None);
+		}
+		return (None, Some(position));
+	}
+
+	fn parse_array_access(parser: &ExpressionParser, part_index: &usize, exprs: Rc<Vec<Rc<Expression>>>, context: &Option<&mut Context>, position: Position) -> (Option<ExpressionPiece>,Option<Position>) {
+		let result = Self::get_expression_from_piece(&parser.parts[part_index - 1], context);
+		if result.is_some() {
+			return (Some(ExpressionPiece::Expression(Rc::new(Expression::ArrayAccess(result.unwrap(), exprs, VariableType::inferred(), position)))), None);
 		}
 		return (None, Some(position));
 	}
@@ -197,6 +292,13 @@ impl ExpressionPiece {
 		};
 	}
 
+	fn get_access_from_piece(access_type: &VariableType, piece: &ExpressionPiece, context: &Option<&mut Context>) -> Option<String> {
+		return match piece {
+			ExpressionPiece::Value(value, position) => Some(value.clone()),
+			_ => None
+		};
+	}
+
 	fn infer_type_from_value_string(value: &str, context: &Option<&mut Context>) -> VariableType {
 		if value.is_empty() {
 			return VariableType::inferred();
@@ -215,8 +317,10 @@ impl ExpressionPiece {
 				return match ct.unwrap() {
 					ContextType::Variable(variable_type) => variable_type,
 					ContextType::Function(function) => VariableType::function(function),
+					ContextType::QuantumFunction(functions) => VariableType::quantum_function(functions),
 					ContextType::Class(class_type) => VariableType::class(class_type),
-					ContextType::Namespace(content) => VariableType::namespace()
+					ContextType::Namespace(content) => VariableType::namespace(),
+					_ => VariableType::inferred()
 				}
 			}
 		}
@@ -252,11 +356,13 @@ impl ExpressionPiece {
 		match piece {
 			ExpressionPiece::Prefix(index, _) |
 			ExpressionPiece::Suffix(index, _) |
-			ExpressionPiece::Infix(index, _) => {
+			ExpressionPiece::Infix(index, _) |
+			ExpressionPiece::Ternary(index, _, _) => {
 				let op = parser.get_operator(match piece {
 					ExpressionPiece::Prefix(..) => "prefix",
 					ExpressionPiece::Suffix(..) => "suffix",
 					ExpressionPiece::Infix(..) => "infix",
+					ExpressionPiece::Ternary(..) => "ternary",
 					_ => ""
 				}, *index);
 				*priority = op.priority;
@@ -266,7 +372,6 @@ impl ExpressionPiece {
 			ExpressionPiece::ArrayAccessParameters(..) => {
 				*priority = 950;
 			},
-			ExpressionPiece::TernaryCondition(..) => {},
 			_ => ()
 		}
 	}

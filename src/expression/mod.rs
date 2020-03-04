@@ -22,7 +22,7 @@ use crate::context_management::context::Context;
 use std::rc::Rc;
 
 /// Stores the expression and its components recursively. 
-/// The `i32` represents the operators' index in the JSON data.
+/// The `usize` represents the operators' index in the JSON data.
 pub enum Expression {
 	Invalid,
 	Value(String, VariableType, Position),
@@ -32,8 +32,8 @@ pub enum Expression {
 	Ternary(Rc<Expression>, Rc<Expression>, Rc<Expression>, usize, VariableType),
 	Expressions(Rc<Vec<Rc<Expression>>>, VariableType, Position),
 	InitializerList(Rc<Vec<Rc<Expression>>>, VariableType, Position),
-	FunctionCall(Rc<Vec<Rc<Expression>>>, VariableType, Position),
-	ArrayAccess(Rc<Vec<Rc<Expression>>>, VariableType, Position)
+	FunctionCall(Rc<Expression>, Rc<Vec<Rc<Expression>>>, VariableType, Position),
+	ArrayAccess(Rc<Expression>, Rc<Vec<Rc<Expression>>>, VariableType, Position)
 }
 
 impl Expression {
@@ -49,8 +49,8 @@ impl Expression {
 				Expression::Ternary(_, _, _, _, v) => v,
 				Expression::Expressions(_, v, _) => v,
 				Expression::InitializerList(_, v, _) => v,
-				Expression::FunctionCall(_, v, _) => v,
-				Expression::ArrayAccess(_, v, _) => v,
+				Expression::FunctionCall(_, _, v, _) => v,
+				Expression::ArrayAccess(_, _, v, _) => v,
 				Expression::Invalid => panic!("Invalid!")
 			}.clone();
 		}
@@ -70,8 +70,8 @@ impl Expression {
 				Expression::Ternary(_, _, _, _, _) => panic!("Ternary!"),
 				Expression::Expressions(_, _, p) => p,
 				Expression::InitializerList(_, _, p) => p,
-				Expression::FunctionCall(_, _, p) => p,
-				Expression::ArrayAccess(_, _, p) => p,
+				Expression::FunctionCall(_, _, _, p) => p,
+				Expression::ArrayAccess(_, _, _, p) => p,
 				Expression::Invalid => panic!("Invalid!")
 			}.line.unwrap_or(0));
 		}
@@ -86,22 +86,28 @@ impl Expression {
 				s.to_string()
 			},
 			Expression::Prefix(expr, id, _, _) => {
-				String::from(format!("{}{}", operators["prefix"][*id].name.as_ref().unwrap_or(&"".to_string()), expr.to_string(operators, context)))
+				format!("{}{}", operators["prefix"][*id].name.as_ref().unwrap_or(&"".to_string()), expr.to_string(operators, context))
 			},
 			Expression::Suffix(expr, id, _, _) => {
-				String::from(format!("{}{}", expr.to_string(operators, context), operators["suffix"][*id].name.as_ref().unwrap_or(&"".to_string())))
+				format!("{}{}", expr.to_string(operators, context), operators["suffix"][*id].name.as_ref().unwrap_or(&"".to_string()))
 			},
 			Expression::Infix(expr_left, expr_right, id, _, _) => {
-				if *id <= 1 {
+				if *id == 1 {
 					let expr_right_str = expr_right.to_string(operators, context);
 					let op = expr_left.get_type().access_operator(&expr_right_str);
 					String::from(format!("{}{}{}", expr_left.to_string(operators, context), op, expr_right_str))
+				} else if *id == 24 {
+					let right_str = expr_right.to_string(operators, context);
+					format!("{} {} {}", expr_left.to_string(operators, context), "=", expr_right.get_type().convert_between_styles(&expr_left.get_type(), &right_str).unwrap_or(right_str.to_string()))
 				} else {
-					String::from(format!("{} {} {}", expr_left.to_string(operators, context), operators["infix"][*id].name.as_ref().unwrap_or(&"".to_string()), expr_right.to_string(operators, context)))
+					format!("{} {} {}", expr_left.to_string(operators, context), operators["infix"][*id].name.as_ref().unwrap_or(&"".to_string()), expr_right.to_string(operators, context))
 				}
 			},
-			Expression::Ternary(..) => {
-				String::from("[ternary]")
+			Expression::Ternary(expr_1, expr_2, expr_3, _, _) => {
+				format!("{} ? {} : {}", 
+					expr_1.to_string(operators, context), 
+					expr_2.to_string(operators, context), 
+					expr_3.to_string(operators, context))
 			},
 			Expression::Expressions(exprs, _, _) => {
 				let mut expr_list = Vec::new();
@@ -127,7 +133,11 @@ impl Expression {
 					};
 					expr_list.push(prefix + &e.to_string(operators, context));
 				}
-				format!("std::make_tuple({})", expr_list.join(", "))
+				if expr_list.len() == 1 {
+					format!("({})", expr_list.first().unwrap())
+				} else {
+					format!("std::make_tuple({})", expr_list.join(", "))
+				}
 			},
 			Expression::InitializerList(exprs, _, _) => {
 				let mut expr_list = Vec::new();
@@ -136,11 +146,19 @@ impl Expression {
 				}
 				format!("{{ {} }}", expr_list.join(", "))
 			},
-			Expression::FunctionCall(..) => {
-				String::from("[functioncall]")
+			Expression::FunctionCall(expr, exprs, _, _) => {
+				let mut expr_list = Vec::new();
+				for e in exprs.iter() {
+					expr_list.push(e.to_string(operators, context));
+				}
+				format!("{}({})", expr.to_string(operators, context), expr_list.join(", "))
 			},
-			Expression::ArrayAccess(..) => {
-				String::from("[arrayaccess]")
+			Expression::ArrayAccess(expr, exprs, _, _) => {
+				let mut expr_list = Vec::new();
+				for e in exprs.iter() {
+					expr_list.push(e.to_string(operators, context));
+				}
+				format!("{}[{}]", expr.to_string(operators, context), expr_list.join(", "))
 			}
 		}
 	}

@@ -176,7 +176,7 @@ impl<'a> ExpressionParser<'a> {
 				}
 			},
 			ParseState::Infix => {
-				if self.parse_next_infix_operator(parser) {
+				if self.parse_next_infix_operator(parser, context) {
 					*state = ParseState::Prefix;
 				} else {
 					self.set_end_reason(ExpressionEndReason::EndOfExpression);
@@ -232,6 +232,11 @@ impl<'a> ExpressionParser<'a> {
 		self.parts.push(ExpressionPiece::Infix(op, self.generate_pos(start, Some(end))));
 	}
 
+	fn add_ternary_op(&mut self, expr: Rc<Expression>, op: usize, start: usize, end: usize) {
+		//println!("Added ternary: {}", op);
+		self.parts.push(ExpressionPiece::Ternary(op, expr, self.generate_pos(start, Some(end))));
+	}
+
 	fn add_encapsulated_values(&mut self, expressions: Vec<Rc<Expression>>, start: usize, end: usize) {
 		self.parts.push(ExpressionPiece::EncapsulatedValues(Rc::new(expressions), self.generate_pos(start, Some(end))));
 	}
@@ -246,10 +251,6 @@ impl<'a> ExpressionParser<'a> {
 
 	fn add_array_access_params(&mut self, expressions: Vec<Rc<Expression>>, start: usize, end: usize) {
 		self.parts.push(ExpressionPiece::ArrayAccessParameters(Rc::new(expressions), self.generate_pos(start, Some(end))));
-	}
-
-	fn add_ternary_internals(&mut self, expressions: Vec<Rc<Expression>>, start: usize, end: usize) {
-		self.parts.push(ExpressionPiece::TernaryCondition(Rc::new(expressions), self.generate_pos(start, Some(end))));
 	}
 
 	fn str_len(&self) -> usize {
@@ -387,8 +388,35 @@ impl<'a> ExpressionParser<'a> {
 		return self.parse_next_operator("prefix", parser);
 	}
 
-	fn parse_next_infix_operator(&mut self, parser: &mut Parser) -> bool {
-		return self.parse_next_operator("infix", parser);
+	fn parse_next_infix_operator(&mut self, parser: &mut Parser, context: &mut Option<&mut Context>) -> bool {
+		if self.parse_next_operator("infix", parser) {
+			return true;
+		}
+		return self.parse_next_ternary(parser, context);
+	}
+
+	fn parse_next_ternary(&mut self, parser: &mut Parser, context: &mut Option<&mut Context>) -> bool {
+		parser.parse_whitespace();
+		let original_index = parser.index;
+		if parser.get_curr() == '?' {
+			let end_char = ':';
+			parser.index += 1;
+			let start_pos = parser.index;
+			let chars = vec!(end_char);
+			if self.index_within_bounds(parser) {
+				let expr_parser = ExpressionParser::new(parser, self.generate_pos(parser.index, None), self.config_data, context, Some(chars));
+				let expr = expr_parser.expression;
+				parser.index += 1;
+				if let ExpressionEndReason::ReachedChar(c) = expr_parser.end_data.reason {
+					if end_char == c {
+						self.add_ternary_op(Rc::clone(&expr), 0, original_index, parser.index);
+						return true;
+					}
+				}
+			}
+		}
+		parser.index = original_index;
+		return false;
 	}
 
 	fn is_group_char(&self, c: char) -> bool {
@@ -416,17 +444,18 @@ impl<'a> ExpressionParser<'a> {
 
 	fn parse_suffix_internal_expressions(&mut self, start_char: char, parser: &mut Parser, context: &mut Option<&mut Context>) -> bool {
 		let end_char = self.get_end_char(start_char);
-		let full_operator = format!("{}{}", start_char, end_char);
 		let space_offset = self.parse_next_whitespace(parser);
 		let real_second_char = parser.chars[parser.index + space_offset];
 		if real_second_char == end_char {
 			let empty = Vec::new();
+			println!("FJDLS {}", end_char);
 			match end_char {
 				')' => self.add_function_params(empty, parser.index, parser.index + space_offset),
 				']' => self.add_array_access_params(empty, parser.index, parser.index + space_offset),
 				_ => {}
 			}
 			parser.index += space_offset + 1;
+			return true;
 		} else {
 			return self.parse_internal_expressions(end_char, false, parser, context);
 		}
@@ -442,9 +471,8 @@ impl<'a> ExpressionParser<'a> {
 			if self.index_within_bounds(parser) {
 				let expr_parser = ExpressionParser::new(parser, self.generate_pos(parser.index, None), self.config_data, context, Some(chars));
 				expressions.push(expr_parser.expression);
-				parser.index += 1;//expr_parser.end_data.end_index + 1;
+				parser.index += 1;
 				final_line_offset = parser.line + expr_parser.position.line_offset;
-				//parser.line = init_line + expr_parser.position.line_offset;
 				if let ExpressionEndReason::ReachedChar(c) = expr_parser.end_data.reason {
 					if end_char == c {
 						break;
@@ -474,9 +502,9 @@ impl<'a> ExpressionParser<'a> {
 
 	fn check_operator(&self, op_str: &str, op_type: &str, exact: bool) -> Vec<usize> {
 		let mut result = Vec::new();
-		let prefixes = &self.config_data.operators[op_type];
-		for i in 0..prefixes.len() {
-			let op = &prefixes[i];
+		let operators = &self.config_data.operators[op_type];
+		for i in 0..operators.len() {
+			let op = &operators[i];
 			if op.name.is_some() {
 				let v = op.name.as_ref().unwrap();
 				if (exact && v == op_str) || (!exact && v.starts_with(op_str)) {

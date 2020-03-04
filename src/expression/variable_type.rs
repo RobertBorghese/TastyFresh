@@ -5,7 +5,12 @@
  * within Tasty Fresh.
  **********************************************************/
 
+use std::rc::Rc;
+
+use crate::expression::Expression;
 use crate::expression::value_type::{ NumberType, StringType, ClassType, Function };
+
+use crate::context_management::context::Context;
 
 lazy_static! {
 	pub static ref STYLE_TYPES: Vec<&'static str> = vec!("copy", "ref", "borrow", "move", "ptr", "autoptr", "uniqueptr", "classptr", "ptr2", "ptr3", "ptr4", "ptr5", "ptr6", "ptr7", "ptr8", "ptr9");
@@ -124,6 +129,15 @@ impl VariableType {
 		};
 	}
 
+	pub fn quantum_function(funcs: Vec<Function>) -> VariableType {
+		return VariableType {
+			var_type: Type::QuantumFunction(funcs),
+			var_style: VarStyle::Copy,
+			var_properties: None,
+			var_optional: false
+		};
+	}
+
 	pub fn tuple(tuple_types: Vec<VariableType>) -> VariableType {
 		return VariableType {
 			var_type: Type::Tuple(tuple_types),
@@ -142,6 +156,140 @@ impl VariableType {
 			"."
 		};
 	}
+
+	pub fn compare_types(&self, other: &VariableType) -> Option<VariableType> {
+		if self == other || (self.is_inferred() && !other.is_inferred()) {
+			return Some(self.clone());
+		} else if !self.is_inferred() && other.is_inferred() {
+			return Some(other.clone());
+		}
+		return None;
+	}
+
+	pub fn convert_between_styles(&self, other: &VariableType, content: &str) -> Option<String> {
+		return match self.var_style {
+			VarStyle::Copy |
+			VarStyle::Ref |
+			VarStyle::Borrow |
+			VarStyle::Move => {
+				match other.var_style {
+					VarStyle::Copy |
+					VarStyle::Ref |
+					VarStyle::Borrow => Some(content.to_string()),
+					VarStyle::Move => Some(format!("std::move({})", content)),
+					VarStyle::Ptr(size) => Some(format!("{}{}", String::from_utf8(vec![b'&'; size]).unwrap(), content)),
+					VarStyle::AutoPtr => Some(format!("std::make_shared({})", content)),
+					VarStyle::UniquePtr => Some(format!("std::make_unique({})", content)),
+					_ => None
+				}
+			},
+			VarStyle::Ptr(self_size) => {
+				let stars = String::from_utf8(vec![b'*'; self_size]).unwrap();
+				match other.var_style {
+					VarStyle::Copy |
+					VarStyle::Ref |
+					VarStyle::Borrow => Some(format!("{}{}", stars, content)),
+					VarStyle::Ptr(size) => {
+						if self_size < size {
+							Some(format!("{}{}", String::from_utf8(vec![b'&'; size - self_size]).unwrap(), content))
+						} else if self_size > size {
+							Some(format!("{}{}", String::from_utf8(vec![b'*'; self_size - size]).unwrap(), content))
+						} else {
+							Some(content.to_string())
+						}
+					},
+					VarStyle::AutoPtr => Some(format!("std::make_shared({}{})", stars, content)),
+					VarStyle::UniquePtr => Some(format!("std::make_unique({}{})", stars, content)),
+					_ => None
+				}
+			},
+			VarStyle::AutoPtr => {
+				match other.var_style {
+					VarStyle::Copy |
+					VarStyle::Ref |
+					VarStyle::Borrow => Some(format!("*{}", content)),
+					VarStyle::Move => Some(format!("std::move(*{})", content)),
+					VarStyle::Ptr(size) => if size == 1 {
+						Some(format!("{}.get()", content))
+					} else {
+						Some(format!("{}{}.get()", String::from_utf8(vec![b'&'; size - 1]).unwrap(), content))
+					},
+					VarStyle::AutoPtr => Some(content.to_string()),
+					_ => None
+				}
+			},
+			VarStyle::UniquePtr => {
+				match other.var_style {
+					VarStyle::Copy |
+					VarStyle::Ref |
+					VarStyle::Borrow => Some(format!("*{}", content)),
+					VarStyle::Move => Some(format!("std::move(*{})", content)),
+					VarStyle::Ptr(size) => if size == 1 {
+						Some(format!("{}.get()", content))
+					} else {
+						Some(format!("{}{}.get()", String::from_utf8(vec![b'&'; size - 1]).unwrap(), content))
+					},
+					VarStyle::UniquePtr => Some(content.to_string()),
+					_ => None
+				}
+			},
+			_ => None
+		}
+	}
+
+	pub fn check_accessor_content(&self, content: &str, context: &Option<&mut Context>) -> Option<VariableType> {
+		return match &self.var_type {
+			Type::Class(cls_type) => {
+				Some(cls_type.get_field(content))
+			},
+			_ => None
+		}
+	}
+
+	pub fn is_quantum_function(&self) -> bool {
+		if let Type::QuantumFunction(_) = self.var_type {
+			return true;
+		}
+		return false;
+	}
+
+	pub fn resolve_quantum_function(&self, params: Rc<Vec<Rc<Expression>>>) -> Option<VariableType> {
+		if self.is_quantum_function() {
+			if let Type::QuantumFunction(funcs) = &self.var_type {
+				let mut possible_functions = funcs.clone();
+				let mut index = 0;
+				for p in params.iter() {
+					if possible_functions.is_empty() {
+						return None;
+					}
+					let param_type = p.get_type();
+					let mut new_possible_functions = Vec::new();
+					for f in possible_functions {
+						if index < f.parameters.len() {
+							let prop_type = &f.parameters[index].prop_type;
+							if prop_type.is_inferred() || prop_type.var_type == param_type.var_type {
+								new_possible_functions.push(f.clone());
+							}
+						}
+					}
+					possible_functions = new_possible_functions;
+				}
+				if possible_functions.len() == 1 {
+					return Some(VariableType::function(possible_functions.remove(0)));
+				}
+			}
+		}
+		return None;
+	}
+
+	pub fn get_function_call_return(&self) -> Option<VariableType> {
+		return match &self.var_type {
+			Type::Function(func_type) => {
+				Some(func_type.return_type.clone())
+			},
+			_ => None
+		}
+	}
 }
 
 #[derive(Clone, PartialEq)]
@@ -153,6 +301,7 @@ pub enum Type {
 	String(StringType),
 	Class(ClassType),
 	Function(Box<Function>),
+	QuantumFunction(Vec<Function>),
 	InitializerList(Box<VariableType>),
 	Tuple(Vec<VariableType>),
 	Inferred,
@@ -179,6 +328,13 @@ impl Type {
 					}
 				}
 				format!("std::function<{}({})>", func.return_type.to_cpp(), params_output)
+			},
+			Type::QuantumFunction(funcs) => {
+				if !funcs.is_empty() {
+					Type::Function(Box::new(funcs.first().unwrap().clone())).to_cpp()
+				} else {
+					"".to_string()
+				}
 			},
 			Type::InitializerList(init_type) => {
 				format!("std::initializer_list<{}>", init_type.to_cpp())
@@ -251,6 +407,7 @@ impl Type {
 			Type::String(string_type) => Some("\"\""),
 			Type::Class(class_type) => None,
 			Type::Function(func) => Some("nullptr"),
+			Type::QuantumFunction(funcs) => Some("nullptr"),
 			Type::InitializerList(init_type) => Some("{}"),
 			Type::Tuple(types) => None,
 			Type::Inferred => None,

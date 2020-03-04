@@ -5,6 +5,8 @@
  * inside of Tasty Fresh.
  **********************************************************/
 
+use std::collections::BTreeMap;
+
 use crate::expression::variable_type::VariableType;
 
 /*
@@ -228,7 +230,30 @@ pub struct ClassType {
 	pub name: String,
 	pub type_params: Option<Vec<VariableType>>,
 	pub properties: Vec<Property>,
-	pub functions: Vec<Function>
+	pub functions: Vec<Function>,
+	pub operators: BTreeMap<usize,Vec<Function>>
+}
+
+impl ClassType {
+	pub fn get_field(&self, name: &str) -> VariableType {
+		for p in &self.properties {
+			if p.name == name {
+				return p.prop_type.clone();
+			}
+		}
+		let mut possible_functions = Vec::new();
+		for f in &self.functions {
+			if f.name == name {
+				possible_functions.push(f.clone());
+			}
+		}
+		if possible_functions.len() == 1 {
+			return VariableType::function(possible_functions.remove(0));
+		} else if possible_functions.len() > 1 {
+			return VariableType::quantum_function(possible_functions);
+		}
+		return VariableType::inferred();
+	}
 }
 
 #[derive(Clone, PartialEq)]

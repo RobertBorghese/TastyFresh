@@ -645,6 +645,9 @@ impl Parser {
 						"bool" => {
 							return Type::Boolean;
 						},
+						"text" => {
+							return Type::String(StringType::ConstCharArray);
+						},
 						"void" => {
 							return Type::Void;
 						},

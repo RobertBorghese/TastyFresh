@@ -1,7 +1,14 @@
 #include "./examples/hello_world/main.hpp"
 
-#include <iostream>
-
 void main() {
-	std::cout << "I am a depression." << std::endl;
+	int bla1 = test(12);
+	float bla2 = test("fdsfds");
+}
+
+int test(int a) {
+	return 0;
+}
+
+float test(const char* a) {
+	return 0.0f;
 }

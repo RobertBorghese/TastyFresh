@@ -13,8 +13,8 @@
 		{ "operator": "delete",   "priority": 900, "cannot_touch": true, "reverse_priority": true },
 		{ "operator": "throw",    "priority": 250, "cannot_touch": true, "reverse_priority": true },
 		{ "operator": "co_yield", "priority": 250, "cannot_touch": true, "reverse_priority": true },
-		{ "operator": ["new","[","]"],    "priority": 900, "reverse_priority": true },
-		{ "operator": ["delete","[","]"], "priority": 900, "reverse_priority": true }
+		{ "operator": "new[]",    "priority": 900, "cannot_touch": true, "reverse_priority": true },
+		{ "operator": "delete[]", "priority": 900, "cannot_touch": true, "reverse_priority": true }
 	],
 	"suffix": [
 		{ "operator": "++", "priority": 950 },
@@ -59,13 +59,6 @@
 		{ "operator": ",",   "priority": 100 }
 	],
 	"ternary": [
-		{ "operator": [null,"?",null,":",null], "priority": 250 }
-	],
-	"prefix_input": [
-		{ "operator": ["(",null,")"], "priority": 900 }
-	],
-	"suffix_input": [
-		{ "operator": ["(",null,")"], "priority": 950 },
-		{ "operator": ["[",null,"]"], "priority": 950 }
+		{ "operator": ["?",":"], "priority": 250, "reverse_priority": true }
 	]
 }

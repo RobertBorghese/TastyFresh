@@ -1,5 +1,12 @@
-include system iostream;
-
 fn main() {
-	std.cout << "I am a depression." << std.endl;
+	copy bla1 = test(12);
+	copy bla2 = test("fdsfds");
+}
+
+fn test(copy a: int) -> int {
+	return 0;
+}
+
+fn test(copy a: text) -> float {
+	return 0.0f;
 }
