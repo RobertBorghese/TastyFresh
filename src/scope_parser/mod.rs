@@ -71,6 +71,11 @@ impl ScopeExpression {
 								if var_declare.var_type.is_inferred() {
 									var_declare.var_type.var_type = expr.get_type().var_type;
 								}
+								println!("{}", var_declare.var_type.var_style.get_name());
+								if var_declare.var_type.var_style.is_inferred() {
+									println!("test");
+									var_declare.var_type.var_style = var_declare.var_type.var_style.attempt_inference(&expr.get_type());
+								}
 								context.register_type(&var_declare.var_type);
 								context.typing.add_variable(var_declare.name.clone(), var_declare.var_type.clone());
 								scope_exprs.push(ScopeExpression::VariableDeclaration(var_declare, Some(expr)));

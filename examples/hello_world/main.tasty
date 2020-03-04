@@ -1,6 +1,17 @@
 fn main() {
-	copy bla1 = test(12);
-	copy bla2 = test("fdsfds");
+	let bla1 = test(12);
+	let bla2 = test("fdsfds");
+	let bla3 = test(23.43f);
+	let bla4 = test(1.2);
+
+	ptr2 bla5 = bla4;
+	ptr4 bla6 = bla4;
+
+	copy bla7 = bla4;
+
+	let bla10 = bla5;
+
+	let test = fdjsklfds();
 }
 
 fn test(copy a: int) -> int {
@@ -9,4 +20,12 @@ fn test(copy a: int) -> int {
 
 fn test(copy a: text) -> float {
 	return 0.0f;
+}
+
+fn test(copy a: float) -> text {
+	return "This is text";
+}
+
+fn test(copy a: double) -> ptr QString? {
+	return nullptr;
 }

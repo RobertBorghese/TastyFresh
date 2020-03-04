@@ -13,7 +13,7 @@ use crate::expression::value_type::{ NumberType, StringType, ClassType, Function
 use crate::context_management::context::Context;
 
 lazy_static! {
-	pub static ref STYLE_TYPES: Vec<&'static str> = vec!("copy", "ref", "borrow", "move", "ptr", "autoptr", "uniqueptr", "classptr", "ptr2", "ptr3", "ptr4", "ptr5", "ptr6", "ptr7", "ptr8", "ptr9");
+	pub static ref STYLE_TYPES: Vec<&'static str> = vec!("copy", "ref", "borrow", "move", "ptr", "autoptr", "uniqueptr", "classptr", "let", "ptr2", "ptr3", "ptr4", "ptr5", "ptr6", "ptr7", "ptr8", "ptr9");
 	pub static ref VARIABLE_PROPS: Vec<&'static str> = vec!("const", "constexpr", "constinit", "extern", "mutable", "static", "thread_local", "volatile");
 }
 
@@ -253,21 +253,28 @@ impl VariableType {
 		return false;
 	}
 
-	pub fn resolve_quantum_function(&self, params: Rc<Vec<Rc<Expression>>>) -> Option<VariableType> {
+	pub fn types_match(&self, other: &VariableType) -> bool {
+		if other.is_inferred() {
+			return true;
+		}
+		return self.var_type == other.var_type && self.var_optional == other.var_optional;
+	}
+
+	pub fn resolve_quantum_function(&self, params: Rc<Vec<Rc<Expression>>>) -> Result<VariableType, &'static str> {
 		if self.is_quantum_function() {
 			if let Type::QuantumFunction(funcs) = &self.var_type {
 				let mut possible_functions = funcs.clone();
 				let mut index = 0;
 				for p in params.iter() {
 					if possible_functions.is_empty() {
-						return None;
+						return Err("function does not exist");
 					}
 					let param_type = p.get_type();
 					let mut new_possible_functions = Vec::new();
 					for f in possible_functions {
 						if index < f.parameters.len() {
 							let prop_type = &f.parameters[index].prop_type;
-							if prop_type.is_inferred() || prop_type.var_type == param_type.var_type {
+							if param_type.types_match(prop_type) {
 								new_possible_functions.push(f.clone());
 							}
 						}
@@ -275,11 +282,13 @@ impl VariableType {
 					possible_functions = new_possible_functions;
 				}
 				if possible_functions.len() == 1 {
-					return Some(VariableType::function(possible_functions.remove(0)));
+					return Ok(VariableType::function(possible_functions.remove(0)));
+				} else {
+					return Err("function that takes these parameters doesn't exist");
 				}
 			}
 		}
-		return None;
+		return Err("not a quantum function");
 	}
 
 	pub fn get_function_call_return(&self) -> Option<VariableType> {
@@ -428,7 +437,8 @@ pub enum VarStyle {
 	Ptr(usize),
 	AutoPtr,
 	UniquePtr,
-	ClassPtr
+	ClassPtr,
+	Infer
 }
 
 impl VarStyle {
@@ -449,6 +459,7 @@ impl VarStyle {
 			"autoptr" => VarStyle::AutoPtr,
 			"uniqueptr" => VarStyle::UniquePtr,
 			"classptr" => VarStyle::ClassPtr,
+			"let" => VarStyle::Infer,
 			_ => VarStyle::Unknown
 		}
 	}
@@ -469,9 +480,24 @@ impl VarStyle {
 			VarStyle::AutoPtr => "autoptr",
 			VarStyle::UniquePtr => "uniqueptr",
 			VarStyle::ClassPtr => "classptr",
+			VarStyle::Infer => "let",
 			VarStyle::Namespace => "namespace",
 			VarStyle::Unknown => "unknown"
 		}
+	}
+
+	pub fn is_inferred(&self) -> bool {
+		if let VarStyle::Infer = &self {
+			return true;
+		}
+		return false;
+	}
+
+	pub fn attempt_inference(self, other: &VariableType) -> VarStyle {
+		if self.is_inferred() {
+			return other.var_style.clone();
+		}
+		return self;
 	}
 
 	pub fn to_cpp(&self, var_type: &Type) -> String {
@@ -536,6 +562,7 @@ impl VarStyle {
 			VarStyle::AutoPtr => Some(true),
 			VarStyle::UniquePtr => Some(true),
 			VarStyle::ClassPtr => Some(true),
+			VarStyle::Infer => Some(false),
 			VarStyle::Namespace => None,
 			VarStyle::Unknown => None
 		}

@@ -142,7 +142,7 @@ impl ExpressionPiece {
 						}
 					},
 					ExpressionPiece::FunctionParameters(exprs, position) => {
-						let expr_and_pos = Self::parse_function_call(parser, &part_index, exprs, context, position);
+						let expr_and_pos = Self::parse_function_call(parser, &part_index, exprs, context, position, file_content);
 						if expr_and_pos.0.is_some() {
 							parser.parts.insert(part_index - 1, expr_and_pos.0.unwrap());
 							for i in 0..1 { parser.parts.remove(part_index); }
@@ -247,16 +247,17 @@ impl ExpressionPiece {
 		return (None, Some(position), Some(2));
 	}
 
-	fn parse_function_call(parser: &ExpressionParser, part_index: &usize, exprs: Rc<Vec<Rc<Expression>>>, context: &Option<&mut Context>, position: Position) -> (Option<ExpressionPiece>,Option<Position>) {
+	fn parse_function_call(parser: &ExpressionParser, part_index: &usize, exprs: Rc<Vec<Rc<Expression>>>, context: &Option<&mut Context>, position: Position, file_content: &str) -> (Option<ExpressionPiece>,Option<Position>) {
 		let result = Self::get_expression_from_piece(&parser.parts[part_index - 1], context);
 		if result.is_some() {
 			let left_expr = result.unwrap();
 			let mut left_type = left_expr.get_type();
 			if left_type.is_quantum_function() {
 				let left_type_resolved = left_type.resolve_quantum_function(Rc::clone(&exprs));
-				if left_type_resolved.is_some() {
+				if left_type_resolved.is_ok() {
 					left_type = left_type_resolved.unwrap();
 				} else {
+					print_code_error("Function Error", left_type_resolved.err().unwrap(), &position, file_content);
 					left_type = VariableType::inferred();
 				}
 			}
