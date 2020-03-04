@@ -52,3 +52,76 @@ void main() {
 	std::cout << "I am a depression." << std::endl;
 }
 ```
+
+## Memory Management
+
+*main.tasty*
+```rust
+include system iostream;
+
+fn main() {
+	copy myNumber = 100;
+	ref myNumberRef = myNumber;
+	ptr myNumberPtr = myNumber;
+	
+	myNumber++;
+	myNumberRef++;
+	myNumberPtr++;
+	
+	std.cout << myNumber << std.endl;
+}
+```
+
+*main.cpp (output)*
+
+```cpp
+#include "main.hpp"
+
+#include <iostream>
+
+void main() {
+	int myNumber = 100;
+	int& myNumberRef = myNumber;
+	int* myNumberPtr = &myNumber;
+	
+	myNumber++;
+	myNumberRef++;
+	(*myNumberPtr)++;
+	
+	std::cout << myNumber << std::endl;
+}
+```
+
+
+## Tuples
+
+*main.tasty*
+```rust
+include system iostream;
+
+fn main() {
+	copy myTuple = (100, 200, 300);
+	printTuple(myTuple);
+}
+
+fn printTuple(tuple: (int, int, int)) {
+	std.cout << tuple.0 << tuple.1 << tuple.2 << std.endl;
+}
+```
+
+*main.cpp (output)*
+
+```cpp
+#include "main.hpp" // "#include <tuple>" automatically added within header file.
+
+#include <iostream>
+
+void main() {
+	std::tuple<int, int, int> myTuple = std::make_tuple(100, 200, 300);
+	printTuple(myTuple);
+}
+
+void printTuple(std::tuple<int, int, int> tuple) {
+	std::cout << std::get<0>(tuple) << std::get<1>(tuple) << std::get<2>(tuple) << std::endl;
+}
+```
