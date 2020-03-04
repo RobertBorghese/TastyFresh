@@ -1,31 +1,5 @@
-
 include system iostream;
 
-copy glob1 = 65;copy glob2 = 32;
-
 fn main() {
-	std.cout << "Hello, World!" << std.endl; std.cout << "Secnd line combo" << std.endl;
-
-	copy a = 31.2l;
-	std.cout << "The value of \"a\" is: " << a << "!" << std.endl;
-	std.cout << "The value of \"glob\" is: " << glob << "!" << std.endl;
-
-
-
-	borrow b = "Putting char array in variable \"b\"";
-	b.test = 32;
-	copy fds = ("jfdklsfjds", 54);
-
-	autoptr fds: int;
-	copy bla: vector<(ptr2 int, int)>;
-	ptr3 bla = 32;
-
-
-
-
-	return 123;
-}
-
-fn secondFunction() -> ptr (unsigned int, long double) {
-	return (43, 64);
+	std.cout << "I am a depression." << std.endl;
 }

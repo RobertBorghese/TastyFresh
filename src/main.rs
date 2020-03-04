@@ -321,7 +321,7 @@ fn transpile_source_file(file: &str, output_dirs: &Vec<String>, config_data: &Co
 				insert_output_line(&mut output_lines, &func_declaration, line, false);
 				if func_content.is_some() {
 					let re = Regex::new("(?:\n|\n\r)").unwrap();
-					insert_output_line(&mut output_lines, " {", line, false);
+					insert_output_line(&mut output_lines, "{", line, false);
 					for func_line in re.split(&func_content.unwrap()) {
 						insert_output_line(&mut output_lines, func_line, line, false);
 						line += 1;
@@ -442,6 +442,9 @@ fn transpile_source_file(file: &str, output_dirs: &Vec<String>, config_data: &Co
 fn insert_output_line(output_lines: &mut Vec<String>, line: &str, line_number: usize, clear: bool) {
 	while line_number >= output_lines.len() {
 		output_lines.push("".to_string());
+	}
+	if line.is_empty() {
+		return;
 	}
 	if !output_lines[line_number].is_empty() {
 		output_lines[line_number] += " ";
