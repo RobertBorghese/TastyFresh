@@ -125,3 +125,81 @@ void printTuple(std::tuple<int, int, int> tuple) {
 	std::cout << std::get<0>(tuple) << std::get<1>(tuple) << std::get<2>(tuple) << std::endl;
 }
 ```
+
+
+## "New" Inference
+
+*main.tasty*
+```rust
+class Test {}
+
+fn main() {
+	let test = new Test();
+
+	copy test2 = new Test();
+
+	ptr test3 = new Test();
+	delete test3;
+
+	autoptr test4 = new Test();
+
+	uniqueptr test5 = new Test();
+}
+```
+
+*main.cpp (output)*
+
+```cpp
+#include "main.hpp"
+
+void main() {
+	Test test;
+
+	Test test2;
+
+	Test* test3 = new Test();
+	delete test3;
+
+	std::shared_ptr<Test> test4 = std::make_shared<Test>();
+
+	std::unique_ptr<Test> test5 = std::make_unique<Test>();
+}
+```
+
+
+## Templates
+
+*main.tasty*
+```rust
+include system iostream;
+include system vector;
+
+fn main() {
+	let intList = new std.vector@int();
+	for i in 0..10 {
+		intList.push_back(i);
+	}
+	for num in intList {
+		std.cout << num << std.endl;
+	}
+}
+```
+
+*main.cpp (output)*
+
+```cpp
+#include "main.hpp"
+
+#include <iostream>
+#include <vector>
+
+void main() {
+	std::vector<int> intList;
+	for(int i = 0; i < 10; i++) {
+		intList.push_back(i);
+	}
+	for(auto num : intList) {
+		std.cout << num << std.endl;
+	}
+}
+```

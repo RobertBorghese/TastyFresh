@@ -166,6 +166,19 @@ impl VariableType {
 		return None;
 	}
 
+	pub fn convert_construct_type(&self, type_name: &str) -> Option<String> {
+		return match self.var_style {
+			VarStyle::Copy => Some(type_name.to_string()),
+			VarStyle::Ref => None,
+			VarStyle::Borrow => None,
+			VarStyle::Move => None,
+			VarStyle::Ptr(self_size) => Some(format!("new {}", type_name)),
+			VarStyle::AutoPtr => Some(format!("std::make_shared<{}>", type_name)),
+			VarStyle::UniquePtr => Some(format!("std::make_unique<{}>", type_name)),
+			_ => None
+		}
+	}
+
 	pub fn convert_between_styles(&self, other: &VariableType, content: &str) -> Option<String> {
 		return match self.var_style {
 			VarStyle::Copy |
@@ -178,8 +191,8 @@ impl VariableType {
 					VarStyle::Borrow => Some(content.to_string()),
 					VarStyle::Move => Some(format!("std::move({})", content)),
 					VarStyle::Ptr(size) => Some(format!("{}{}", String::from_utf8(vec![b'&'; size]).unwrap(), content)),
-					VarStyle::AutoPtr => Some(format!("std::make_shared({})", content)),
-					VarStyle::UniquePtr => Some(format!("std::make_unique({})", content)),
+					VarStyle::AutoPtr => Some(format!("std::make_shared<{}>({})", other.to_cpp(), content)),
+					VarStyle::UniquePtr => Some(format!("std::make_unique<{}>({})", other.to_cpp(), content)),
 					_ => None
 				}
 			},
@@ -198,8 +211,8 @@ impl VariableType {
 							Some(content.to_string())
 						}
 					},
-					VarStyle::AutoPtr => Some(format!("std::make_shared({}{})", stars, content)),
-					VarStyle::UniquePtr => Some(format!("std::make_unique({}{})", stars, content)),
+					VarStyle::AutoPtr => Some(format!("std::make_shared<{}>({}{})", other.to_cpp(), stars, content)),
+					VarStyle::UniquePtr => Some(format!("std::make_unique<{}>({}{})", other.to_cpp(), stars, content)),
 					_ => None
 				}
 			},

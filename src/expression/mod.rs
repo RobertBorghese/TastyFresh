@@ -77,6 +77,47 @@ impl Expression {
 		}
 	}
 
+	pub fn get_op_type(&self) -> Option<usize> {
+		return match self {
+			Expression::Value(_, _, _) => None,
+			Expression::Prefix(_, id, _, _) => Some(*id),
+			Expression::Suffix(_, id, _, _) => Some(*id),
+			Expression::Infix(_, _, id, _, _) => Some(*id),
+			Expression::Ternary(_, _, _, _, _) => None,
+			Expression::Expressions(_, _, _) => None,
+			Expression::InitializerList(_, _, _) => None,
+			Expression::FunctionCall(_, _, _, _) => None,
+			Expression::ArrayAccess(_, _, _, _) => None,
+			Expression::Invalid => None
+		}
+	}
+
+	pub fn deconstruct_new(&self, operators: &OperatorDataStructure, context: &mut Context) -> Option<Vec<String>> {
+		return match self {
+			Expression::Prefix(expr, id, _, _) => {
+				if *id == 9 {
+					 match &**expr {
+						Expression::FunctionCall(expr2, args, _, _) => {
+							let mut expr_list = Vec::new();
+							for e in args.iter() {
+								expr_list.push(e.to_string(operators, context));
+							}
+							match &**expr2 {
+								Expression::Value(s, _, _) => Some(vec![s.to_string(), expr_list.join(", ")]),
+								Expression::Infix(_, _, _, _, _) => Some(vec![expr2.to_string(operators, context), expr_list.join(", ")]),
+								_ => None
+							}
+						},
+						_ => None
+					}
+				} else {
+					None
+				}
+			},
+			_ => None
+		}
+	}
+
 	pub fn to_string(&self, operators: &OperatorDataStructure, context: &mut Context) -> String {
 		return match self {
 			Expression::Invalid => {
@@ -86,17 +127,34 @@ impl Expression {
 				s.to_string()
 			},
 			Expression::Prefix(expr, id, _, _) => {
-				format!("{}{}", operators["prefix"][*id].name.as_ref().unwrap_or(&"".to_string()), expr.to_string(operators, context))
+				let operator_data = &operators["prefix"][*id];
+				format!("{}{}{}", operator_data.name.as_ref().unwrap_or(&"".to_string()),
+					if operator_data.cannot_touch { " " } else { "" },
+					expr.to_string(operators, context)
+				)
 			},
 			Expression::Suffix(expr, id, _, _) => {
 				format!("{}{}", expr.to_string(operators, context), operators["suffix"][*id].name.as_ref().unwrap_or(&"".to_string()))
 			},
 			Expression::Infix(expr_left, expr_right, id, _, _) => {
 				if *id == 1 {
+					let insides = expr_right.to_string(operators, context);
+					format!("{}<{}>", expr_left.to_string(operators, context), 
+						if insides.starts_with('(') && insides.ends_with(')') {
+							&insides[1..insides.len() - 1]
+						} else if insides.starts_with("std::make_tuple(") && insides.ends_with(')') {
+							&insides[16..insides.len() - 1]
+						} else { &insides }
+					)
+				} else if *id == 2 {
 					let expr_right_str = expr_right.to_string(operators, context);
 					let op = expr_left.get_type().access_operator(&expr_right_str);
 					String::from(format!("{}{}{}", expr_left.to_string(operators, context), op, expr_right_str))
-				} else if *id == 24 {
+				} else if *id == 25 {
+					// if right expr is "new"
+					if expr_right.get_op_type().unwrap_or(0) == 9 {
+						println!("GOT A NEW!");
+					}
 					let right_str = expr_right.to_string(operators, context);
 					format!("{} {} {}", expr_left.to_string(operators, context), "=", expr_right.get_type().convert_between_styles(&expr_left.get_type(), &right_str).unwrap_or(right_str.to_string()))
 				} else {

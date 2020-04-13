@@ -156,13 +156,50 @@ impl VariableDeclaration {
 	pub fn to_cpp(&self, expr: &Option<Rc<Expression>>, operators: &OperatorDataStructure, context: &mut Context) -> String {
 		let var_type = &self.var_type;
 		let default_value = var_type.default_value();
-		return if expr.is_some() {
+		if expr.is_some() {
+			//println!("{}", expr.as_ref().unwrap().deconstruct_new(operators, context).unwrap_or("NONE".to_string()));
+			//if expr.as_ref().unwrap().get_op_type().unwrap_or(0) == 9 {
+			//}
+			let create_components = expr.as_ref().unwrap().deconstruct_new(operators, context);
+			if create_components.is_some() {
+				let comps = create_components.unwrap();
+				match var_type.var_style {
+					VarStyle::Copy => {
+						let args = &comps[1];
+						if args.is_empty() {
+							return format!("{} {};", comps.first().unwrap(), self.name);
+						} else {
+							return format!("{} {}({});", comps.first().unwrap(), self.name, args);
+						}
+					},
+					VarStyle::Ptr(self_size) => {
+						if self_size == 1 {
+							let var_name = comps.first().unwrap();
+							return format!("{}* {} = new {}({});", &var_name, self.name, &var_name, &comps[1]);
+						}
+					},
+					VarStyle::AutoPtr => {
+						let var_name = comps.first().unwrap();
+						return format!("std::shared_ptr<{}> {} = std::make_shared<{}>({});", &var_name, self.name, &var_name, &comps[1]);
+					},
+					VarStyle::UniquePtr => {
+						let var_name = comps.first().unwrap();
+						return format!("std::unique_ptr<{}> {} = std::make_unique<{}>({});", &var_name, self.name, &var_name, &comps[1]);
+					},
+					_ => ()
+				}
+			}
+
 			let right_str = expr.as_ref().unwrap().to_string(operators, context);
-			format!("{} {} = {};", var_type.to_cpp(), self.name, expr.as_ref().unwrap().get_type().convert_between_styles(var_type, &right_str).unwrap_or(right_str.to_string()))
+			return format!("{} {} = {};",
+				var_type.to_cpp(),
+				self.name,
+				expr.as_ref().unwrap().get_type().convert_between_styles(var_type, &right_str).unwrap_or(right_str.to_string())
+			);
 		} else if default_value.is_some() {
-			format!("{} {} = {};", var_type.to_cpp(), self.name, default_value.unwrap())
+			return format!("{} {} = {};", var_type.to_cpp(), self.name, default_value.unwrap());
 		} else {
-			format!("{} {};", var_type.to_cpp(), self.name)
+			return format!("{} {};", var_type.to_cpp(), self.name);
 		};
 	}
 }

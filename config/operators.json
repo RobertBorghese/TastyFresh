@@ -22,6 +22,7 @@
 	],
 	"infix": [
 		{ "operator": "::",  "priority": 1000 },
+		{ "operator": "@",   "priority": 975, "reverse_priority": true },
 		{ "operator": ".",   "priority": 950 },
 		{ "operator": "->",  "priority": 950 },
 		{ "operator": ".*",  "priority": 850 },

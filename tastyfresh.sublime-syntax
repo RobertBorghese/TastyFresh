@@ -1,0 +1,129 @@
+%YAML 1.2
+---
+file_extensions:
+  - tasty
+name: Tasty Fresh
+scope: source.tasty-fresh
+variables:
+  identifier: '(?:(?:[[:alpha:]][_[:alnum:]]*|_[_[:alnum:]]+)\b)'
+contexts:
+  prototype:
+    - include: comments
+    - include: module_attributes
+    - include: operators
+  main:
+    - match: '"'
+      scope: punctuation.definition.string.begin.tasty-fresh
+      push: double_quoted_string
+
+    - match: '//'
+      scope: punctuation.definition.comment.tasty-fresh
+      push: line_comment
+
+    - match: '/\*'
+      scope: punctuation.definition.comment.tasty-fresh
+      push: line_comment
+
+    - match: '(fn)\s+({{identifier}})'
+      scope: meta.function.tasty-fresh
+      captures:
+        1: storage.type.function.tasty-fresh
+        2: entity.name.function.tasty-fresh
+
+    - match: '(\@{{identifier}})'
+      scope: variable.parameter.tasty-fresh
+
+    - match: '[a-zA-Z0-9_]+(\@\(?\s*[^\)]+\)?)'
+      scope: meta.template.tasty-fresh
+      captures:
+        1: keyword.operator.tasty-fresh
+
+    - match: '\b(if|else|for|while|do)\b'
+      scope: keyword.control.tasty-fresh
+
+    - match: \breturn\b
+      scope: keyword.control.tasty-fresh
+
+    - match: '\b(let|copy|borrow|ref|ptr|autoptr|uniqueptr|ptr2|ptr3|ptr4|ptr5|ptr6|ptr7|ptr8|ptr9)\b'
+      scope: storage.type.tasty-fresh
+
+    - match: '\bfn\b'
+      scope: storage.type.function.tasty-fresh
+
+    - match: '\b(class|abstract|enum)\b'
+      scope: storage.type.class.tasty-fresh
+
+    - match: '(assume)\s+({{identifier}})\s+(is)\s+(a)\s+({{identifier}})'
+      scope: meta.assume.tasty-fresh
+      captures:
+        1: storage.type.assume.tasty-fresh
+        2: variable.parameter.tasty-fresh
+        3: keyword.operator.tasty-fresh
+        4: keyword.operator.tasty-fresh
+        5: keyword.control.tasty-fresh
+
+    - match: '(include)\s+({{identifier}})\s+({{identifier}})'
+      scope: meta.assume.tasty-fresh
+      captures:
+        1: storage.type.assume.tasty-fresh
+        2: keyword.control.tasty-fresh
+        3: variable.parameter.tasty-fresh
+
+    - match: '\b(unsigned|bool|char|short|int|long|float|double|text)\b'
+      scope: storage.type.numeric.tasty-fresh
+
+    - match: '\b(-)?[0-9\.ful]+\b'
+      scope: constant.numeric.tasty-fresh
+
+    - match: '\b(true|false)\b'
+      scope: constant.numeric.tasty-fresh
+
+    - match: '\b(nullptr|null|none)\b'
+      scope: constant.numeric.tasty-fresh
+
+  operators:
+    - match: '[!<>=]=|[<>\.]'
+      scope: keyword.operator.comparison.tasty-fresh
+    - match: '(?:[-+%/*^&|]|<<|>>)?='
+      scope: keyword.operator.assignment.tasty-fresh
+    - match: '&&|\|\||!'
+      scope: keyword.operator.logical.tasty-fresh
+    - match: '[-+%/*]'
+      scope: keyword.operator.arithmetic.tasty-fresh
+    - match: '[&|^]|<<|>>'
+      scope: keyword.operator.bitwise.tasty-fresh
+    - match: '[~?$#'']'
+      scope: keyword.operator.tasty-fresh
+    - match: 'new'
+      scope: keyword.operator.tasty-fresh
+
+  module_attributes:
+    - match: '(%{{identifier}}%)'
+      scope: keyword.control.tasty-fresh
+
+  double_quoted_string:
+    - meta_scope: string.quoted.double.tasty-fresh
+    - match: '\\.'
+      scope: constant.character.escape.tasty-fresh
+    - match: '"'
+      scope: punctuation.definition.string.end.tasty-fresh
+      pop: true
+
+  line_comment:
+    - meta_scope: comment.line.tasty-fresh
+    - match: $
+      pop: true
+
+  comments:
+    - match: '/\*'
+      scope: punctuation.definition.comment.c
+      push: 
+        - meta_scope: comment.block.c
+        - match: '\*/'
+          pop: true
+    - match: '/[^\*]'
+      scope: punctuation.definition.comment.c
+      push:
+        - meta_scope: comment.line.double-slash.c
+        - match: $\n?
+          pop: true

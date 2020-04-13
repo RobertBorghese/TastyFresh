@@ -448,7 +448,6 @@ impl<'a> ExpressionParser<'a> {
 		let real_second_char = parser.chars[parser.index + space_offset];
 		if real_second_char == end_char {
 			let empty = Vec::new();
-			println!("FJDLS {}", end_char);
 			match end_char {
 				')' => self.add_function_params(empty, parser.index, parser.index + space_offset),
 				']' => self.add_array_access_params(empty, parser.index, parser.index + space_offset),

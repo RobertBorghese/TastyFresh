@@ -248,8 +248,7 @@ fn parse_source_file(file: &str, output_dirs: &Vec<String>, config_data: &Config
 	}
 	module_contexts.insert(file.to_string(), context);
 	return module_declaration;
-}/*pub parameters: Vec<(VariableType, String, Option<usize>, Option<usize>)>,
-	pub return_type: VariableType,*/
+}
 
 /// Transpiles the input source file into C++ and outputs it to the provided `output_dirs`.
 ///
@@ -271,8 +270,10 @@ fn transpile_source_file(file: &str, output_dirs: &Vec<String>, config_data: &Co
 
 	let mut output_lines = Vec::new();
 
-	let mut variable_declarations = Vec::new();
-	let mut function_declarations = Vec::new();
+	let mut variable_declarations = Vec::<String>::new();
+	let mut function_declarations = Vec::<String>::new();
+	let mut variable_declarations_isolated = Vec::<String>::new();
+	let mut function_declarations_isolated = Vec::<String>::new();
 	
 	let mut handling_module_attributes = true;
 	let mut header_include_line: Option<usize> = None;
@@ -314,19 +315,20 @@ fn transpile_source_file(file: &str, output_dirs: &Vec<String>, config_data: &Co
 				let mut line = if context.align_lines { func_data.line } else { output_lines.len() + 1 };
 				end_line = line;
 				if func_data.start_index.is_some() && func_data.end_index.is_some() {
-					let scope = ScopeExpression::new(parser, func_data.start_index.unwrap(), func_data.line, file, config_data, &mut context);
+					let scope = ScopeExpression::new(parser, None, func_data.start_index.unwrap(), func_data.line, file, config_data, &mut context);
 					func_content = Some(scope.to_string(&config_data.operators, func_data.line, 1, &mut context));
 				}
 				let func_declaration = func_data.to_function(&file).to_cpp();
 				insert_output_line(&mut output_lines, &func_declaration, line, false);
 				if func_content.is_some() {
 					let re = Regex::new("(?:\n|\n\r)").unwrap();
+					let original_line = line;
 					insert_output_line(&mut output_lines, "{", line, false);
 					for func_line in re.split(&func_content.unwrap()) {
 						insert_output_line(&mut output_lines, func_line, line, false);
 						line += 1;
 					}
-					insert_output_line(&mut output_lines, "}", line, false);
+					insert_output_line(&mut output_lines, "}", if original_line == line - 1 { original_line } else { line }, false);
 				} else {
 					insert_output_line(&mut output_lines, ";", line, false);
 				}
@@ -340,7 +342,7 @@ fn transpile_source_file(file: &str, output_dirs: &Vec<String>, config_data: &Co
 					}
 				}
 				if add_to_header {
-					function_declarations.push(format!("{};", func_declaration));
+					configure_declaration_with_attributes(&mut function_declarations, &mut function_declarations_isolated, &func_declaration, &attributes, &parser.content);
 				}
 			},
 			DeclarationType::Variable(var_data, attributes) => {
@@ -356,7 +358,7 @@ fn transpile_source_file(file: &str, output_dirs: &Vec<String>, config_data: &Co
 				}
 				let var_type = &var_data.var_type;
 				let line = if context.align_lines { var_data.line } else {
-					if var_data.line - end_line < 2 {
+					if end_line > var_data.line || var_data.line - end_line < 2 {
 						output_lines.len()
 					} else {
 						output_lines.len() + 1
@@ -373,7 +375,9 @@ fn transpile_source_file(file: &str, output_dirs: &Vec<String>, config_data: &Co
 					}
 				}
 				if add_to_header {
-					variable_declarations.push(format!("{} {};", var_type.to_cpp(), var_data.name));
+					//variable_declarations.push(format!("{} {};", var_type.to_cpp(), var_data.name));
+					let var_declaraction = format!("{} {}", var_type.to_cpp(), var_data.name);
+					configure_declaration_with_attributes(&mut variable_declarations, &mut variable_declarations_isolated, &var_declaraction, &attributes, &parser.content);
 				}
 			},
 			_ => {
@@ -405,11 +409,23 @@ fn transpile_source_file(file: &str, output_dirs: &Vec<String>, config_data: &Co
 			}
 			header_lines.push("".to_string());
 		}
+		if !variable_declarations_isolated.is_empty() {
+			for d in variable_declarations_isolated {
+				header_lines.push(d);
+				header_lines.push("".to_string());
+			}
+		}
 		if !variable_declarations.is_empty() {
 			for d in variable_declarations {
 				header_lines.push(d);
 			}
 			header_lines.push("".to_string());
+		}
+		if !function_declarations_isolated.is_empty() {
+			for d in function_declarations_isolated {
+				header_lines.push(d);
+				header_lines.push("".to_string());
+			}
 		}
 		if !function_declarations.is_empty() {
 			for d in function_declarations {
@@ -428,7 +444,9 @@ fn transpile_source_file(file: &str, output_dirs: &Vec<String>, config_data: &Co
 			let path_base = path_str_unwrap[..(path_str_unwrap.len() - path.extension().and_then(OsStr::to_str).unwrap_or("").len())].to_string();
 			let header_path = path_base.clone() + "hpp";
 			if header_include_line.is_some() {
-				insert_output_line(&mut output_lines, format!("#include \"{}\"", header_path).as_str(), header_include_line.unwrap(), true);
+				insert_output_line(&mut output_lines, format!("#include \"{}\"", if header_path.starts_with("./") {
+					&header_path[2..]
+				} else { &header_path }).as_str(), header_include_line.unwrap(), true);
 			}
 			std::fs::write(path_base + "cpp", output_lines.join("\n"));
 			std::fs::write(header_path, header_lines.join("\n"));
@@ -437,6 +455,41 @@ fn transpile_source_file(file: &str, output_dirs: &Vec<String>, config_data: &Co
 		}
 	}
 	return true;
+}
+
+fn configure_declaration_with_attributes(delcarations: &mut Vec<String>, declarations_isolated: &mut Vec<String>, declaration: &str, attributes: &Option<Vec<AttributeDeclaration>>, content: &str) {
+	let mut prepend = "".to_string();
+	let mut append = "".to_string();
+	let mut isolated = false;
+	if attributes.is_some() {
+		for a in attributes.as_ref().unwrap() {
+			if a.name == "DeclarePrepend" {
+				if a.parameters.is_some() {
+					for param in a.parameters.as_ref().unwrap() {
+						prepend += &content[param.0..param.1];
+					}
+				}
+			} else if a.name == "DeclareAppend" {
+				if a.parameters.is_some() {
+					for param in a.parameters.as_ref().unwrap() {
+						append += &content[param.0..param.1];
+					}
+				}
+			} else if a.name == "Isolated" {
+				isolated = true;
+			}
+		}
+	}
+	let mut result = format!("{}{};{}", 
+		if prepend.is_empty() { "".to_string() } else { format!("{}\n", prepend) }, 
+		declaration,
+		if append.is_empty() { "".to_string() } else { format!("\n{}", append) }
+	);
+	if isolated {
+		declarations_isolated.push(result);
+	} else {
+		delcarations.push(result);
+	}
 }
 
 fn insert_output_line(output_lines: &mut Vec<String>, line: &str, line_number: usize, clear: bool) {
@@ -502,8 +555,6 @@ fn main() {
 		_ => "other"
 	});
 	*/
-
-	println!("{}", expression::value_type::NumberType::from_value_text("31.2l").to_cpp());
 
 	//"++!&&a(!~dfjks.jfdk[32.help],12,ew)()+sd"
 	//" + ++ !& ^^^& (!~dfjks.  jfdk[32.help]  ,  12, ew) () + sd"

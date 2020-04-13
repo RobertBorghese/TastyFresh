@@ -8,7 +8,7 @@
 use crate::context_management::typing_context::TypingContext;
 use crate::context_management::header_context::HeaderContext;
 
-use crate::expression::variable_type::{ VariableType, Type };
+use crate::expression::variable_type::{ VariableType, Type, VarStyle };
 
 pub struct Context {
 	pub typing: TypingContext,
@@ -27,14 +27,19 @@ impl Context {
 		}
 	}
 
-	pub fn add_header(&mut self, path: String, is_system: bool) {
+	pub fn add_header(&mut self, path: &str, is_system: bool) {
 		self.headers.add_header(path, is_system);
 	}
 
 	pub fn register_type(&mut self, var_type: &VariableType) {
 		match &var_type.var_type {
-			Type::Function(func) => self.add_header("functional".to_string(), true),
-			Type::Tuple(types) => self.add_header("tuple".to_string(), true),
+			Type::Function(func) => self.add_header("functional", true),
+			Type::Tuple(types) => self.add_header("tuple", true),
+			_ => ()
+		}
+		match &var_type.var_style {
+			VarStyle::AutoPtr => self.add_header("memory", true),
+			VarStyle::UniquePtr => self.add_header("memory", true),
 			_ => ()
 		}
 	}

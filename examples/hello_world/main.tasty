@@ -1,3 +1,15 @@
+
+let bla = 32;
+
+autoptr anotherTest: Asd;
+
+include system iostream;
+include system vector;
+
+assume std is a namespace;
+
+@Prepend("fdsfds")
+@Isolated
 fn main() {
 	let bla1 = test(12);
 	let bla2 = test("fdsfds");
@@ -12,20 +24,41 @@ fn main() {
 	let bla10 = bla5;
 
 	let test = fdjsklfds();
+
+	let cond = true;
+
+	let test = Bla();
+	{ 
+		let one = 1;
+		{
+			let two = 2;
+			{
+				let three = 4;
+				let another = 32;
+			}
+		}
+	}
+	if cond {
+		return 3;
+	}
+	let test2 = (32, 54);
+
+	std.cout << "teste" << std.endl;
+	let b = 32 == 32 ? 1 : 0;
+	//let a = new std.vector@(std.vector@int)();
+
+	return 10;
+
+	let bla = new std.vector@(int)(34, "fdsfds");
 }
 
-fn test(copy a: int) -> int {
-	return 0;
-}
+fn aaaaa(a: map@int) {
 
-fn test(copy a: text) -> float {
-	return 0.0f;
 }
+fn test() -> int { return 3; }
 
-fn test(copy a: float) -> text {
-	return "This is text";
-}
-
-fn test(copy a: double) -> ptr QString? {
-	return nullptr;
-}
+fn test(a: text) -> float {
+	return 0.0f; }
+fn test(a: int) -> float { return 0.0f; }
+fn test(a: float) -> int { return 0.0f; }
+fn test(a: double) -> char { return 0.0f; }

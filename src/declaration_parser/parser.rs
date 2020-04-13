@@ -316,7 +316,8 @@ impl Parser {
 				_ => ()
 			}
 			if brackets <= 0 && parentheses <= 0 {
-				if self.get_curr() == c || self.get_curr() == c2 {
+				if (self.get_curr() == c && ((c != '}' || brackets < 0) && (c != '(' || parentheses < 0)) ||
+					self.get_curr() == c2 && ((c2 != '}' || brackets < 0) && (c2 != '(' || parentheses < 0))) {
 					*result = self.get_curr();
 					break;
 				}
@@ -680,15 +681,16 @@ impl Parser {
 		if self.parse_whitespace_and_check_space() { return Type::Inferred; }
 
 		// Check for Type Parameters
-		let mut next_char = self.get_curr();
-		if next_char == '<' {
+		let template_char = self.get_curr();
+		if template_char == '<' || template_char == '@' {
 
-			// Skip `<`
+			// Skip `<` or `@`
 			if self.increment() { return Type::Inferred; }
 
 			// Store Type Parameters
 			let mut type_params = Vec::new();
-			loop {
+
+			if template_char == '@' && self.get_curr() != '(' {
 
 				// Parse Whitespace
 				if self.parse_whitespace_and_check_space() { return Type::Inferred; }
@@ -696,22 +698,39 @@ impl Parser {
 				// Parse Type Parameter
 				type_params.push(VariableType::from_type_style(self.parse_type_and_style(unexpected_character, conflicting_specifiers)));
 
-				// Check for Errors
-				if self.out_of_space || *unexpected_character || conflicting_specifiers.is_some() { return Type::Inferred; }
+			} else {
 
-				// Parse Whitespace
-				if self.parse_whitespace_and_check_space() { return Type::Inferred; }
+				if template_char == '@' && self.get_curr() == '(' {
+					if self.increment() {
+						return Type::Inferred;
+					}
+				}
 
-				// Check for End of Parameters or Next Parameter
-				next_char = self.get_curr();
-				if next_char == ',' {
-					if self.increment() { return Type::Inferred; }
-				} else if next_char == '>' {
-					self.increment();
-					break;
-				} else {
-					*unexpected_character = true;
-					return Type::Inferred;
+				loop {
+
+					// Parse Whitespace
+					if self.parse_whitespace_and_check_space() { return Type::Inferred; }
+
+					// Parse Type Parameter
+					type_params.push(VariableType::from_type_style(self.parse_type_and_style(unexpected_character, conflicting_specifiers)));
+
+					// Check for Errors
+					if self.out_of_space || *unexpected_character || conflicting_specifiers.is_some() { return Type::Inferred; }
+
+					// Parse Whitespace
+					if self.parse_whitespace_and_check_space() { return Type::Inferred; }
+
+					// Check for End of Parameters or Next Parameter
+					let next_char = self.get_curr();
+					if next_char == ',' {
+						if self.increment() { return Type::Inferred; }
+					} else if (template_char == '<' && next_char == '>') || (template_char == '@' && next_char == ')') {
+						self.increment();
+						break;
+					} else {
+						*unexpected_character = true;
+						return Type::Inferred;
+					}
 				}
 			}
 
