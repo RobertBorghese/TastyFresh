@@ -199,7 +199,7 @@ void main() {
 		intList.push_back(i);
 	}
 	for(auto num : intList) {
-		std.cout << num << std.endl;
+		std::cout << num << std::endl;
 	}
 }
 ```
