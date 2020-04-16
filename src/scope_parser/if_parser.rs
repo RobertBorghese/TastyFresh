@@ -15,6 +15,7 @@ use crate::config_management::ConfigData;
 
 use crate::expression::Expression;
 use crate::expression::expression_parser::ExpressionEndReason;
+use crate::expression::variable_type::VariableType;
 
 use crate::declaration_parser::declaration::{ Declaration, DeclarationResult };
 use crate::declaration_parser::parser::Parser;
@@ -54,7 +55,7 @@ impl IfParser {
 		declare_parse_whitespace!(parser);
 
 		let mut reason = ExpressionEndReason::Unknown;
-		let expression = parser.parse_expression(file_name.clone(), config_data, Some(context), &mut reason);
+		let expression = parser.parse_expression(file_name.clone(), config_data, Some(context), &mut reason, Some(VariableType::boolean()));
 
 		match reason {
 			ExpressionEndReason::Unknown => return IfParserResult::Err("Unknown Error", "unknown expression parsing error", parser.index - 1, parser.index),
@@ -68,12 +69,12 @@ impl IfParser {
 
 		let mut scope: Option<ScopeExpression> = None;
 		if parser.get_curr() == '{' {
-			scope = Some(ScopeExpression::new(parser, None, parser.index + 1, parser.line, &file_name, config_data, context));
+			scope = Some(ScopeExpression::new(parser, None, parser.index + 1, parser.line, &file_name, config_data, context, None));
 			if parser.get_curr() == '}' {
 				//println!("SUCCESS!");
 			}
 		} else {
-			scope = Some(ScopeExpression::new(parser, Some(1), parser.index, parser.line, &file_name, config_data, context));
+			scope = Some(ScopeExpression::new(parser, Some(1), parser.index, parser.line, &file_name, config_data, context, None));
 		}
 
 		return IfParserResult::Ok(IfParser {

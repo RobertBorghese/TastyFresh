@@ -29,10 +29,27 @@ pub enum ExpressionPiece {
 	EncapsulatedValues(Rc<Vec<Rc<Expression>>>, Position),
 	InitializerList(Rc<Vec<Rc<Expression>>>, Position),
 	FunctionParameters(Rc<Vec<Rc<Expression>>>, Position),
-	ArrayAccessParameters(Rc<Vec<Rc<Expression>>>, Position)
+	ArrayAccessParameters(Rc<Vec<Rc<Expression>>>, Position),
+	Type(Type, Position)
 }
 
 impl ExpressionPiece {
+	pub fn print_type(&self) {
+		match self {
+			ExpressionPiece::Expression(..) => println!("expression"),
+			ExpressionPiece::Prefix(..) => println!("prefix"),
+			ExpressionPiece::Value(..) => println!("value"),
+			ExpressionPiece::Suffix(..) => println!("suffix"),
+			ExpressionPiece::Infix(..) => println!("infix"),
+			ExpressionPiece::Ternary(..) => println!("ternary"),
+			ExpressionPiece::EncapsulatedValues(..) => println!("encapsulated values"),
+			ExpressionPiece::InitializerList(..) => println!("initializer list"),
+			ExpressionPiece::FunctionParameters(..) => println!("function params"),
+			ExpressionPiece::ArrayAccessParameters(..) => println!("array access params"),
+			ExpressionPiece::Type(..) => println!("type")
+		}
+	}
+
 	pub fn get_encapsulated_type(&self) -> Option<VariableType> {
 		return match self {
 			ExpressionPiece::EncapsulatedValues(exprs, _) => {
@@ -75,12 +92,23 @@ impl ExpressionPiece {
 		};
 	}
 
-	pub fn parse_expr_parts(parser: &mut ExpressionParser, context: &mut Option<&mut Context>, file_content: &str) -> Rc<Expression> {
+	pub fn parse_expr_parts(parser: &mut ExpressionParser, context: &mut Option<&mut Context>, file_content: &str, final_desired_type: Option<VariableType>) -> Rc<Expression> {
 		let mut error = false;
 		if parser.parts.len() == 1 {
 			match Self::get_expression_from_piece(&parser.parts[0], context) {
 				Some(expr) => parser.parts[0] = ExpressionPiece::Expression(expr),
 				None => return Rc::new(Expression::Invalid) // TODO: error
+			}
+		}
+		if parser.parts.len() == 3 {
+			if let ExpressionPiece::Prefix(index, pos) = &parser.parts[0] {
+				if *index == 9 {
+					if let ExpressionPiece::Type(tf_type, _) = &parser.parts[1] {
+						if let ExpressionPiece::FunctionParameters(exprs, _) = &parser.parts[2] {
+							return Rc::new(Expression::ConstructCall(tf_type.clone(), Rc::clone(exprs), VariableType::copy(tf_type.clone()), pos.clone()));
+						}
+					}
+				}
 			}
 		}
 		while parser.parts.len() > 1 {
@@ -166,6 +194,9 @@ impl ExpressionPiece {
 						}
 					},
 					_ => {
+						for p in &parser.parts {
+							p.print_type();
+						}
 						println!("No support for this expression atm!");
 						error = true;
 						break;
@@ -195,10 +226,32 @@ impl ExpressionPiece {
 		return Rc::new(Expression::Invalid);
 	}
 
+	fn expect_type(operator_id: usize, is_prefix: bool) -> bool {
+		if is_prefix {
+			return operator_id == 8 || operator_id == 9;
+		}
+		return operator_id == 6;
+	}
+
 	fn parse_prefix(parser: &ExpressionParser, part_index: &usize, operator_id: usize, context: &Option<&mut Context>, position: Position) -> (Option<ExpressionPiece>,Option<Position>) {
-		let result = Self::get_expression_from_piece(&parser.parts[*part_index], context);
-		if result.is_some() {
-			return (Some(ExpressionPiece::Expression(Rc::new(Expression::Prefix(result.unwrap(), operator_id, VariableType::inferred(), position)))), None);
+		if Self::expect_type(operator_id, true) {
+			let tf_type = Self::get_type_from_piece(&parser.parts[*part_index], context);
+			let result = Self::get_expression_from_piece(&parser.parts[*part_index], context);
+			if result.is_some() {
+				return (Some(ExpressionPiece::Expression(Rc::new(Expression::Prefix(result.unwrap(), operator_id,
+				if operator_id == 8 {
+					VariableType::copy(Type::Number(NumberType::UInt))
+				} else if tf_type.is_some() {
+					VariableType::copy((*tf_type.unwrap()).clone())
+				} else {
+					VariableType::inferred()
+				}, position)))), None);
+			}
+		} else {
+			let result = Self::get_expression_from_piece(&parser.parts[*part_index], context);
+			if result.is_some() {
+				return (Some(ExpressionPiece::Expression(Rc::new(Expression::Prefix(result.unwrap(), operator_id, VariableType::inferred(), position)))), None);
+			}
 		}
 		return (None, Some(position));
 	}
@@ -251,6 +304,10 @@ impl ExpressionPiece {
 		let result = Self::get_expression_from_piece(&parser.parts[part_index - 1], context);
 		if result.is_some() {
 			let left_expr = result.unwrap();
+			let mut is_new_call = false;
+			if let Expression::Prefix(_, op_id, _, _) = *left_expr {
+				is_new_call = true;
+			}
 			let mut left_type = left_expr.get_type();
 			if left_type.is_quantum_function() {
 				let left_type_resolved = left_type.resolve_quantum_function(Rc::clone(&exprs));
@@ -261,7 +318,7 @@ impl ExpressionPiece {
 					left_type = VariableType::inferred();
 				}
 			}
-			let final_type = left_type.get_function_call_return().unwrap_or(VariableType::inferred());
+			let final_type = if is_new_call { left_type } else { left_type.get_function_call_return().unwrap_or(VariableType::inferred()) };
 			return (Some(ExpressionPiece::Expression(Rc::new(Expression::FunctionCall(left_expr, Rc::clone(&exprs), final_type, position)))), None);
 		}
 		return (None, Some(position));
@@ -278,7 +335,9 @@ impl ExpressionPiece {
 	fn get_expression_from_piece(piece: &ExpressionPiece, context: &Option<&mut Context>) -> Option<Rc<Expression>> {
 		return match piece {
 			ExpressionPiece::Value(value, position) => {
-				Some(Rc::new(Expression::Value(value.clone(), Self::infer_type_from_value_string(&value, context), position.clone())))
+				let mut final_val = value.clone();
+				let var_type = Self::infer_type_from_value_string(&mut final_val, context);
+				Some(Rc::new(Expression::Value(final_val, var_type, position.clone())))
 			},
 			ExpressionPiece::Expression(expr) => {
 				Some(Rc::clone(expr))
@@ -288,6 +347,18 @@ impl ExpressionPiece {
 			},
 			ExpressionPiece::InitializerList(expressions, position) => {
 				Some(Rc::new(Expression::InitializerList(Rc::clone(expressions), piece.get_encapsulated_type().unwrap_or(VariableType::inferred()), position.clone())))
+			},
+			ExpressionPiece::Type(tf_type, position) => {
+				Some(Rc::new(Expression::Value(tf_type.to_cpp(), VariableType::copy((*tf_type).clone()), position.clone())))
+			},
+			_ => None
+		};
+	}
+
+	fn get_type_from_piece(piece: &ExpressionPiece, context: &Option<&mut Context>) -> Option<Rc<Type>> {
+		return match piece {
+			ExpressionPiece::Type(tf_type, position) => {
+				Some(Rc::new((*tf_type).clone()))
 			},
 			_ => None
 		};
@@ -300,7 +371,7 @@ impl ExpressionPiece {
 		};
 	}
 
-	fn infer_type_from_value_string(value: &str, context: &Option<&mut Context>) -> VariableType {
+	fn infer_type_from_value_string(value: &mut String, context: &Option<&mut Context>) -> VariableType {
 		if value.is_empty() {
 			return VariableType::inferred();
 		}
@@ -328,7 +399,7 @@ impl ExpressionPiece {
 		return VariableType::inferred();
 	}
 
-	fn infer_number_type(value: &str) -> Type {
+	fn infer_number_type(value: &mut String) -> Type {
 		return Type::Number(NumberType::from_value_text(value));
 	}
 
@@ -339,9 +410,9 @@ impl ExpressionPiece {
 
 	fn get_next_operator(parser: &mut ExpressionParser) -> Option<usize> {
 		let mut next_op_index = None;
-		let mut next_op_priority = -1;
+		let mut next_op_priority = -3;
 		for i in 0..parser.parts.len() {
-			let mut priority = -2;
+			let mut priority = -3;
 			let mut reverse_priority = false;
 			Self::get_piece_priority(parser, i, &mut priority, &mut reverse_priority);
 			if (priority > next_op_priority) || (priority == next_op_priority && reverse_priority) {
@@ -373,7 +444,9 @@ impl ExpressionPiece {
 			ExpressionPiece::ArrayAccessParameters(..) => {
 				*priority = 950;
 			},
-			_ => ()
+			_ => {
+				*priority = -2;
+			}
 		}
 	}
 }

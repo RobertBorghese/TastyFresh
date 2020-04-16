@@ -1,64 +1,51 @@
 
-let bla = 32;
+contain system iostream;
 
-autoptr anotherTest: Asd;
+autoptr bla: vector;
+copy bla: vector;
 
-include system iostream;
-include system vector;
+fn main() -> int {
+	std.cout << "Hello world" << std.endl;
 
-assume std is a namespace;
+	let test = new TestClass();
+	test.printValue();
 
-@Prepend("fdsfds")
-@Isolated
-fn main() {
-	let bla1 = test(12);
-	let bla2 = test("fdsfds");
-	let bla3 = test(23.43f);
-	let bla4 = test(1.2);
+	test++;
+	test++;
+	test++;
 
-	ptr2 bla5 = bla4;
-	ptr4 bla6 = bla4;
+	test.printValue();
 
-	copy bla7 = bla4;
+	let test = fdsf#int;
 
-	let bla10 = bla5;
+	let test2 = static_cast@int(32f);
 
-	let test = fdjsklfds();
-
-	let cond = true;
-
-	let test = Bla();
-	{ 
-		let one = 1;
-		{
-			let two = 2;
-			{
-				let three = 4;
-				let another = 32;
-			}
-		}
-	}
-	if cond {
-		return 3;
-	}
-	let test2 = (32, 54);
-
-	std.cout << "teste" << std.endl;
-	let b = 32 == 32 ? 1 : 0;
-	//let a = new std.vector@(std.vector@int)();
-
-	return 10;
-
-	let bla = new std.vector@(int)(34, "fdsfds");
+	return 0;
 }
 
-fn aaaaa(a: map@int) {
+class Test_Class {
+	forever let a: int;
 
+	let b = new vector@int();
+
+	ptr ghj: vector@int := 0;
+
+	constructor(a: int) {
+		this.a = a;
+	}
+
+	constructor(a: float) {
+		this.a = a#int;
+	}
+
+	virtual destructor {
+	}
+
+	fn printValue() {
+		std.cout << "The value of 'a' is: " << a << std.endl;
+	}
+
+	op ++() {
+		a++;
+	}
 }
-fn test() -> int { return 3; }
-
-fn test(a: text) -> float {
-	return 0.0f; }
-fn test(a: int) -> float { return 0.0f; }
-fn test(a: float) -> int { return 0.0f; }
-fn test(a: double) -> char { return 0.0f; }

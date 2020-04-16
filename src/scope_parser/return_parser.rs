@@ -15,6 +15,7 @@ use crate::config_management::ConfigData;
 
 use crate::expression::Expression;
 use crate::expression::expression_parser::ExpressionEndReason;
+use crate::expression::variable_type::VariableType;
 
 use crate::declaration_parser::declaration::{ Declaration, DeclarationResult };
 use crate::declaration_parser::parser::Parser;
@@ -44,7 +45,7 @@ impl CPPTranspiler for ReturnParser {
 }
 
 impl ReturnParser {
-	pub fn new(parser: &mut Parser, file_name: String, config_data: &ConfigData, context: &mut Context) -> ReturnParserResult {
+	pub fn new(parser: &mut Parser, file_name: String, config_data: &ConfigData, context: &mut Context, expected_return_type: Option<VariableType>) -> ReturnParserResult {
 		let initial_line = parser.line;
 
 		let mut return_keyword = "".to_string();
@@ -62,7 +63,7 @@ impl ReturnParser {
 	}*/
 
 		let mut reason = ExpressionEndReason::Unknown;
-		let expression = parser.parse_expression(file_name, config_data, Some(context), &mut reason);
+		let expression = parser.parse_expression(file_name, config_data, Some(context), &mut reason, expected_return_type);
 
 		match reason {
 			ExpressionEndReason::Unknown => return ReturnParserResult::Err("Unknown Error", "unknown expression parsing error", parser.index - 1, parser.index),

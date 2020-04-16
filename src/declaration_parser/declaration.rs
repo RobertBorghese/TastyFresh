@@ -70,6 +70,16 @@ pub trait Declaration<T> {
 		return None;
 	}
 
+	fn parse_required_ascii_op(result: &mut String, error_title: &'static str, error_msg: &'static str, parser: &mut Parser) -> Option<DeclarationResult<T>> {
+		*result = parser.parse_ascii_op_name();
+		if result.is_empty() {
+			return Some(DeclarationResult::Err(error_title, error_msg, parser.index - 1, parser.index));
+		} else if parser.out_of_space {
+			return Some(Self::out_of_space(parser.index));
+		}
+		return None;
+	}
+
 	fn parse_required_next_char(c: char, error_msg: &'static str, next_char: &mut char, parser: &mut Parser) -> Option<DeclarationResult<T>> {
 		*next_char = parser.get_curr();
 		if *next_char == c {
@@ -187,6 +197,17 @@ macro_rules! declare_parse_ascii {
 macro_rules! declare_parse_required_ascii {
 	($var_name:expr, $error_title:expr, $error_msg:expr, $parser:expr) => {
 		if let Some(result) = Self::parse_required_ascii(&mut $var_name, $error_title, $error_msg, $parser) {
+			return result;
+		}
+	}
+}
+
+/// Parses next ASCII operator characters to form a `String`.
+/// Fails if an operators cannot be found.
+#[macro_export]
+macro_rules! declare_parse_required_ascii_op {
+	($var_name:expr, $error_title:expr, $error_msg:expr, $parser:expr) => {
+		if let Some(result) = Self::parse_required_ascii_op(&mut $var_name, $error_title, $error_msg, $parser) {
 			return result;
 		}
 	}

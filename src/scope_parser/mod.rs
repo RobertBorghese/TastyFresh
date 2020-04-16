@@ -15,7 +15,7 @@ use crate::declaration_parser::variable_declaration::VariableDeclaration;
 
 use crate::expression::Expression;
 use crate::expression::expression_parser::ExpressionEndReason;
-use crate::expression::variable_type::Type;
+use crate::expression::variable_type::{ VariableType, Type };
 
 use crate::scope_parser::return_parser::ReturnParser;
 use crate::scope_parser::if_parser::IfParser;
@@ -39,7 +39,7 @@ pub enum ScopeExpression {
 }
 
 impl ScopeExpression {
-	pub fn new(parser: &mut Parser, limit: Option<usize>, start_index: usize, line: usize, file: &str, config_data: &ConfigData, context: &mut Context) -> ScopeExpression {
+	pub fn new(parser: &mut Parser, limit: Option<usize>, start_index: usize, line: usize, file: &str, config_data: &ConfigData, context: &mut Context, expected_return_type: Option<VariableType>) -> ScopeExpression {
 		parser.reset(start_index, line);
 
 		let mut scope_exprs = Vec::new();
@@ -52,7 +52,7 @@ impl ScopeExpression {
 			}
 			parser.parse_whitespace();
 			if ReturnParser::is_declaration(parser) {
-				let mut result = ReturnParser::new(parser, file.to_string(), config_data, context);
+				let mut result = ReturnParser::new(parser, file.to_string(), config_data, context, expected_return_type.clone());
 				if result.is_error() {
 					result.print_error(file.to_string(), &parser.content);
 					break;
@@ -89,7 +89,7 @@ impl ScopeExpression {
 					if var_declare.value.is_some() {
 						parser.reset(var_declare.value.as_ref().unwrap().0, var_declare.line);
 						let mut reason = ExpressionEndReason::Unknown;
-						let expr = parser.parse_expression(file.to_string(), config_data, Some(context), &mut reason);
+						let expr = parser.parse_expression(file.to_string(), config_data, Some(context), &mut reason, Some(var_declare.var_type.clone()));
 						if reason == ExpressionEndReason::EndOfExpression {
 							parser.parse_whitespace();
 							if parser.get_curr() == ';' {
@@ -119,7 +119,7 @@ impl ScopeExpression {
 				let initial_line = parser.line;
 				parser.increment();
 				scope_exprs.push(ScopeExpression::SubScope(
-					Box::new(ScopeExpression::new(parser, limit, parser.index, parser.line, file, config_data, context)),
+					Box::new(ScopeExpression::new(parser, limit, parser.index, parser.line, file, config_data, context, None)),
 					initial_line,
 					parser.line
 				));
@@ -130,7 +130,7 @@ impl ScopeExpression {
 					break;
 				}
 				let mut reason = ExpressionEndReason::Unknown;
-				let expr = parser.parse_expression(file.to_string(), config_data, Some(context), &mut reason);
+				let expr = parser.parse_expression(file.to_string(), config_data, Some(context), &mut reason, None);
 				if reason != ExpressionEndReason::EndOfExpression {
 					break;
 				} else {
@@ -190,7 +190,7 @@ impl ScopeExpression {
 				format!("{};", expr.to_string(operators, context))
 			},
 			ScopeExpression::VariableDeclaration(declaration, expr) => {
-				declaration.to_cpp(expr, operators, context)
+				declaration.to_cpp(expr, operators, context, None)
 			},
 			ScopeExpression::Return(expr, _) => {
 				format!("return {};", expr.to_string(operators, context))

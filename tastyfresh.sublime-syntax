@@ -24,6 +24,11 @@ contexts:
       scope: punctuation.definition.comment.tasty-fresh
       push: line_comment
 
+    - match: '(?<!fn)\s*(?!constructor|super|this)([a-zA-Z_](?:[a-zA-Z0-9_]+|::|\.|\->)+[a-zA-Z0-9_])\s*(?=\()'
+      scope: meta.function.tasty-fresh
+      captures:
+        1: entity.name.function.tasty-fresh
+
     - match: '(fn)\s+({{identifier}})'
       scope: meta.function.tasty-fresh
       captures:
@@ -33,7 +38,12 @@ contexts:
     - match: '(\@{{identifier}})'
       scope: variable.parameter.tasty-fresh
 
-    - match: '[a-zA-Z0-9_]+(\@\(?\s*[^\)]+\)?)'
+    - match: '[a-zA-Z0-9_]+(\@[^\(\)\s]+)'
+      scope: meta.template.tasty-fresh
+      captures:
+        1: keyword.operator.tasty-fresh
+
+    - match: '[a-zA-Z0-9_]+(\@\([^\)]+\))'
       scope: meta.template.tasty-fresh
       captures:
         1: keyword.operator.tasty-fresh
@@ -44,16 +54,43 @@ contexts:
     - match: \breturn\b
       scope: keyword.control.tasty-fresh
 
-    - match: '\b(let|copy|borrow|ref|ptr|autoptr|uniqueptr|ptr2|ptr3|ptr4|ptr5|ptr6|ptr7|ptr8|ptr9)\b'
+    - match: '\b(let|copy|borrow|ref|move|ptr|autoptr|uniqueptr|ptr2|ptr3|ptr4|ptr5|ptr6|ptr7|ptr8|ptr9)\b'
       scope: storage.type.tasty-fresh
 
-    - match: '\bfn\b'
+    - match: '(?<=let|copy|borrow|ref|move|ptr|autoptr|uniqueptr|ptr2|ptr3|ptr4|ptr5|ptr6|ptr7|ptr8|ptr9)\s+({{identifier}})'
+      scope: entity.name.function.tasty-fresh
+
+    - match: '\b(static|inline|extern|virtual|meta)\b'
+      scope: storage.type.tasty-fresh
+
+    - match: '\b(const|constexpr|constinit|extern|mutable|forever|thread_local|volatile)\b'
+      scope: storage.type.tasty-fresh
+
+    - match: '\b(fn|op|constructor|destructor)\b'
       scope: storage.type.function.tasty-fresh
 
-    - match: '\b(class|abstract|enum)\b'
+    - match: '(class|abstract|enum)\s+({{identifier}})'
+      scope: meta.assume.tasty-fresh
+      captures:
+        1: storage.type.class.tasty-fresh
+        2: entity.name.class.tasty-fresh
+
+    - match: '(?<=extends|and|becomes)\s+(([a-zA-Z_](?:[a-zA-Z0-9_]+|::|\.|\->)+[a-zA-Z0-9_]))'
+      scope: entity.name.class.tasty-fresh
+
+    - match: '\b(extends|becomes|and)\b'
       scope: storage.type.class.tasty-fresh
 
-    - match: '(assume)\s+({{identifier}})\s+(is)\s+(a)\s+({{identifier}})'
+    - match: \b(super)\b
+      scope: variable.language.super.js
+
+    - match: \b(this)\b
+      scope: variable.language.this.js
+
+    - match: '\b(std)\b'
+      scope: storage.type.namespace.tasty-fresh
+
+    - match: '(assume)\s+({{identifier}})\s+(is)\s+(a)\s+(namespace|class|variable)'
       scope: meta.assume.tasty-fresh
       captures:
         1: storage.type.assume.tasty-fresh
@@ -62,12 +99,18 @@ contexts:
         4: keyword.operator.tasty-fresh
         5: keyword.control.tasty-fresh
 
-    - match: '(include)\s+({{identifier}})\s+({{identifier}})'
-      scope: meta.assume.tasty-fresh
+    - match: '(include|contain)\s+(system\s+|local\s+)?([a-zA-Z0-9_\.\/\\]+)'
+      scope: meta.include.tasty-fresh
       captures:
-        1: storage.type.assume.tasty-fresh
+        1: storage.type.include.tasty-fresh
         2: keyword.control.tasty-fresh
         3: variable.parameter.tasty-fresh
+
+    - match: '(import)\s+([a-zA-Z0-9_\.\/\\]+)'
+      scope: meta.import.tasty-fresh
+      captures:
+        1: storage.type.import.tasty-fresh
+        2: variable.parameter.tasty-fresh
 
     - match: '\b(unsigned|bool|char|short|int|long|float|double|text)\b'
       scope: storage.type.numeric.tasty-fresh
@@ -92,7 +135,9 @@ contexts:
       scope: keyword.operator.arithmetic.tasty-fresh
     - match: '[&|^]|<<|>>'
       scope: keyword.operator.bitwise.tasty-fresh
-    - match: '[~?$#'']'
+    - match: '[~?$#:'']'
+      scope: keyword.operator.tasty-fresh
+    - match: '[,\(\)\{\}]'
       scope: keyword.operator.tasty-fresh
     - match: 'new'
       scope: keyword.operator.tasty-fresh
@@ -121,7 +166,7 @@ contexts:
         - meta_scope: comment.block.c
         - match: '\*/'
           pop: true
-    - match: '/[^\*]'
+    - match: '//[^\*]'
       scope: punctuation.definition.comment.c
       push:
         - meta_scope: comment.line.double-slash.c

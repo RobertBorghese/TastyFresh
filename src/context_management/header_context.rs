@@ -21,7 +21,7 @@ impl HeaderContext {
 	pub fn add_header(&mut self, path: &str, is_system: bool) {
 		if !self.contains(path) {
 			self.headers.push(Header::new(path.to_string(), if is_system {
-				IncludeType::Header
+				IncludeType::System
 			} else {
 				IncludeType::Local
 			}));

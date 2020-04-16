@@ -2,18 +2,23 @@
 #define MAIN_TASTYFILE
 
 #include <memory>
-#include <tuple>
 
-int bla;
-std::shared_ptr<Asd> anotherTest;
+extern std::shared_ptr<vector> bla;
+extern vector bla;
 
-void main();
+int main();
 
-void aaaaa(map<int> a);
-int test();
-float test(const char* a);
-float test(int a);
-int test(float a);
-char test(double a);
+class Test_Class {
+public:
+	Test_Class(int a);
+	Test_Class(float a);
+	virtual ~Test_Class();
+	void printValue();
+	void operator++();
+
+	static int a;
+	vector<int> b = vector<int>();
+	vector<int>* ghj = 0;
+};
 
 #endif

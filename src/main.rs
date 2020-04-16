@@ -39,6 +39,7 @@ mod expression;
 mod scope_parser;
 
 mod file_system;
+mod transpiler;
 
 #[macro_use]
 extern crate lazy_static;
@@ -54,7 +55,6 @@ use declaration_parser::attribute_declaration::AttributeDeclaration;
 use declaration_parser::include_declaration::IncludeDeclaration;
 use declaration_parser::import_declaration::ImportDeclaration;
 use declaration_parser::function_declaration::{ FunctionDeclaration, FunctionDeclarationType };
-
 use declaration_parser::variable_declaration::VariableDeclaration;
 
 use scope_parser::ScopeExpression;
@@ -63,8 +63,11 @@ use config_management::ConfigData;
 
 use file_system::get_all_tasty_files;
 
+use transpiler::Transpiler;
+
 use context_management::context::Context;
 use context_management::typing_context::TypingContext;
+use context_management::print_code_error;
 
 use std::env;
 use std::env::Args;
@@ -246,7 +249,11 @@ fn parse_source_file(file: &str, output_dirs: &Vec<String>, config_data: &Config
 			}
 		}
 	}
-	module_contexts.insert(file.to_string(), context);
+	module_contexts.insert(if file.ends_with(".tasty") {
+		(&file[0..file.len() - 6]).to_string()
+	} else {
+		file.to_string()
+	}, context);
 	return module_declaration;
 }
 
@@ -262,12 +269,18 @@ fn parse_source_file(file: &str, output_dirs: &Vec<String>, config_data: &Config
 ///
 /// If successful, `true` is returned; otherwise `false`.
 fn transpile_source_file(file: &str, output_dirs: &Vec<String>, config_data: &ConfigData, module_contexts: &mut BTreeMap<String,Context>, module_declaration: &mut ModuleDeclaration, parser: &mut Parser) -> bool {
+	let access_file_path = if file.ends_with(".tasty") {
+		&file[0..file.len() - 6]
+	} else {
+		file
+	};
 	{
-		let mut context = module_contexts.get_mut(file).unwrap();
+		let mut context = module_contexts.get_mut(access_file_path).unwrap();
 		let mut typing = &mut context.typing;
 		typing.add(&context.module);
 	}
 
+	/*
 	let mut output_lines = Vec::new();
 
 	let mut variable_declarations = Vec::<String>::new();
@@ -278,121 +291,22 @@ fn transpile_source_file(file: &str, output_dirs: &Vec<String>, config_data: &Co
 	let mut handling_module_attributes = true;
 	let mut header_include_line: Option<usize> = None;
 	let mut end_line = 0;
-	for declaration in &mut module_declaration.declarations {
 
-		// Module Attributes
-		if let DeclarationType::ModuleAttribute(module_attribute) = declaration {
-			let mut context = module_contexts.get_mut(file).unwrap();
-			context.register_module_attribute(&module_attribute.name);
-			if context.align_lines {
-				header_include_line = Some(module_attribute.line);
-			}
-			continue;
-		} else if handling_module_attributes {
-			handling_module_attributes = false;
-		}
+	let mut header_system_includes = Vec::new();
+	let mut header_local_includes = Vec::new();
+	*/
 
-		// All Others
-		match declaration {
-			DeclarationType::Assume(assume, attributes) => {
-			},
-			DeclarationType::Import(import, attributes) => {
-				let module = module_contexts.get(&import.path).unwrap().module.clone();
-				let mut context = module_contexts.get_mut(file).unwrap();
-				let mut typing = &mut context.typing;
-				typing.add(&module);
-			},
-			DeclarationType::Include(include, attributes) => {
-				insert_output_line(&mut output_lines, format!("#include {}", if include.inc_type.is_local() {
-					format!("\"{}\"", include.path)
-				} else {
-					format!("<{}>", include.path)
-				}).as_str(), include.line, false);
-			},
-			DeclarationType::Function(func_data, attributes) => {
-				let mut context = module_contexts.get_mut(file).unwrap();
-				let mut func_content: Option<String> = None;
-				let mut line = if context.align_lines { func_data.line } else { output_lines.len() + 1 };
-				end_line = line;
-				if func_data.start_index.is_some() && func_data.end_index.is_some() {
-					let scope = ScopeExpression::new(parser, None, func_data.start_index.unwrap(), func_data.line, file, config_data, &mut context);
-					func_content = Some(scope.to_string(&config_data.operators, func_data.line, 1, &mut context));
-				}
-				let func_declaration = func_data.to_function(&file).to_cpp();
-				insert_output_line(&mut output_lines, &func_declaration, line, false);
-				if func_content.is_some() {
-					let re = Regex::new("(?:\n|\n\r)").unwrap();
-					let original_line = line;
-					insert_output_line(&mut output_lines, "{", line, false);
-					for func_line in re.split(&func_content.unwrap()) {
-						insert_output_line(&mut output_lines, func_line, line, false);
-						line += 1;
-					}
-					insert_output_line(&mut output_lines, "}", if original_line == line - 1 { original_line } else { line }, false);
-				} else {
-					insert_output_line(&mut output_lines, ";", line, false);
-				}
-				end_line = func_data.line + (line - end_line);
-				let mut add_to_header = true;
-				if attributes.is_some() {
-					for a in attributes.as_ref().unwrap() {
-						if a.name == "NoHeader" {
-							add_to_header = false;
-						}
-					}
-				}
-				if add_to_header {
-					configure_declaration_with_attributes(&mut function_declarations, &mut function_declarations_isolated, &func_declaration, &attributes, &parser.content);
-				}
-			},
-			DeclarationType::Variable(var_data, attributes) => {
-				let mut context = module_contexts.get_mut(file).unwrap();
-				let mut reason = ExpressionEndReason::Unknown;
-				let mut expr: Option<Rc<Expression>> = None;
-				if var_data.value.is_some() {
-					parser.reset(var_data.value.unwrap().0, var_data.line);
-					expr = Some(parser.parse_expression(file.to_string(), config_data, Some(&mut context), &mut reason));
-					if var_data.var_type.is_inferred() {
-						var_data.var_type.var_type = expr.as_ref().unwrap().get_type().var_type;
-					}
-				}
-				let var_type = &var_data.var_type;
-				let line = if context.align_lines { var_data.line } else {
-					if end_line > var_data.line || var_data.line - end_line < 2 {
-						output_lines.len()
-					} else {
-						output_lines.len() + 1
-					}
-				};
-				insert_output_line(&mut output_lines, &var_data.to_cpp(&expr, &config_data.operators, &mut context), line, false);
-				end_line = var_data.line;
-				let mut add_to_header = true;
-				if attributes.is_some() {
-					for a in attributes.as_ref().unwrap() {
-						if a.name == "NoHeader" {
-							add_to_header = false;
-						}
-					}
-				}
-				if add_to_header {
-					//variable_declarations.push(format!("{} {};", var_type.to_cpp(), var_data.name));
-					let var_declaraction = format!("{} {}", var_type.to_cpp(), var_data.name);
-					configure_declaration_with_attributes(&mut variable_declarations, &mut variable_declarations_isolated, &var_declaraction, &attributes, &parser.content);
-				}
-			},
-			_ => {
-			}
-		}
-	}
+	let mut transpile_context = Transpiler::new(file, access_file_path, config_data, module_contexts, parser);
+	transpile_context.parse_declarations(&mut module_declaration.declarations, None);
 
-	if header_include_line.is_none() {
-		if !output_lines[0].is_empty() {
-			output_lines.insert(0, "".to_string());
+	if transpile_context.header_include_line.is_none() {
+		if !transpile_context.output_lines[0].is_empty() {
+			transpile_context.output_lines.insert(0, "".to_string());
 		}
-		if !output_lines[1].is_empty() {
-			output_lines.insert(0, "".to_string());
+		if !transpile_context.output_lines[1].is_empty() {
+			transpile_context.output_lines.insert(0, "".to_string());
 		}
-		header_include_line = Some(0);
+		transpile_context.header_include_line = Some(0);
 	}
 
 	let mut header_lines = Vec::new();
@@ -402,35 +316,36 @@ fn transpile_source_file(file: &str, output_dirs: &Vec<String>, config_data: &Co
 		header_lines.push("#ifndef ".to_string() + &marco_name);
 		header_lines.push("#define ".to_string() + &marco_name);
 		header_lines.push("".to_string());
-		let context = module_contexts.get_mut(file).unwrap();
-		if !context.headers.is_empty() {
+		let context = transpile_context.module_contexts.get_mut(access_file_path).unwrap();
+		if !context.headers.is_empty() || !transpile_context.header_system_includes.is_empty() {
 			for head in &context.headers.headers {
 				header_lines.push(format!("#include <{}>", head.path));
 			}
-			header_lines.push("".to_string());
-		}
-		if !variable_declarations_isolated.is_empty() {
-			for d in variable_declarations_isolated {
-				header_lines.push(d);
-				header_lines.push("".to_string());
-			}
-		}
-		if !variable_declarations.is_empty() {
-			for d in variable_declarations {
-				header_lines.push(d);
+			for head_path in &transpile_context.header_system_includes {
+				header_lines.push(format!("#include <{}>", head_path));
 			}
 			header_lines.push("".to_string());
 		}
-		if !function_declarations_isolated.is_empty() {
-			for d in function_declarations_isolated {
-				header_lines.push(d);
-				header_lines.push("".to_string());
+		if !transpile_context.header_local_includes.is_empty() {
+			for head_path in &transpile_context.header_local_includes {
+				header_lines.push(format!("#include \"{}\"", head_path));
 			}
+			header_lines.push("".to_string());
 		}
-		if !function_declarations.is_empty() {
-			for d in function_declarations {
-				header_lines.push(d);
+		transpile_context.declarations.export_to_lines(&mut header_lines, 0, true);
+		for cls in transpile_context.class_declarations {
+			header_lines.push(cls.0);
+			if !cls.1.is_empty() {
+				header_lines.push("public:".to_string());
+				cls.1.export_to_lines(&mut header_lines, 1, false);
+				header_lines.pop();
 			}
+			if !cls.2.is_empty() {
+				header_lines.push("private:".to_string());
+				cls.2.export_to_lines(&mut header_lines, 1, false);
+				header_lines.pop();
+			}
+			header_lines.push("};".to_string());
 			header_lines.push("".to_string());
 		}
 		header_lines.push("#endif".to_string());
@@ -443,12 +358,12 @@ fn transpile_source_file(file: &str, output_dirs: &Vec<String>, config_data: &Co
 			let path_str_unwrap = path_str.unwrap();
 			let path_base = path_str_unwrap[..(path_str_unwrap.len() - path.extension().and_then(OsStr::to_str).unwrap_or("").len())].to_string();
 			let header_path = path_base.clone() + "hpp";
-			if header_include_line.is_some() {
-				insert_output_line(&mut output_lines, format!("#include \"{}\"", if header_path.starts_with("./") {
+			if transpile_context.header_include_line.is_some() {
+				insert_output_line(&mut transpile_context.output_lines, format!("#include \"{}\"", if header_path.starts_with("./") {
 					&header_path[2..]
-				} else { &header_path }).as_str(), header_include_line.unwrap(), true);
+				} else { &header_path }).as_str(), transpile_context.header_include_line.unwrap(), true);
 			}
-			std::fs::write(path_base + "cpp", output_lines.join("\n"));
+			std::fs::write(path_base + "cpp", transpile_context.output_lines.join("\n"));
 			std::fs::write(header_path, header_lines.join("\n"));
 		} else {
 			println!("\nCOULD NOT WRITE TO FILE: {}", format!("{}{}", dir, file));
@@ -457,10 +372,9 @@ fn transpile_source_file(file: &str, output_dirs: &Vec<String>, config_data: &Co
 	return true;
 }
 
-fn configure_declaration_with_attributes(delcarations: &mut Vec<String>, declarations_isolated: &mut Vec<String>, declaration: &str, attributes: &Option<Vec<AttributeDeclaration>>, content: &str) {
+fn get_configure_declaration_with_attributes(isolated: &mut bool, declaration: &str, attributes: &Option<Vec<AttributeDeclaration>>, content: &str, semicolon: bool) -> String {
 	let mut prepend = "".to_string();
 	let mut append = "".to_string();
-	let mut isolated = false;
 	if attributes.is_some() {
 		for a in attributes.as_ref().unwrap() {
 			if a.name == "DeclarePrepend" {
@@ -476,15 +390,22 @@ fn configure_declaration_with_attributes(delcarations: &mut Vec<String>, declara
 					}
 				}
 			} else if a.name == "Isolated" {
-				isolated = true;
+				*isolated = true;
 			}
 		}
 	}
-	let mut result = format!("{}{};{}", 
+	let mut result = format!("{}{}{}{}", 
 		if prepend.is_empty() { "".to_string() } else { format!("{}\n", prepend) }, 
 		declaration,
+		if semicolon { ";" } else { "" },
 		if append.is_empty() { "".to_string() } else { format!("\n{}", append) }
 	);
+	return result;
+}
+
+fn configure_declaration_with_attributes(delcarations: &mut Vec<String>, declarations_isolated: &mut Vec<String>, declaration: &str, attributes: &Option<Vec<AttributeDeclaration>>, content: &str, semicolon: bool) {
+	let mut isolated = false;
+	let result = get_configure_declaration_with_attributes(&mut isolated, declaration, attributes, content, semicolon);
 	if isolated {
 		declarations_isolated.push(result);
 	} else {

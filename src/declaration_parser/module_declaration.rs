@@ -18,6 +18,7 @@ use crate::declaration_parser::function_declaration::{ FunctionDeclaration, Func
 use crate::declaration_parser::import_declaration::ImportDeclaration;
 use crate::declaration_parser::include_declaration::IncludeDeclaration;
 use crate::declaration_parser::variable_declaration::VariableDeclaration;
+use crate::declaration_parser::class_declaration::ClassDeclaration;
 
 pub enum DeclarationType {
 	ModuleAttribute(ModuleAttributeDeclaration),
@@ -25,7 +26,8 @@ pub enum DeclarationType {
 	Function(FunctionDeclaration, Option<Vec<AttributeDeclaration>>),
 	Import(ImportDeclaration, Option<Vec<AttributeDeclaration>>),
 	Include(IncludeDeclaration, Option<Vec<AttributeDeclaration>>),
-	Variable(VariableDeclaration, Option<Vec<AttributeDeclaration>>)
+	Variable(VariableDeclaration, Option<Vec<AttributeDeclaration>>),
+	Class(ClassDeclaration, Option<Vec<AttributeDeclaration>>)
 }
 
 pub struct ModuleDeclaration {
@@ -92,6 +94,21 @@ impl ModuleDeclaration {
 					result.print_error(file_name.to_string(), &parser.content);
 				} else {
 					declarations.push(DeclarationType::Function(result.unwrap_and_move(), if attributes.is_empty() {
+						None
+					} else {
+						Some(std::mem::replace(&mut attributes, Vec::new()))
+					}));
+				}
+				attributes.clear();
+				continue;
+			}
+
+			if ClassDeclaration::is_declaration(parser) {
+				let mut result = ClassDeclaration::new(parser, file_name);
+				if result.is_error() {
+					result.print_error(file_name.to_string(), &parser.content);
+				} else {
+					declarations.push(DeclarationType::Class(result.unwrap_and_move(), if attributes.is_empty() {
 						None
 					} else {
 						Some(std::mem::replace(&mut attributes, Vec::new()))

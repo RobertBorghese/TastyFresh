@@ -9,12 +9,12 @@
 		{ "operator": "*",  "priority": 900, "reverse_priority": true },
 		{ "operator": "&",  "priority": 900, "reverse_priority": true },
 		{ "operator": "sizeof",   "priority": 900, "cannot_touch": true, "reverse_priority": true },
-		{ "operator": "new",      "priority": 900, "cannot_touch": true, "reverse_priority": true },
-		{ "operator": "delete",   "priority": 900, "cannot_touch": true, "reverse_priority": true },
+		{ "operator": "new",      "priority": 960, "cannot_touch": true, "reverse_priority": true },
+		{ "operator": "delete",   "priority": 960, "cannot_touch": true, "reverse_priority": true },
 		{ "operator": "throw",    "priority": 250, "cannot_touch": true, "reverse_priority": true },
 		{ "operator": "co_yield", "priority": 250, "cannot_touch": true, "reverse_priority": true },
-		{ "operator": "new[]",    "priority": 900, "cannot_touch": true, "reverse_priority": true },
-		{ "operator": "delete[]", "priority": 900, "cannot_touch": true, "reverse_priority": true }
+		{ "operator": "new[]",    "priority": 960, "cannot_touch": true, "reverse_priority": true },
+		{ "operator": "delete[]", "priority": 960, "cannot_touch": true, "reverse_priority": true }
 	],
 	"suffix": [
 		{ "operator": "++", "priority": 950 },
@@ -23,10 +23,11 @@
 	"infix": [
 		{ "operator": "::",  "priority": 1000 },
 		{ "operator": "@",   "priority": 975, "reverse_priority": true },
-		{ "operator": ".",   "priority": 950 },
-		{ "operator": "->",  "priority": 950 },
+		{ "operator": ".",   "priority": 970 },
+		{ "operator": "->",  "priority": 970 },
 		{ "operator": ".*",  "priority": 850 },
 		{ "operator": "->*", "priority": 850 },
+		{ "operator": "#",   "priority": 825, "reverse_priority": true },
 		{ "operator": "*",   "priority": 800 },
 		{ "operator": "/",   "priority": 800 },
 		{ "operator": "%",   "priority": 800 },
@@ -47,6 +48,7 @@
 		{ "operator": "&&",  "priority": 350 },
 		{ "operator": "||",  "priority": 300 },
 		{ "operator": "=",   "priority": 250, "reverse_priority": true },
+		{ "operator": ":=",  "priority": 250, "reverse_priority": true },
 		{ "operator": "+=",  "priority": 250, "reverse_priority": true },
 		{ "operator": "-=",  "priority": 250, "reverse_priority": true },
 		{ "operator": "*=",  "priority": 250, "reverse_priority": true },

@@ -151,7 +151,20 @@ impl Parser {
 	///
 	/// If the `char` is valid, `true` is returned; otherwise, `false`.
 	pub fn curr_is_valid_var_char(&self, is_first: bool) -> bool {
-		return self.curr_is_alphabetic() || (!is_first && self.curr_is_numeric());
+		return self.curr_is_alphabetic() || self.get_curr() == '_' || (!is_first && self.curr_is_numeric());
+	}
+
+	/// Checks if the current `char` is valid in a Tasty Fresh operator.
+	///
+	///
+	/// # Return
+	///
+	/// If the `char` is valid, `true` is returned; otherwise, `false`.
+	pub fn curr_is_valid_op_char(&self) -> bool {
+		return match self.get_curr() {
+			'!' => true, '%' => true, '^' => true, '&' => true, '*' => true, '[' => true, ']' => true,
+			'+' => true, '-' => true, '<' => true, '>' => true, '?' => true, '/' => true, _ => false
+		};
 	}
 
 	/// Checks if the current `char` is a hex digit character.
@@ -258,6 +271,32 @@ impl Parser {
 		return result;
 	}
 
+	/// Parses all upcoming ascii characters to form a `String`.
+	///
+	/// # Return
+	///
+	/// The parsed `String`.
+	pub fn parse_ascii_op_name(&mut self) -> String {
+		let mut result = "".to_string();
+		if self.check_for_end() {
+			return result;
+		}
+		if self.get_curr() == '(' {
+			if self.increment() {
+				return result;
+			} else if self.get_curr() == ')' {
+				return "()".to_string();
+			}
+		}
+		while self.curr_is_valid_op_char() {
+			result.push(self.chars[self.index]);
+			if self.increment() {
+				break;
+			}
+		}
+		return result;
+	}
+
 	/// Brings the parser to the next `char` that is `c`.
 	///
 	/// # Arguments
@@ -316,8 +355,8 @@ impl Parser {
 				_ => ()
 			}
 			if brackets <= 0 && parentheses <= 0 {
-				if (self.get_curr() == c && ((c != '}' || brackets < 0) && (c != '(' || parentheses < 0)) ||
-					self.get_curr() == c2 && ((c2 != '}' || brackets < 0) && (c2 != '(' || parentheses < 0))) {
+				if (self.get_curr() == c && ((c != '}' || brackets < 0) && (c != ')' || parentheses < 0)) ||
+					self.get_curr() == c2 && ((c2 != '}' || brackets < 0) && (c2 != ')' || parentheses < 0))) {
 					*result = self.get_curr();
 					break;
 				}
@@ -335,7 +374,8 @@ impl Parser {
 		if !self.get_curr().is_ascii_digit() {
 			return false;
 		}
-		NumberType::parse_value_for_type(&self.content[self.index..], true, offset);
+		let mut filler = false;
+		NumberType::parse_value_for_type(&self.content[self.index..], true, offset, &mut filler, None);
 		return *offset > 0;
 	}
 
@@ -482,8 +522,8 @@ impl Parser {
 	/// # Return
 	///
 	/// Returns the configuration data that's taken ownership of.
-	pub fn parse_expression(&mut self, file_name: String, config_data: &ConfigData, mut context: Option<&mut Context>, reason: &mut ExpressionEndReason) -> Rc<Expression> {
-		let expr_parser = ExpressionParser::new(self, Position::new(file_name, Some(self.line), self.index, None), config_data, &mut context, None);
+	pub fn parse_expression(&mut self, file_name: String, config_data: &ConfigData, mut context: Option<&mut Context>, reason: &mut ExpressionEndReason, final_desired_type: Option<VariableType>) -> Rc<Expression> {
+		let expr_parser = ExpressionParser::new(self, Position::new(file_name, Some(self.line), self.index, None), config_data, &mut context, None, final_desired_type);
 		self.line += expr_parser.position.line_offset;
 		*reason = expr_parser.end_data.reason;
 		return expr_parser.expression;

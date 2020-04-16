@@ -21,6 +21,7 @@ type IncludeDeclarationResult = DeclarationResult<IncludeDeclaration>;
 
 pub struct IncludeDeclaration {
 	pub path: String,
+	pub location: IncludeLocation,
 	pub inc_type: IncludeType,
 	pub line: usize
 }
@@ -28,14 +29,29 @@ pub struct IncludeDeclaration {
 #[derive(Clone, Copy)]
 pub enum IncludeType {
 	Local,
-	Header
+	System
+}
+
+#[derive(Clone, Copy)]
+pub enum IncludeLocation {
+	Header,
+	Source
 }
 
 impl IncludeType {
 	pub fn is_local(&self) -> bool {
 		return match self {
 			IncludeType::Local => true,
-			IncludeType::Header => false
+			IncludeType::System => false
+		}
+	}
+}
+
+impl IncludeLocation {
+	pub fn is_header(&self) -> bool {
+		return match self {
+			IncludeLocation::Header => true,
+			IncludeLocation::Source => false
 		}
 	}
 }
@@ -50,7 +66,7 @@ impl CPPTranspiler for IncludeDeclaration {
 	fn to_cpp(&self) -> String {
 		return match self.inc_type {
 			IncludeType::Local => format!("#include \"{}\"", self.path),
-			IncludeType::Header => format!("#include <{}>", self.path)
+			IncludeType::System => format!("#include <{}>", self.path)
 		}
 	}
 }
@@ -59,11 +75,17 @@ impl IncludeDeclaration {
 	pub fn new(parser: &mut Parser) -> IncludeDeclarationResult {
 		let initial_line = parser.line;
 
+		let mut location = IncludeLocation::Header;
+
 		// Parse Var Style
 		let mut include_keyword = "".to_string();
 		declare_parse_ascii!(include_keyword, parser);
-		if include_keyword != "include" {
-			return IncludeDeclarationResult::Err("Unexpected Keyword", "\"include\" keyword expected", parser.index - include_keyword.len(), parser.index);
+		if include_keyword != "include" && include_keyword != "contain" {
+			return IncludeDeclarationResult::Err("Unexpected Keyword", "\"include\" or \"contain\" keyword expected", parser.index - include_keyword.len(), parser.index);
+		}
+
+		if include_keyword == "contain" {
+			location = IncludeLocation::Source;
 		}
 
 		// Parse Whitespace
@@ -78,7 +100,7 @@ impl IncludeDeclaration {
 			inc_type = IncludeType::Local;
 			explicit_type = true;
 		} else if type_keyword == "system" {
-			inc_type = IncludeType::Header;
+			inc_type = IncludeType::System;
 			explicit_type = true;
 		} else {
 			inc_type = IncludeType::Local;
@@ -99,6 +121,7 @@ impl IncludeDeclaration {
 
 		return IncludeDeclarationResult::Ok(IncludeDeclaration {
 			path: include_path,
+			location: location,
 			inc_type: inc_type,
 			line: initial_line
 		});
@@ -110,6 +133,6 @@ impl IncludeDeclaration {
 
 	pub fn is_include_declaration(content: &str, index: usize) -> bool {
 		let declare = &content[index..];
-		return declare.starts_with("include ");
+		return declare.starts_with("include ") || declare.starts_with("contain ");
 	}
 }

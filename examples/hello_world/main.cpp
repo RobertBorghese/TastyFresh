@@ -1,74 +1,45 @@
 #include "examples/hello_world/main.hpp"
 
-int bla = 32;
-
-std::shared_ptr<Asd> anotherTest = nullptr;
-
-
 #include <iostream>
-#include <vector>
 
-void main() {
-	float bla1 = test(12);
-	float bla2 = test("fdsfds");
-	int bla3 = test(23.43f);
-	char bla4 = test(1.2);
+std::shared_ptr<vector> bla = nullptr;
+vector bla;
 
-	char** bla5 = &&bla4;
-	char**** bla6 = &&&&bla4;
+int main() {
+	std::cout << "Hello world" << std::endl;
 
-	char bla7 = bla4;
+	TestClass test = TestClass();
+	test.printValue();
 
-	char** bla10 = bla5;
+	test++;
+	test++;
+	test++;
 
-	auto test = fdjsklfds();
+	test.printValue();
 
-	bool cond = true;
+	auto test = (int)(fdsf);
 
-	auto test = Bla();
-	{
-		int one = 1;
-		{
-			int two = 2;
-			{
-				int three = 4;
-				int another = 32;
-			}
-		}
-	}
+	auto test2 = static_cast<int>(32.0f);
 
-	if(cond) {
-		return 3;
-	}
-
-	std::tuple<int, int> test2 = std::make_tuple(32, 54);
-
-	std::cout << "teste" << std::endl;
-	int b = 32 == 32 ? 1 : 0;
-
-	return 10;
-
-	std::vector<int> bla(34, "fdsfds");
+	return 0;
 }
 
-void aaaaa(map<int> a) { }
+int Test_Class::a = 0;
 
-int test() {
-	return 3;
+Test_Class::Test_Class(int a) {
+	this->a = a;
 }
 
-float test(const char* a) {
-	return 0.0f;
+Test_Class::Test_Class(float a) {
+	this->a = (int)(a);
 }
 
-float test(int a) {
-	return 0.0f;
+Test_Class::~Test_Class() { }
+
+void Test_Class::printValue() {
+	std::cout << "The value of 'a' is: " << a << std::endl;
 }
 
-int test(float a) {
-	return 0.0f;
-}
-
-char test(double a) {
-	return 0.0f;
+void Test_Class::operator++() {
+	a++;
 }

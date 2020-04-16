@@ -9,6 +9,7 @@ lazy_static! {
 	pub static ref FUNCTION_STYLES: Vec<&'static str> = vec!("static", "extern", "virtual", "inline", "meta");
 }
 
+#[derive(Clone, PartialEq)]
 pub enum FunStyle {
 	Unknown,
 	Static,
@@ -45,6 +46,20 @@ impl FunStyle {
 		}
 	}
 
+	pub fn is_extern(&self) -> bool {
+		return match self {
+			FunStyle::Extern => true,
+			_ => false
+		}
+	}
+
+	pub fn is_virtual(&self) -> bool {
+		return match self {
+			FunStyle::Virtual => true,
+			_ => false
+		}
+	}
+
 	pub fn is_unknown(&self) -> bool {
 		return match self {
 			FunStyle::Unknown => true,
@@ -63,6 +78,24 @@ impl FunStyle {
 		return match self {
 			FunStyle::Meta => true,
 			FunStyle::Extern => true,
+			_ => false
+		}
+	}
+
+	pub fn class_exportable(&self) -> bool {
+		return match self {
+			FunStyle::Virtual => true,
+			FunStyle::Inline => true,
+			FunStyle::Static => true,
+			_ => false
+		}
+	}
+
+	pub fn module_exportable(&self) -> bool {
+		return match self {
+			FunStyle::Extern => true,
+			FunStyle::Inline => true,
+			FunStyle::Static => true,
 			_ => false
 		}
 	}

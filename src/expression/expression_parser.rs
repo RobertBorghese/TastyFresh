@@ -7,6 +7,7 @@
 
 use crate::expression::Expression;
 use crate::expression::expression_piece::ExpressionPiece;
+use crate::expression::variable_type::{ VariableType, Type };
 
 use crate::config_management::ConfigData;
 use crate::config_management::operator_data::{ Operator, OperatorDataStructure };
@@ -35,6 +36,7 @@ pub struct ExpressionParser<'a> {
 
 	pub parts: Vec<ExpressionPiece>,
 	pub end_data: ExpressionEnd,
+	pub expect_type: bool,
 
 	pub config_data: &'a ConfigData
 }
@@ -93,7 +95,7 @@ impl Expression {
 }
 
 impl<'a> ExpressionParser<'a> {
-	pub fn new(parser: &mut Parser, start_position: Position, config_data: &'a ConfigData, context: &mut Option<&mut Context>, end_chars: Option<Vec<char>>) -> ExpressionParser<'a> {
+	pub fn new(parser: &mut Parser, start_position: Position, config_data: &'a ConfigData, context: &mut Option<&mut Context>, end_chars: Option<Vec<char>>, final_desired_type: Option<VariableType>) -> ExpressionParser<'a> {
 		let mut result = ExpressionParser {
 			expr_str: parser.content.to_string(),
 			position: ExpressionParserPosition {
@@ -109,10 +111,11 @@ impl<'a> ExpressionParser<'a> {
 				until_chars: end_chars.unwrap_or(Vec::new()),
 				end_index: 0,
 				reason: ExpressionEndReason::Unknown
-			}
+			},
+			expect_type: false
 		};
 		result.parse_expr_str(parser, context);
-		result.expression = ExpressionPiece::parse_expr_parts(&mut result, context, &parser.content);
+		result.expression = ExpressionPiece::parse_expr_parts(&mut result, context, &parser.content, final_desired_type);
 		return result;
 	}
 
@@ -163,7 +166,15 @@ impl<'a> ExpressionParser<'a> {
 				}
 			},
 			ParseState::Value => {
-				if !self.parse_value(parser, context) {
+				if self.expect_type {
+					self.expect_type = false;
+					let start_index = parser.index;
+					let mut unexpected_char = false;
+					let mut specifier_error: Option<&'static str> = None;
+					let tf_type = parser.parse_type(&mut unexpected_char, &mut specifier_error);
+					self.add_type(tf_type, start_index, parser.index);
+					*state = ParseState::Suffix;
+				} else if !self.parse_value(parser, context) {
 					self.set_end_reason(ExpressionEndReason::NoValueError);
 					*state = ParseState::End;
 				} else {
@@ -214,6 +225,9 @@ impl<'a> ExpressionParser<'a> {
 
 	fn add_prefix_op(&mut self, op: usize, start: usize, end: usize) {
 		//println!("Added prefix: {}", op);
+		if op == 8 || op == 9 {
+			self.expect_type = true;
+		}
 		self.parts.push(ExpressionPiece::Prefix(op, self.generate_pos(start, Some(end))));
 	}
 
@@ -229,6 +243,9 @@ impl<'a> ExpressionParser<'a> {
 
 	fn add_infix_op(&mut self, op: usize, start: usize, end: usize) {
 		//println!("Added infix: {}", op);
+		if op == 6 {
+			self.expect_type = true;
+		}
 		self.parts.push(ExpressionPiece::Infix(op, self.generate_pos(start, Some(end))));
 	}
 
@@ -251,6 +268,10 @@ impl<'a> ExpressionParser<'a> {
 
 	fn add_array_access_params(&mut self, expressions: Vec<Rc<Expression>>, start: usize, end: usize) {
 		self.parts.push(ExpressionPiece::ArrayAccessParameters(Rc::new(expressions), self.generate_pos(start, Some(end))));
+	}
+
+	fn add_type(&mut self, tf_type: Type, start: usize, end: usize) {
+		self.parts.push(ExpressionPiece::Type(tf_type, self.generate_pos(start, Some(end))));
 	}
 
 	fn str_len(&self) -> usize {
@@ -314,7 +335,7 @@ impl<'a> ExpressionParser<'a> {
 						finish = true;
 					} else {
 						let cc = parser.chars[value_start + offset];
-						if !cc.is_alphanumeric() {
+						if !cc.is_alphanumeric() && cc != '_' {
 							finish = true;
 						}
 					}
@@ -404,7 +425,7 @@ impl<'a> ExpressionParser<'a> {
 			let start_pos = parser.index;
 			let chars = vec!(end_char);
 			if self.index_within_bounds(parser) {
-				let expr_parser = ExpressionParser::new(parser, self.generate_pos(parser.index, None), self.config_data, context, Some(chars));
+				let expr_parser = ExpressionParser::new(parser, self.generate_pos(parser.index, None), self.config_data, context, Some(chars), None);
 				let expr = expr_parser.expression;
 				parser.index += 1;
 				if let ExpressionEndReason::ReachedChar(c) = expr_parser.end_data.reason {
@@ -468,7 +489,7 @@ impl<'a> ExpressionParser<'a> {
 		loop {
 			let chars = vec!(end_char, ',');
 			if self.index_within_bounds(parser) {
-				let expr_parser = ExpressionParser::new(parser, self.generate_pos(parser.index, None), self.config_data, context, Some(chars));
+				let expr_parser = ExpressionParser::new(parser, self.generate_pos(parser.index, None), self.config_data, context, Some(chars), None);
 				expressions.push(expr_parser.expression);
 				parser.index += 1;
 				final_line_offset = parser.line + expr_parser.position.line_offset;

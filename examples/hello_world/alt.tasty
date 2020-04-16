@@ -1,0 +1,6 @@
+
+include system iostream;
+
+fn altfunc() {
+	std.cout << "test" << std.endl;
+}

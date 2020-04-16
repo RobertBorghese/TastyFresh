@@ -13,7 +13,9 @@ Tasty Fresh is a programming language that aims to tackle this problem by transp
 
 ---
 
-By version `1.0.0`, Tasty Fresh hopes to include:
+With that being said, it is very unlikely Tasty Fresh will ever be production ready. It is a small, *MESSY*, one-man project aimed solely at the needs of said main. Bugs, issues, and other unintended behavior will be fixed as needed, and as a result, one must have a relatively advanced understanding of both C++ and Tasty Fresh to receive any benefit from the language. With that being said, contributions to clean-up the code base or elevate this language to production quality are always welcome. 
+
+Ultimately, if Tasty Fresh ever reaches version `1.0.0`, it should include:
 
 * No header files or archaic import systems, but features to help configure how they translate to C++ if necessary.
 * Static-typing and null-safety for all Tasty Fresh code prior to being transpiled into C++.

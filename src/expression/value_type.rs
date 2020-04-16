@@ -8,6 +8,11 @@
 use std::collections::BTreeMap;
 
 use crate::expression::variable_type::VariableType;
+use crate::expression::function_type::FunStyle;
+
+use crate::declaration_parser::function_declaration::FunctionType;
+
+use either;
 
 /*
 pub enum ValueType {
@@ -88,15 +93,22 @@ impl NumberType {
 		}
 	}
 
-	pub fn from_value_text(value: &str) -> NumberType {
+	pub fn from_value_text(value: &mut String) -> NumberType {
 		let mut offset = 0;
-		return Self::parse_value_for_type(value, false, &mut offset);
+		let mut edit = "".to_string();
+		let mut changed = false;
+		let result = Self::parse_value_for_type(value, false, &mut offset, &mut changed, Some(&mut edit));
+		if changed {
+			(*value) = edit;
+		}
+		return result;
 	}
 
-	pub fn parse_value_for_type(value: &str, infinite: bool, offset: &mut usize) -> NumberType {
+	pub fn parse_value_for_type(value: &str, infinite: bool, offset: &mut usize, changed_val: &mut bool, value_mod: Option<&mut String>) -> NumberType {
 		let mut unsigned = false;
 		let mut long = 0;
 		let mut float = false;
+		let mut double = false;
 		let mut dot = false;
 
 		let mut suffix = false;
@@ -134,8 +146,25 @@ impl NumberType {
 					break;
 				}
 			}
-			if dot && c == 'f' {
+			if c == 'f' {
+				if suffix {
+					real_number = false;
+					break;
+				}
 				float = true;
+				suffix = true;
+				if !infinite && rindex > 1 {
+					real_number = false;
+					break;
+				}
+				continue;
+			}
+			if c == 'd' {
+				if suffix {
+					real_number = false;
+					break;
+				}
+				double = true;
 				suffix = true;
 				if !infinite && rindex > 1 {
 					real_number = false;
@@ -174,6 +203,19 @@ impl NumberType {
 
 		if !real_number {
 			return NumberType::UnknownNumber;
+		}
+
+		if float && !dot {
+			if value_mod.is_some() {
+				(*(value_mod.unwrap())) = format!("{}.0f", &value[0..value.len() - 1]);
+				(*changed_val) = true;
+			}
+		} else if double {
+			if value_mod.is_some() {
+				let true_value_mod = value_mod.unwrap();
+				(*true_value_mod) = if !dot { format!("{}.0", &value[0..value.len() - 1]) } else { value[0..value.len() - 1].to_string() };
+				(*changed_val) = true;
+			}
 		}
 
 		return {
@@ -276,11 +318,42 @@ impl Property {
 pub struct Function {
 	pub name: String,
 	pub parameters: Vec<Property>,
-	pub return_type: VariableType
+	pub return_type: VariableType,
+	pub styles: Vec<FunStyle>
 }
 
 impl Function {
-	pub fn to_cpp(&self) -> String {
-		format!("{} {}({})", self.return_type.to_cpp(), self.name, self.parameters.iter().map(|param| param.to_cpp()).collect::<Vec<String>>().join(", "))
+	pub fn to_cpp(&self, use_styles: bool, header: bool, class_name: Option<&str>, func_type: &FunctionType) -> String {
+		let mut style_content = Vec::new();
+		if (func_type.is_normal() || func_type.is_destructor()) && use_styles {
+			for s in &self.styles {
+				if (class_name.is_some() && s.class_exportable()) ||
+					(class_name.is_none() && s.module_exportable()) {
+					if !func_type.is_destructor() || s.is_virtual() {
+						if s.is_extern() {
+							style_content.clear();
+							style_content.push("extern".to_string());
+							break;
+						}
+						style_content.push(s.get_name().to_string());
+					}
+				}
+			}
+		}
+		format!("{}{}{}{}({})",
+			if style_content.is_empty() { "".to_string() } else { format!("{} ", style_content.join(" ")) },
+			if func_type.is_normal_or_operator() { format!("{} ", self.return_type.to_cpp()) } else { "".to_string() },
+			if header || class_name.is_none() { "".to_string() } else { format!("{}::", class_name.unwrap()) },
+			if func_type.is_constructor() {
+				class_name.unwrap().to_string()
+			} else if func_type.is_destructor() {
+				format!("~{}", class_name.unwrap())
+			} else if func_type.is_operator() {
+				format!("operator{}", self.name)
+			} else {
+				self.name.clone()
+			},
+			self.parameters.iter().map(|param| param.to_cpp()).collect::<Vec<String>>().join(", ")
+		)
 	}
 }

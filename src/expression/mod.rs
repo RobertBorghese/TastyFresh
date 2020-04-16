@@ -14,7 +14,7 @@ pub mod function_type;
 
 use crate::config_management::operator_data::OperatorDataStructure;
 
-use crate::expression::variable_type::VariableType;
+use crate::expression::variable_type::{ Type, VariableType };
 
 use crate::context_management::position::Position;
 use crate::context_management::context::Context;
@@ -33,6 +33,7 @@ pub enum Expression {
 	Expressions(Rc<Vec<Rc<Expression>>>, VariableType, Position),
 	InitializerList(Rc<Vec<Rc<Expression>>>, VariableType, Position),
 	FunctionCall(Rc<Expression>, Rc<Vec<Rc<Expression>>>, VariableType, Position),
+	ConstructCall(Type, Rc<Vec<Rc<Expression>>>, VariableType, Position),
 	ArrayAccess(Rc<Expression>, Rc<Vec<Rc<Expression>>>, VariableType, Position)
 }
 
@@ -50,6 +51,7 @@ impl Expression {
 				Expression::Expressions(_, v, _) => v,
 				Expression::InitializerList(_, v, _) => v,
 				Expression::FunctionCall(_, _, v, _) => v,
+				Expression::ConstructCall(_, _, v, _) => v,
 				Expression::ArrayAccess(_, _, v, _) => v,
 				Expression::Invalid => panic!("Invalid!")
 			}.clone();
@@ -71,6 +73,7 @@ impl Expression {
 				Expression::Expressions(_, _, p) => p,
 				Expression::InitializerList(_, _, p) => p,
 				Expression::FunctionCall(_, _, _, p) => p,
+				Expression::ConstructCall(_, _, _, p) => p,
 				Expression::ArrayAccess(_, _, _, p) => p,
 				Expression::Invalid => panic!("Invalid!")
 			}.line.unwrap_or(0));
@@ -87,6 +90,7 @@ impl Expression {
 			Expression::Expressions(_, _, _) => None,
 			Expression::InitializerList(_, _, _) => None,
 			Expression::FunctionCall(_, _, _, _) => None,
+			Expression::ConstructCall(_, _, _, _) => None,
 			Expression::ArrayAccess(_, _, _, _) => None,
 			Expression::Invalid => None
 		}
@@ -127,11 +131,16 @@ impl Expression {
 				s.to_string()
 			},
 			Expression::Prefix(expr, id, _, _) => {
-				let operator_data = &operators["prefix"][*id];
-				format!("{}{}{}", operator_data.name.as_ref().unwrap_or(&"".to_string()),
-					if operator_data.cannot_touch { " " } else { "" },
+				if *id == 9 {
 					expr.to_string(operators, context)
-				)
+				} else {
+					let operator_data = &operators["prefix"][*id];
+					format!("{}{}{}",
+						operator_data.name.as_ref().unwrap_or(&"".to_string()),
+						if operator_data.cannot_touch { " " } else { "" },
+						expr.to_string(operators, context)
+					)
+				}
 			},
 			Expression::Suffix(expr, id, _, _) => {
 				format!("{}{}", expr.to_string(operators, context), operators["suffix"][*id].name.as_ref().unwrap_or(&"".to_string()))
@@ -149,14 +158,23 @@ impl Expression {
 				} else if *id == 2 {
 					let expr_right_str = expr_right.to_string(operators, context);
 					let op = expr_left.get_type().access_operator(&expr_right_str);
-					String::from(format!("{}{}{}", expr_left.to_string(operators, context), op, expr_right_str))
-				} else if *id == 25 {
-					// if right expr is "new"
-					if expr_right.get_op_type().unwrap_or(0) == 9 {
-						println!("GOT A NEW!");
+					format!("{}{}{}", expr_left.to_string(operators, context), op, expr_right_str)
+				} else if *id == 6 {
+					let right = expr_right.to_string(operators, context);
+					let left = expr_left.to_string(operators, context);
+					if let Expression::Expressions(..) = **expr_left {
+						format!("({}){}", right, left)
+					} else {
+						format!("({})({})", right, left)
 					}
+				} else if *id == 26 || *id == 27 {
 					let right_str = expr_right.to_string(operators, context);
-					format!("{} {} {}", expr_left.to_string(operators, context), "=", expr_right.get_type().convert_between_styles(&expr_left.get_type(), &right_str).unwrap_or(right_str.to_string()))
+					let right_str_final = if *id == 26 {
+						expr_right.get_type().convert_between_styles(&expr_left.get_type(), &right_str).unwrap_or(right_str.to_string())
+					} else {
+						right_str
+					};
+					format!("{} {} {}", expr_left.to_string(operators, context), "=", right_str_final)
 				} else {
 					format!("{} {} {}", expr_left.to_string(operators, context), operators["infix"][*id].name.as_ref().unwrap_or(&"".to_string()), expr_right.to_string(operators, context))
 				}
@@ -205,11 +223,11 @@ impl Expression {
 				format!("{{ {} }}", expr_list.join(", "))
 			},
 			Expression::FunctionCall(expr, exprs, _, _) => {
-				let mut expr_list = Vec::new();
-				for e in exprs.iter() {
-					expr_list.push(e.to_string(operators, context));
-				}
+				let mut expr_list = self.get_parameters(operators, context);
 				format!("{}({})", expr.to_string(operators, context), expr_list.join(", "))
+			},
+			Expression::ConstructCall(tf_type, exprs, _, _) => {
+				format!("{}({})", tf_type.to_cpp(), self.get_parameters(operators, context).join(", "))
 			},
 			Expression::ArrayAccess(expr, exprs, _, _) => {
 				let mut expr_list = Vec::new();
@@ -219,5 +237,30 @@ impl Expression {
 				format!("{}[{}]", expr.to_string(operators, context), expr_list.join(", "))
 			}
 		}
+	}
+
+	pub fn is_construction_call(&self) -> bool {
+		if let Expression::ConstructCall(..) = self {
+			return true;
+		}
+		return false;
+	}
+
+	pub fn get_parameters(&self, operators: &OperatorDataStructure, context: &mut Context) -> Vec<String> {
+		let mut result = Vec::new();
+		match self {
+			Expression::FunctionCall(_, params, _, _) => {
+				for e in params.iter() {
+					result.push(e.to_string(operators, context));
+				}
+			},
+			Expression::ConstructCall(_, params, _, _) => {
+				for e in params.iter() {
+					result.push(e.to_string(operators, context));
+				}
+			},
+			_ => ()
+		}
+		return result;
 	}
 }

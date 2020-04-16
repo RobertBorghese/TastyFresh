@@ -14,7 +14,7 @@ use crate::context_management::context::Context;
 
 lazy_static! {
 	pub static ref STYLE_TYPES: Vec<&'static str> = vec!("copy", "ref", "borrow", "move", "ptr", "autoptr", "uniqueptr", "classptr", "let", "ptr2", "ptr3", "ptr4", "ptr5", "ptr6", "ptr7", "ptr8", "ptr9");
-	pub static ref VARIABLE_PROPS: Vec<&'static str> = vec!("const", "constexpr", "constinit", "extern", "mutable", "static", "thread_local", "volatile");
+	pub static ref VARIABLE_PROPS: Vec<&'static str> = vec!("const", "constexpr", "constinit", "extern", "mutable", "forever", "thread_local", "volatile");
 }
 
 #[derive(Clone, PartialEq)]
@@ -66,6 +66,15 @@ impl VariableType {
 			return true;
 		}
 		return false;
+	}
+
+	pub fn this() -> VariableType {
+		return VariableType {
+			var_type: Type::This,
+			var_style: VarStyle::Ptr(1),
+			var_properties: None,
+			var_optional: false
+		};
 	}
 
 	pub fn initializer_list(var_type: VariableType) -> VariableType {
@@ -266,6 +275,20 @@ impl VariableType {
 		return false;
 	}
 
+	pub fn is_only_static(&self) -> bool {
+		let mut result = false;
+		if self.var_properties.is_some() {
+			for prop in self.var_properties.as_ref().unwrap() {
+				if let VarProps::Static = prop {
+					result = true;
+				} else {
+					return false;
+				}
+			}
+		}
+		return result;
+	}
+
 	pub fn types_match(&self, other: &VariableType) -> bool {
 		if other.is_inferred() {
 			return true;
@@ -328,7 +351,8 @@ pub enum Type {
 	Tuple(Vec<VariableType>),
 	Inferred,
 	Undeclared(Vec<String>),
-	UndeclaredWParams(Vec<String>, Vec<VariableType>)
+	UndeclaredWParams(Vec<String>, Vec<VariableType>),
+	This
 }
 
 impl Type {
@@ -409,7 +433,8 @@ impl Type {
 				}
 				result += ">";
 				result
-			}
+			},
+			Type::This => "this".to_string()
 		}
 	}
 
@@ -434,7 +459,8 @@ impl Type {
 			Type::Tuple(types) => None,
 			Type::Inferred => None,
 			Type::Undeclared(names) => None,
-			Type::UndeclaredWParams(names, type_args) => None
+			Type::UndeclaredWParams(names, type_args) => None,
+			Type::This => None
 		}
 	}
 }
@@ -603,7 +629,7 @@ impl VarProps {
 			"constinit" => VarProps::Constinit,
 			"extern" => VarProps::Extern,
 			"mutable" => VarProps::Mutable,
-			"static" => VarProps::Static,
+			"forever" => VarProps::Static,
 			"thread_local" => VarProps::Threadlocal,
 			"volatile" => VarProps::Volatile,
 			_ => VarProps::Unknown
