@@ -13,17 +13,17 @@ Tasty Fresh is a programming language that aims to tackle this problem by transp
 
 ---
 
-With that being said, it is very unlikely Tasty Fresh will ever be production ready. It is a small, *MESSY*, one-man project aimed solely at the needs of said main. Bugs, issues, and other unintended behavior will be fixed as needed, and as a result, one must have a relatively advanced understanding of both C++ and Tasty Fresh to receive any benefit from the language. With that being said, contributions to clean-up the code base or elevate this language to production quality are always welcome. 
+With that being said, it is very unlikely Tasty Fresh will ever be production ready. It is a small, *MESSY*, one-man project aimed solely at the needs of said main. Bugs, issues, and other unintended behavior will be fixed as needed, and as a result, one must have a relatively advanced understanding of both C++ and Tasty Fresh to receive any benefit from the language. Nonetheless, contributions to clean-up the code base or elevate this language to production quality are always welcome. 
 
 Ultimately, if Tasty Fresh ever reaches version `1.0.0`, it should include:
 
-* No header files or archaic import systems, but features to help configure how they translate to C++ if necessary.
+✔️ No header files or archaic import systems, but features to help configure how they translate to C++ if necessary.
 * Static-typing and null-safety for all Tasty Fresh code prior to being transpiled into C++.
-* Allow for the usage of unknown classes and variables that may only exist in the C++ context.
-* Have C++ source file line numbers match the line numbers from the Tasty Fresh source files to help decypher C++ errors and warnings.
+✔️ Allow for the usage of unknown classes and variables that may only exist in the C++ context.
+✔️ Have C++ source file line numbers match the line numbers from the Tasty Fresh source files to help decypher C++ errors and warnings.
 * Modern, Rust-like enums with union storage and pattern matching.
 * Static extensions for classes, primitives, and unknown C++ types.
-* Smart `.` operators as opposed to explicit use of `->` or `::`.
+✔️ Smart `.` operators as opposed to explicit use of `->` or `::`.
 * Basic type inference for variable initialization and function return types.
 * Simple, yet powerful text-replacement meta-programming functions and Haxe-like abstract classes.
 * Ability to directly inject C++ code in any location.
