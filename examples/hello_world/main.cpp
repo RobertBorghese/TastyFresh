@@ -17,4 +17,12 @@ void main() {
 	for(int j = 10; i > 0; i--) {
 		
 	}
+
+	if(test) {
+		fds = 32;
+	} else if(fds) {
+		fds = 32;
+	} else {
+		dfs = 43;
+	}
 }

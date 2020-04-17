@@ -45,12 +45,20 @@ pub enum ForType {
 	ForEach,
 	Increment,
 	Decrement,
+	IncrementTo,
+	DecrementTo,
 	Invalid
 }
 
 impl ForType {
 	pub fn new(id: &str) -> ForType {
-		return match id { "for" => ForType::ForEach, "inc" => ForType::Increment, "dec" => ForType::Decrement, _ => ForType::Invalid };
+		return match id {
+			"for" => ForType::ForEach,
+			"inc" => ForType::Increment,
+			"dec" => ForType::Decrement,
+			"incto" => ForType::IncrementTo,
+			"decto" => ForType::DecrementTo,
+			_ => ForType::Invalid };
 	}
 
 	pub fn is_for(&self) -> bool {
@@ -69,6 +77,20 @@ impl ForType {
 
 	pub fn is_decrement(&self) -> bool {
 		if let ForType::Decrement = self {
+			return true;
+		}
+		return false;
+	}
+
+	pub fn is_incrementto(&self) -> bool {
+		if let ForType::IncrementTo = self {
+			return true;
+		}
+		return false;
+	}
+
+	pub fn is_decrementto(&self) -> bool {
+		if let ForType::DecrementTo = self {
 			return true;
 		}
 		return false;

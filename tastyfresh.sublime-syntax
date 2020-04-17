@@ -50,8 +50,7 @@ contexts:
       captures:
         1: keyword.operator.tasty-fresh
 
-    - match: '\b(if|else|for|while|do|inc|dec|in|from|to|by
-    )\b'
+    - match: '\b(if|else|for|while|do|inc|dec|incto|decto|in|from|to|by)\b'
       scope: keyword.control.tasty-fresh
 
     - match: \breturn\b

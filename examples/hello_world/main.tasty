@@ -20,4 +20,16 @@ fn main() {
 	dec j from 10 to 0 {
 
 	}
+
+	incto i from 0 to vec.size() by 2 {
+
+	}
+
+	decto j from 10 to 0 {
+
+	}
+
+	if test fds = 32;
+	else if fds fds = 32;
+	else dfs = 43;
 }

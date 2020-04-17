@@ -22,7 +22,7 @@ use crate::expression::expression_parser::ExpressionEndReason;
 use crate::expression::variable_type::{ VariableType, Type };
 
 use crate::scope_parser::return_parser::ReturnParser;
-use crate::scope_parser::if_parser::IfParser;
+use crate::scope_parser::if_parser::{ IfParser, IfType };
 use crate::scope_parser::while_parser::WhileParser;
 use crate::scope_parser::loop_parser::LoopParser;
 use crate::scope_parser::dowhile_parser::DoWhileParser;
@@ -43,13 +43,13 @@ pub enum ScopeExpression {
 	SubScope(Box<ScopeExpression>, usize, usize),
 	VariableDeclaration(VariableDeclaration, Option<Rc<Expression>>),
 	Return(Rc<Expression>, usize),
-	If(Rc<Expression>, Box<ScopeExpression>, usize, usize),
+	If(IfType, Option<Rc<Expression>>, Box<ScopeExpression>, usize, usize),
 	While(Rc<Expression>, Box<ScopeExpression>, usize, usize),
 	Loop(Box<ScopeExpression>, usize, usize),
 	DoWhile(Rc<Expression>, Box<ScopeExpression>, usize, usize, usize),
 	For(String, Rc<Expression>, Box<ScopeExpression>, usize, usize),
-	Increment(String, Rc<Expression>, Rc<Expression>, Option<Rc<Expression>>, Box<ScopeExpression>, usize, usize),
-	Decrement(String, Rc<Expression>, Rc<Expression>, Option<Rc<Expression>>, Box<ScopeExpression>, usize, usize)
+	Increment(String, Rc<Expression>, Rc<Expression>, Option<Rc<Expression>>, Box<ScopeExpression>, bool, usize, usize),
+	Decrement(String, Rc<Expression>, Rc<Expression>, Option<Rc<Expression>>, Box<ScopeExpression>, bool, usize, usize)
 }
 
 impl ScopeExpression {
@@ -86,7 +86,7 @@ impl ScopeExpression {
 				} else {
 					parser.parse_whitespace();
 					let if_declare = result.unwrap_and_move();
-					scope_exprs.push(ScopeExpression::If(if_declare.expression, if_declare.scope, if_declare.line, if_declare.end_line));
+					scope_exprs.push(ScopeExpression::If(if_declare.if_type, if_declare.expression, if_declare.scope, if_declare.line, if_declare.end_line));
 				}
 			} else if WhileParser::is_declaration(parser) {
 				let mut result = WhileParser::new(parser, file.to_string(), config_data, context);
@@ -134,7 +134,7 @@ impl ScopeExpression {
 							for_declare.line,
 							for_declare.end_line
 						));
-					} else if for_declare.for_type.is_increment() {
+					} else if for_declare.for_type.is_increment() || for_declare.for_type.is_incrementto() {
 						let exprs = for_declare.content.right().unwrap();
 						scope_exprs.push(ScopeExpression::Increment(
 							for_declare.var_name,
@@ -142,10 +142,11 @@ impl ScopeExpression {
 							exprs.1,
 							exprs.2,
 							for_declare.scope,
+							for_declare.for_type.is_incrementto(),
 							for_declare.line,
 							for_declare.end_line
 						));
-					} else if for_declare.for_type.is_decrement() {
+					} else if for_declare.for_type.is_decrement() || for_declare.for_type.is_decrementto() {
 						let exprs = for_declare.content.right().unwrap();
 						scope_exprs.push(ScopeExpression::Decrement(
 							for_declare.var_name,
@@ -153,6 +154,7 @@ impl ScopeExpression {
 							exprs.1,
 							exprs.2,
 							for_declare.scope,
+							for_declare.for_type.is_decrementto(),
 							for_declare.line,
 							for_declare.end_line
 						));
@@ -237,7 +239,9 @@ impl ScopeExpression {
 					let line_number = if context.align_lines {
 						real_line_number
 					} else {
-						if real_line_number - real_last_line_offset > 1 {
+						if e.is_extend() {
+							last_line_offset
+						} else if real_line_number - real_last_line_offset > 1 {
 							last_line_offset + 2
 						} else {
 							last_line_offset + 1
@@ -278,14 +282,23 @@ impl ScopeExpression {
 				let scope_str = scope.to_string(operators, *line, tab_offset, context);
 				format!("{}", self.format_scope_contents(&scope_str, context, line, end_line))
 			},
-			ScopeExpression::If(expr, scope, line, end_line) => {
-				let expr_str = expr.to_string(operators, context);
+			ScopeExpression::If(if_type, expr, scope, line, end_line) => {
+				let expr_str = if expr.is_some() { expr.as_ref().unwrap().to_string(operators, context) } else { "".to_string() };
 				let scope_str = scope.to_string(operators, *line, tab_offset, context);
-				format!("if({}) {}", if context.align_lines {
-					&expr_str
-				} else {
-					expr_str.trim()
-				}, self.format_scope_contents(&scope_str, context, line, end_line))
+				format!("{} {}", if if_type.is_else() {
+						"else".to_string()
+					} else {
+						format!("{}if({})", if if_type.is_elseif() {
+								"else "
+							} else {
+								""
+							}, if context.align_lines {
+								&expr_str
+							} else {
+								expr_str.trim()
+							}
+						)
+					}, self.format_scope_contents(&scope_str, context, line, end_line))
 			},
 			ScopeExpression::While(expr, scope, line, end_line) => {
 				let expr_str = expr.to_string(operators, context);
@@ -329,16 +342,17 @@ impl ScopeExpression {
 					expr_str.trim()
 				}, self.format_scope_contents(&scope_str, context, line, end_line))
 			},
-			ScopeExpression::Increment(name, start_expr, end_expr, by_expr, scope, line, end_line) => {
+			ScopeExpression::Increment(name, start_expr, end_expr, by_expr, scope, is_to, line, end_line) => {
 				let start_str = start_expr.to_string(operators, context);
 				let end_str = end_expr.to_string(operators, context);
 				let by_str = if by_expr.is_none() { None } else { Some(by_expr.as_ref().unwrap().to_string(operators, context)) };
 				let scope_str = scope.to_string(operators, *line, tab_offset, context);
-				format!("for({} {} = {}; i < {}; {}) {}", start_expr.get_type().to_cpp(), name, if context.align_lines {
+				format!("for({} {} = {}; i {} {}; {}) {}", start_expr.get_type().to_cpp(), name, if context.align_lines {
 					&start_str
 				} else {
 					start_str.trim()
 				},
+				if *is_to { "<=" } else { "<" },
 				if context.align_lines {
 					&end_str
 				} else {
@@ -354,16 +368,17 @@ impl ScopeExpression {
 					})
 				}, self.format_scope_contents(&scope_str, context, line, end_line))
 			},
-			ScopeExpression::Decrement(name, start_expr, end_expr, by_expr, scope, line, end_line) => {
+			ScopeExpression::Decrement(name, start_expr, end_expr, by_expr, scope, is_to, line, end_line) => {
 				let start_str = start_expr.to_string(operators, context);
 				let end_str = end_expr.to_string(operators, context);
 				let by_str = if by_expr.is_none() { None } else { Some(by_expr.as_ref().unwrap().to_string(operators, context)) };
 				let scope_str = scope.to_string(operators, *line, tab_offset, context);
-				format!("for({} {} = {}; i > {}; {}) {}", start_expr.get_type().to_cpp(), name, if context.align_lines {
+				format!("for({} {} = {}; i {} {}; {}) {}", start_expr.get_type().to_cpp(), name, if context.align_lines {
 					&start_str
 				} else {
 					start_str.trim()
 				},
+				if *is_to { ">=" } else { ">" },
 				if context.align_lines {
 					&end_str
 				} else {
@@ -415,14 +430,21 @@ impl ScopeExpression {
 			ScopeExpression::SubScope(_, line, _) => Some(*line),
 			ScopeExpression::VariableDeclaration(declare, _) => Some(declare.line),
 			ScopeExpression::Return(_, line) => Some(*line),
-			ScopeExpression::If(_, _, line, _) => Some(*line),
+			ScopeExpression::If(_, _, _, line, _) => Some(*line),
 			ScopeExpression::While(_, _, line, _) => Some(*line),
 			ScopeExpression::Loop(_, line, _) => Some(*line),
 			ScopeExpression::DoWhile(_, _, line, _, _) => Some(*line),
 			ScopeExpression::For(_, _, _, line, _) => Some(*line),
-			ScopeExpression::Increment(_, _, _, _, _, line, _) => Some(*line),
-			ScopeExpression::Decrement(_, _, _, _, _, line, _) => Some(*line),
+			ScopeExpression::Increment(_, _, _, _, _, _, line, _) => Some(*line),
+			ScopeExpression::Decrement(_, _, _, _, _, _, line, _) => Some(*line),
 			_ => None
+		};
+	}
+
+	pub fn is_extend(&self) -> bool {
+		return match self {
+			ScopeExpression::If(if_type, _, _, _, _) => if_type.is_elseif() || if_type.is_else(),
+			_ => false
 		};
 	}
 }

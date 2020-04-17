@@ -8,6 +8,7 @@ use crate::{
 	declare_parse_whitespace,
 	declare_parse_required_whitespace,
 	declare_parse_ascii,
+	parse_unneccessary_ascii,
 	declare_parse_until_char
 };
 
@@ -30,10 +31,40 @@ use std::rc::Rc;
 type IfParserResult = DeclarationResult<IfParser>;
 
 pub struct IfParser {
-	pub expression: Rc<Expression>,
+	pub if_type: IfType,
+	pub expression: Option<Rc<Expression>>,
 	pub scope: Box<ScopeExpression>,
 	pub line: usize,
 	pub end_line: usize
+}
+
+pub enum IfType {
+	If,
+	ElseIf,
+	Else
+}
+
+impl IfType {
+	pub fn is_if(&self) -> bool {
+		if let IfType::If = self {
+			return true;
+		}
+		return false;
+	}
+
+	pub fn is_elseif(&self) -> bool {
+		if let IfType::ElseIf = self {
+			return true;
+		}
+		return false;
+	}
+
+	pub fn is_else(&self) -> bool {
+		if let IfType::Else = self {
+			return true;
+		}
+		return false;
+	}
 }
 
 impl Declaration<IfParser> for IfParser {
@@ -48,23 +79,45 @@ impl IfParser {
 
 		let mut if_keyword = "".to_string();
 		declare_parse_ascii!(if_keyword, parser);
-		if if_keyword != "if" {
-			return IfParserResult::Err("Unexpected Keyword", "\"if\" keyword expected", parser.index - if_keyword.len(), parser.index);
+		if if_keyword != "if" && if_keyword != "else" {
+			return IfParserResult::Err("Unexpected Keyword", "\"if\" or \"else\" keyword expected", parser.index - if_keyword.len(), parser.index);
 		}
+
+		let mut if_type = IfType::If;
+		let mut obtain_condition = if_keyword == "if";
 
 		declare_parse_whitespace!(parser);
 
-		let mut reason = ExpressionEndReason::Unknown;
-		let expression = parser.parse_expression(file_name.clone(), config_data, Some(context), &mut reason, Some(VariableType::boolean()));
+		if if_keyword == "else" {
+			let curr_index = parser.index;
+			let curr_line = parser.line;
 
-		match reason {
-			ExpressionEndReason::Unknown => return IfParserResult::Err("Unknown Error", "unknown expression parsing error", parser.index - 1, parser.index),
-			ExpressionEndReason::EndOfContent =>  return IfParserResult::Err("Unexpected End of Expression", "unexpected end of expression", parser.index - 1, parser.index),
-			ExpressionEndReason::NoValueError => return IfParserResult::Err("Value Expected", "expression value expected here", parser.index - 1, parser.index),
-			_ => ()
+			let mut real_if_keyword = "".to_string();
+			parse_unneccessary_ascii!(real_if_keyword, parser);
+			if real_if_keyword == "if" {
+				declare_parse_whitespace!(parser);
+				obtain_condition = true;
+				if_type = IfType::ElseIf;
+			} else {
+				parser.reset(curr_index, curr_line);
+				if_type = IfType::Else;
+			}
 		}
 
-		declare_parse_whitespace!(parser);
+		let mut expression: Option<Rc<Expression>> = None;
+		if obtain_condition {
+			let mut reason = ExpressionEndReason::Unknown;
+			expression = Some(parser.parse_expression(file_name.clone(), config_data, Some(context), &mut reason, Some(VariableType::boolean())));
+
+			match reason {
+				ExpressionEndReason::Unknown => return IfParserResult::Err("Unknown Error", "unknown expression parsing error", parser.index - 1, parser.index),
+				ExpressionEndReason::EndOfContent =>  return IfParserResult::Err("Unexpected End of Expression", "unexpected end of expression", parser.index - 1, parser.index),
+				ExpressionEndReason::NoValueError => return IfParserResult::Err("Value Expected", "expression value expected here", parser.index - 1, parser.index),
+				_ => ()
+			}
+
+			declare_parse_whitespace!(parser);
+		}
 
 		let mut scope: Option<ScopeExpression> = None;
 		if parser.get_curr() == '{' {
@@ -77,6 +130,7 @@ impl IfParser {
 		}
 
 		return IfParserResult::Ok(IfParser {
+			if_type: if_type,
 			expression: expression,
 			scope: Box::new(scope.unwrap()),
 			line: initial_line,
@@ -90,6 +144,6 @@ impl IfParser {
 
 	pub fn is_if_declaration(content: &str, index: usize) -> bool {
 		let declare = &content[index..];
-		return declare.starts_with("if ") || declare.starts_with("if(");
+		return declare.starts_with("if ") || declare.starts_with("if(") || declare.starts_with("else ");
 	}
 }
