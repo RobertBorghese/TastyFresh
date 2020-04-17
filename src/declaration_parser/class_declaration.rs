@@ -137,7 +137,7 @@ impl ClassDeclaration {
 			let initial_index = parser.index;
 
 			if AttributeDeclaration::is_declaration(parser) {
-				let mut result = AttributeDeclaration::new(parser);
+				let mut result = AttributeDeclaration::new(parser, false);
 				if result.is_error() {
 					result.print_error(file_name.to_string(), &parser.content);
 				} else {

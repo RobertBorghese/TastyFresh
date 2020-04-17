@@ -9,6 +9,7 @@ pub mod position;
 pub mod context;
 pub mod typing_context;
 pub mod header_context;
+pub mod global_context;
 
 use position::Position;
 

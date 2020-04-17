@@ -171,10 +171,10 @@ impl VariableDeclaration {
 		return self.var_type.is_only_static();
 	}
 
-	pub fn to_cpp(&self, expr: &Option<Rc<Expression>>, operators: &OperatorDataStructure, context: &mut Context, class_name: Option<&str>) -> String {
+	pub fn to_cpp(&self, expr: &Option<Rc<Expression>>, operators: &OperatorDataStructure, context: &mut Context, export_type: VariableExportType) -> String {
 		let var_type = &self.var_type;
 		let default_value = var_type.default_value();
-		let props = if var_type.var_properties.is_some() && class_name.is_none() {
+		let props = if var_type.var_properties.is_some() && !export_type.is_class_source() {
 			let mut result = Vec::new();
 			for prop in var_type.var_properties.as_ref().unwrap() {
 				result.push(prop.get_name());
@@ -188,63 +188,42 @@ impl VariableDeclaration {
 			"".to_string()
 		};
 
-		let final_name = if class_name.is_none() { self.name.to_string() } else { format!("{}::{}", class_name.unwrap(), self.name) };
+		let final_name = if !export_type.is_class_source() { self.name.to_string() } else { format!("{}::{}", export_type.get_source_name(), self.name) };
 
 		if expr.is_some() {
-			//println!("{}", expr.as_ref().unwrap().deconstruct_new(operators, context).unwrap_or("NONE".to_string()));
-			//if expr.as_ref().unwrap().get_op_type().unwrap_or(0) == 9 {
-			//}
 
-			if expr.as_ref().unwrap().is_construction_call() {
+			let is_construction = expr.as_ref().unwrap().is_construction_call();
+
+			if is_construction {
 				let var_type_output = var_type.to_cpp();
 				let var_type_name = var_type.var_type.to_cpp();
-				let params = expr.as_ref().unwrap().get_parameters(operators, context).join(", ");
+				let params = expr.as_ref().unwrap().get_parameters(operators, context);
+				let params_str = params.join(", ");
 				match var_type.var_style {
 					VarStyle::Copy => {
-						return format!("{}{} {} = {}({});", props, var_type_output, final_name, var_type_name, params);
-					},
-					VarStyle::Ptr(self_size) => {
-						if self_size == 1 {
-							return format!("{}{} {} = new {}({});", props, var_type_output, final_name, var_type_name, params);
-						}
-					},
-					VarStyle::AutoPtr => {
-					},
-					VarStyle::UniquePtr => {
-					},
-					_ => ()
-				}
-			}
-
-			let create_components = expr.as_ref().unwrap().deconstruct_new(operators, context);
-			if create_components.is_some() {
-				let comps = create_components.unwrap();
-				match var_type.var_style {
-					VarStyle::Copy => {
-						let args = &comps[1];
-						if args.is_empty() {
-							return format!("{}{} {};", props, comps.first().unwrap(), final_name);
+						if export_type.is_class_header() {
+							return format!("{}{} {} = {}({});", props, var_type_output, final_name, var_type_name, params_str);
 						} else {
-							return format!("{}{} {}({});", props, comps.first().unwrap(), final_name, args);
+							if params.is_empty() {
+								return format!("{}{} {};", props, var_type_output, final_name);
+							} else {
+								return format!("{}{} {}({});", props, var_type_output, final_name, params_str);
+							}
 						}
 					},
 					VarStyle::Move => {
-						let var_name = comps.first().unwrap();
-						return format!("{}{}&& {} = {}({});", props, &var_name, final_name, &var_name, &comps[1]);
+						return format!("{}{}&& {} = {}({});", props, var_type_output, final_name, var_type_name, params_str);
 					},
 					VarStyle::Ptr(self_size) => {
 						if self_size == 1 {
-							let var_name = comps.first().unwrap();
-							return format!("{}{}* {} = new {}({});", props, &var_name, final_name, &var_name, &comps[1]);
+							return format!("{}{} {} = new {}({});", props, var_type_output, final_name, var_type_name, params_str);
 						}
 					},
 					VarStyle::AutoPtr => {
-						let var_name = comps.first().unwrap();
-						return format!("{}std::shared_ptr<{}> {} = std::make_shared<{}>({});", props, &var_name, final_name, &var_name, &comps[1]);
+						return format!("{}std::shared_ptr<{}> {} = std::make_shared<{}>({});", props, var_type_output, final_name, var_type_name, params_str);
 					},
 					VarStyle::UniquePtr => {
-						let var_name = comps.first().unwrap();
-						return format!("{}std::unique_ptr<{}> {} = std::make_unique<{}>({});", props, &var_name, final_name, &var_name, &comps[1]);
+						return format!("{}std::unique_ptr<{}> {} = std::make_unique<{}>({});", props, var_type_output, final_name, var_type_name, params_str);
 					},
 					_ => ()
 				}
@@ -266,5 +245,36 @@ impl VariableDeclaration {
 		} else {
 			return format!("{}{} {};", props, var_type.to_cpp(), final_name);
 		};
+	}
+}
+
+pub enum VariableExportType<'a> {
+	Scoped,
+	ModuleHeader,
+	ModuleSource,
+	ClassHeader,
+	ClassSource(&'a str)
+}
+
+impl<'a> VariableExportType<'a> {
+	pub fn is_class_header(&self) -> bool {
+		if let VariableExportType::ClassHeader = self {
+			return true;
+		}
+		return false;
+	}
+
+	pub fn is_class_source(&self) -> bool {
+		if let VariableExportType::ClassSource(name) = self {
+			return true;
+		}
+		return false;
+	}
+
+	pub fn get_source_name(&self) -> &'a str {
+		if let VariableExportType::ClassSource(name) = self {
+			return name;
+		}
+		return "";
 	}
 }

@@ -70,6 +70,14 @@ pub trait Declaration<T> {
 		return None;
 	}
 
+	fn parse_unneccessary_ascii(result: &mut String, parser: &mut Parser) -> Option<DeclarationResult<T>> {
+		*result = parser.parse_ascii_char_name();
+		if parser.out_of_space {
+			return Some(Self::out_of_space(parser.index));
+		}
+		return None;
+	}
+
 	fn parse_required_ascii_op(result: &mut String, error_title: &'static str, error_msg: &'static str, parser: &mut Parser) -> Option<DeclarationResult<T>> {
 		*result = parser.parse_ascii_op_name();
 		if result.is_empty() {
@@ -197,6 +205,17 @@ macro_rules! declare_parse_ascii {
 macro_rules! declare_parse_required_ascii {
 	($var_name:expr, $error_title:expr, $error_msg:expr, $parser:expr) => {
 		if let Some(result) = Self::parse_required_ascii(&mut $var_name, $error_title, $error_msg, $parser) {
+			return result;
+		}
+	}
+}
+
+/// Parses all next ASCII characters to form a `String`.
+/// If the first character parsed is not an ASCII character, an error is returned.
+#[macro_export]
+macro_rules! parse_unneccessary_ascii {
+	($var_name:expr, $parser:expr) => {
+		if let Some(result) = Self::parse_unneccessary_ascii(&mut $var_name, $parser) {
 			return result;
 		}
 	}

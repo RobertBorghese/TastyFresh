@@ -1,24 +1,13 @@
 #ifndef MAIN_TASTYFILE
 #define MAIN_TASTYFILE
 
-#include <memory>
+#include <iostream>
 
-extern std::shared_ptr<vector> bla;
-extern vector bla;
+void main();
 
-int main();
-
-class Test_Class {
+class Bla {
 public:
-	Test_Class(int a);
-	Test_Class(float a);
-	virtual ~Test_Class();
-	void printValue();
-	void operator++();
-
-	static int a;
-	vector<int> b = vector<int>();
-	vector<int>* ghj = 0;
+	std::vector<int> vec = std::vector<int>(32);
 };
 
 #endif

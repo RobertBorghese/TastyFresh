@@ -9,9 +9,13 @@
 pub mod expression_scope_parser;
 pub mod return_parser;
 pub mod if_parser;
+pub mod while_parser;
+pub mod loop_parser;
+pub mod dowhile_parser;
+pub mod for_parser;
 
 use crate::declaration_parser::parser::Parser;
-use crate::declaration_parser::variable_declaration::VariableDeclaration;
+use crate::declaration_parser::variable_declaration::{ VariableDeclaration, VariableExportType };
 
 use crate::expression::Expression;
 use crate::expression::expression_parser::ExpressionEndReason;
@@ -19,6 +23,10 @@ use crate::expression::variable_type::{ VariableType, Type };
 
 use crate::scope_parser::return_parser::ReturnParser;
 use crate::scope_parser::if_parser::IfParser;
+use crate::scope_parser::while_parser::WhileParser;
+use crate::scope_parser::loop_parser::LoopParser;
+use crate::scope_parser::dowhile_parser::DoWhileParser;
+use crate::scope_parser::for_parser::{ ForParser, ForType };
 
 use crate::config_management::ConfigData;
 use crate::config_management::operator_data::OperatorDataStructure;
@@ -35,7 +43,13 @@ pub enum ScopeExpression {
 	SubScope(Box<ScopeExpression>, usize, usize),
 	VariableDeclaration(VariableDeclaration, Option<Rc<Expression>>),
 	Return(Rc<Expression>, usize),
-	If(Rc<Expression>, Box<ScopeExpression>, usize, usize)
+	If(Rc<Expression>, Box<ScopeExpression>, usize, usize),
+	While(Rc<Expression>, Box<ScopeExpression>, usize, usize),
+	Loop(Box<ScopeExpression>, usize, usize),
+	DoWhile(Rc<Expression>, Box<ScopeExpression>, usize, usize, usize),
+	For(String, Rc<Expression>, Box<ScopeExpression>, usize, usize),
+	Increment(String, Rc<Expression>, Rc<Expression>, Option<Rc<Expression>>, Box<ScopeExpression>, usize, usize),
+	Decrement(String, Rc<Expression>, Rc<Expression>, Option<Rc<Expression>>, Box<ScopeExpression>, usize, usize)
 }
 
 impl ScopeExpression {
@@ -71,13 +85,78 @@ impl ScopeExpression {
 					break;
 				} else {
 					parser.parse_whitespace();
-					//if parser.get_curr() == ';' || parser.get_curr() == '}' {
-						let if_declare = result.unwrap_and_move();
-						scope_exprs.push(ScopeExpression::If(if_declare.expression, if_declare.scope, if_declare.line, if_declare.end_line));
-						if parser.get_curr() == '}' {
-							parser.increment();
-						}
-					//}
+					let if_declare = result.unwrap_and_move();
+					scope_exprs.push(ScopeExpression::If(if_declare.expression, if_declare.scope, if_declare.line, if_declare.end_line));
+				}
+			} else if WhileParser::is_declaration(parser) {
+				let mut result = WhileParser::new(parser, file.to_string(), config_data, context);
+				if result.is_error() {
+					result.print_error(file.to_string(), &parser.content);
+					break;
+				} else {
+					parser.parse_whitespace();
+					let while_declare = result.unwrap_and_move();
+					scope_exprs.push(ScopeExpression::While(while_declare.expression, while_declare.scope, while_declare.line, while_declare.end_line));
+				}
+			} else if LoopParser::is_declaration(parser) {
+				let mut result = LoopParser::new(parser, file.to_string(), config_data, context);
+				if result.is_error() {
+					result.print_error(file.to_string(), &parser.content);
+					break;
+				} else {
+					parser.parse_whitespace();
+					let loop_declare = result.unwrap_and_move();
+					scope_exprs.push(ScopeExpression::Loop(loop_declare.scope, loop_declare.line, loop_declare.end_line));
+				}
+			} else if DoWhileParser::is_declaration(parser) {
+				let mut result = DoWhileParser::new(parser, file.to_string(), config_data, context);
+				if result.is_error() {
+					result.print_error(file.to_string(), &parser.content);
+					break;
+				} else {
+					parser.parse_whitespace();
+					let do_while_declare = result.unwrap_and_move();
+					scope_exprs.push(ScopeExpression::DoWhile(do_while_declare.expression, do_while_declare.scope, do_while_declare.line, do_while_declare.end_line, do_while_declare.while_offset));
+				}
+			} else if ForParser::is_declaration(parser) {
+				let mut result = ForParser::new(parser, file.to_string(), config_data, context);
+				if result.is_error() {
+					result.print_error(file.to_string(), &parser.content);
+					break;
+				} else {
+					parser.parse_whitespace();
+					let for_declare = result.unwrap_and_move();
+					if for_declare.for_type.is_for() {
+						scope_exprs.push(ScopeExpression::For(
+							for_declare.var_name,
+							for_declare.content.left().unwrap(),
+							for_declare.scope,
+							for_declare.line,
+							for_declare.end_line
+						));
+					} else if for_declare.for_type.is_increment() {
+						let exprs = for_declare.content.right().unwrap();
+						scope_exprs.push(ScopeExpression::Increment(
+							for_declare.var_name,
+							exprs.0,
+							exprs.1,
+							exprs.2,
+							for_declare.scope,
+							for_declare.line,
+							for_declare.end_line
+						));
+					} else if for_declare.for_type.is_decrement() {
+						let exprs = for_declare.content.right().unwrap();
+						scope_exprs.push(ScopeExpression::Decrement(
+							for_declare.var_name,
+							exprs.0,
+							exprs.1,
+							exprs.2,
+							for_declare.scope,
+							for_declare.line,
+							for_declare.end_line
+						));
+					}
 				}
 			} else if VariableDeclaration::is_declaration(parser) {
 				let mut result = VariableDeclaration::new(parser);
@@ -190,7 +269,7 @@ impl ScopeExpression {
 				format!("{};", expr.to_string(operators, context))
 			},
 			ScopeExpression::VariableDeclaration(declaration, expr) => {
-				declaration.to_cpp(expr, operators, context, None)
+				declaration.to_cpp(expr, operators, context, VariableExportType::Scoped)
 			},
 			ScopeExpression::Return(expr, _) => {
 				format!("return {};", expr.to_string(operators, context))
@@ -198,7 +277,7 @@ impl ScopeExpression {
 			ScopeExpression::SubScope(scope, line, end_line) => {
 				let scope_str = scope.to_string(operators, *line, tab_offset, context);
 				format!("{}", self.format_scope_contents(&scope_str, context, line, end_line))
-			}
+			},
 			ScopeExpression::If(expr, scope, line, end_line) => {
 				let expr_str = expr.to_string(operators, context);
 				let scope_str = scope.to_string(operators, *line, tab_offset, context);
@@ -206,6 +285,98 @@ impl ScopeExpression {
 					&expr_str
 				} else {
 					expr_str.trim()
+				}, self.format_scope_contents(&scope_str, context, line, end_line))
+			},
+			ScopeExpression::While(expr, scope, line, end_line) => {
+				let expr_str = expr.to_string(operators, context);
+				let scope_str = scope.to_string(operators, *line, tab_offset, context);
+				format!("while({}) {}", if context.align_lines {
+					&expr_str
+				} else {
+					expr_str.trim()
+				}, self.format_scope_contents(&scope_str, context, line, end_line))
+			},
+			ScopeExpression::Loop(scope, line, end_line) => {
+				let scope_str = scope.to_string(operators, *line, tab_offset, context);
+				format!("while(true) {}", self.format_scope_contents(&scope_str, context, line, end_line))
+			},
+			ScopeExpression::DoWhile(expr, scope, line, end_line, while_offset) => {
+				let expr_str = expr.to_string(operators, context);
+				let scope_str = scope.to_string(operators, *line, tab_offset, context);
+				format!("do {}{}while({});",
+					self.format_scope_contents(&scope_str, context, line, end_line),
+					if context.align_lines {
+						let tabs = String::from_utf8(vec![b'\t'; tab_offset]).unwrap_or("".to_string());
+						let mut result = "".to_string();
+						for i in 0..*while_offset {
+							result += format!("{}\n", tabs).as_str();
+						}
+						result
+					} else { " ".to_string() },
+					if context.align_lines {
+						&expr_str
+					} else {
+						expr_str.trim()
+					}
+				)
+			},
+			ScopeExpression::For(name, expr, scope, line, end_line) => {
+				let expr_str = expr.to_string(operators, context);
+				let scope_str = scope.to_string(operators, *line, tab_offset, context);
+				format!("for(auto& {} : {}) {}", name, if context.align_lines {
+					&expr_str
+				} else {
+					expr_str.trim()
+				}, self.format_scope_contents(&scope_str, context, line, end_line))
+			},
+			ScopeExpression::Increment(name, start_expr, end_expr, by_expr, scope, line, end_line) => {
+				let start_str = start_expr.to_string(operators, context);
+				let end_str = end_expr.to_string(operators, context);
+				let by_str = if by_expr.is_none() { None } else { Some(by_expr.as_ref().unwrap().to_string(operators, context)) };
+				let scope_str = scope.to_string(operators, *line, tab_offset, context);
+				format!("for({} {} = {}; i < {}; {}) {}", start_expr.get_type().to_cpp(), name, if context.align_lines {
+					&start_str
+				} else {
+					start_str.trim()
+				},
+				if context.align_lines {
+					&end_str
+				} else {
+					end_str.trim()
+				},
+				if by_str.is_none() {
+					"i++".to_string()
+				} else {
+					format!("i += {}", if context.align_lines {
+						&by_str.as_ref().unwrap()
+					} else {
+						by_str.as_ref().unwrap().trim()
+					})
+				}, self.format_scope_contents(&scope_str, context, line, end_line))
+			},
+			ScopeExpression::Decrement(name, start_expr, end_expr, by_expr, scope, line, end_line) => {
+				let start_str = start_expr.to_string(operators, context);
+				let end_str = end_expr.to_string(operators, context);
+				let by_str = if by_expr.is_none() { None } else { Some(by_expr.as_ref().unwrap().to_string(operators, context)) };
+				let scope_str = scope.to_string(operators, *line, tab_offset, context);
+				format!("for({} {} = {}; i > {}; {}) {}", start_expr.get_type().to_cpp(), name, if context.align_lines {
+					&start_str
+				} else {
+					start_str.trim()
+				},
+				if context.align_lines {
+					&end_str
+				} else {
+					end_str.trim()
+				},
+				if by_str.is_none() {
+					"i--".to_string()
+				} else {
+					format!("i -= {}", if context.align_lines {
+						&by_str.as_ref().unwrap()
+					} else {
+						by_str.as_ref().unwrap().trim()
+					})
 				}, self.format_scope_contents(&scope_str, context, line, end_line))
 			}
 		}
@@ -245,6 +416,12 @@ impl ScopeExpression {
 			ScopeExpression::VariableDeclaration(declare, _) => Some(declare.line),
 			ScopeExpression::Return(_, line) => Some(*line),
 			ScopeExpression::If(_, _, line, _) => Some(*line),
+			ScopeExpression::While(_, _, line, _) => Some(*line),
+			ScopeExpression::Loop(_, line, _) => Some(*line),
+			ScopeExpression::DoWhile(_, _, line, _, _) => Some(*line),
+			ScopeExpression::For(_, _, _, line, _) => Some(*line),
+			ScopeExpression::Increment(_, _, _, _, _, line, _) => Some(*line),
+			ScopeExpression::Decrement(_, _, _, _, _, line, _) => Some(*line),
 			_ => None
 		};
 	}

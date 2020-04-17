@@ -10,8 +10,10 @@ contexts:
   prototype:
     - include: comments
     - include: module_attributes
-    - include: operators
+
   main:
+    - include: operators
+
     - match: '"'
       scope: punctuation.definition.string.begin.tasty-fresh
       push: double_quoted_string
@@ -48,7 +50,8 @@ contexts:
       captures:
         1: keyword.operator.tasty-fresh
 
-    - match: '\b(if|else|for|while|do)\b'
+    - match: '\b(if|else|for|while|do|inc|dec|in|from|to|by
+    )\b'
       scope: keyword.control.tasty-fresh
 
     - match: \breturn\b
@@ -70,6 +73,27 @@ contexts:
       scope: storage.type.function.tasty-fresh
 
     - match: '(class|abstract|enum)\s+({{identifier}})'
+      scope: meta.assume.tasty-fresh
+      captures:
+        1: storage.type.class.tasty-fresh
+        2: entity.name.class.tasty-fresh
+
+    - match: '(attribute)\s+({{identifier}})(\()'
+      scope: meta.assume.tasty-fresh
+      captures:
+        1: storage.type.class.tasty-fresh
+        2: entity.name.class.tasty-fresh
+        3: keyword.operator.tasty-fresh
+      push:
+        - match: '\)'
+          scope: keyword.operator.tasty-fresh
+          pop: true
+        - match: ','
+          scope: keyword.operator.tasty-fresh
+        - match: '(?:\b[a-zA-Z0-9_]+\b|\[|\])'
+          scope: variable.parameter.function.tasty-fresh
+
+    - match: '(attribute)\s+({{identifier}})'
       scope: meta.assume.tasty-fresh
       captures:
         1: storage.type.class.tasty-fresh
@@ -139,7 +163,7 @@ contexts:
       scope: keyword.operator.tasty-fresh
     - match: '[,\(\)\{\}]'
       scope: keyword.operator.tasty-fresh
-    - match: 'new'
+    - match: '(?:new|delete|new\[\]|delete\[\])'
       scope: keyword.operator.tasty-fresh
 
   module_attributes:
@@ -161,14 +185,14 @@ contexts:
 
   comments:
     - match: '/\*'
-      scope: punctuation.definition.comment.c
+      scope: punctuation.definition.comment.tasty-fresh
       push: 
-        - meta_scope: comment.block.c
+        - meta_scope: comment.block.tasty-fresh
         - match: '\*/'
           pop: true
     - match: '//[^\*]'
-      scope: punctuation.definition.comment.c
+      scope: punctuation.definition.comment.tasty-fresh
       push:
-        - meta_scope: comment.line.double-slash.c
+        - meta_scope: comment.line.double-slash.tasty-fresh
         - match: $\n?
           pop: true

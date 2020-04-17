@@ -1,51 +1,23 @@
+include system iostream;
+contain system vector;
 
-contain system iostream;
-
-autoptr bla: vector;
-copy bla: vector;
-
-fn main() -> int {
-	std.cout << "Hello world" << std.endl;
-
-	let test = new TestClass();
-	test.printValue();
-
-	test++;
-	test++;
-	test++;
-
-	test.printValue();
-
-	let test = fdsf#int;
-
-	let test2 = static_cast@int(32f);
-
-	return 0;
+class Bla {
+	let vec = new std.vector@int(32);
 }
 
-class Test_Class {
-	forever let a: int;
+fn main() {
+	let vec = new std.vector@int(32);
+	vec.push_back(32);
 
-	let b = new vector@int();
-
-	ptr ghj: vector@int := 0;
-
-	constructor(a: int) {
-		this.a = a;
+	for i in vec {
+		
 	}
 
-	constructor(a: float) {
-		this.a = a#int;
+	inc i from 0 to vec.size() by 2 {
+
 	}
 
-	virtual destructor {
-	}
+	dec j from 10 to 0 {
 
-	fn printValue() {
-		std.cout << "The value of 'a' is: " << a << std.endl;
-	}
-
-	op ++() {
-		a++;
 	}
 }

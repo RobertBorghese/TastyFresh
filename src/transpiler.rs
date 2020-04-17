@@ -9,14 +9,16 @@ use crate::expression::expression_parser::{ ExpressionParser, ExpressionEndReaso
 use crate::expression::variable_type::VariableType;
 
 use crate::context_management::position::Position;
+use crate::context_management::global_context::GlobalContext;
 
 use crate::declaration_parser::parser::Parser;
 use crate::declaration_parser::module_declaration::{ ModuleDeclaration, DeclarationType };
 use crate::declaration_parser::attribute_declaration::AttributeDeclaration;
+use crate::declaration_parser::attribute_class_declaration::AttributeClassDeclaration;
 use crate::declaration_parser::include_declaration::IncludeDeclaration;
 use crate::declaration_parser::import_declaration::ImportDeclaration;
 use crate::declaration_parser::function_declaration::{ FunctionDeclaration, FunctionDeclarationType };
-use crate::declaration_parser::variable_declaration::VariableDeclaration;
+use crate::declaration_parser::variable_declaration::{ VariableDeclaration, VariableExportType };
 
 use crate::config_management::ConfigData;
 
@@ -111,7 +113,7 @@ pub struct Transpiler<'a> {
 	pub output_lines: Vec<String>,
 
 	pub declarations: VarFuncDeclarations,
-	pub class_declarations: Vec<(String,VarFuncDeclarations,VarFuncDeclarations)>,
+	pub class_declarations: Vec<(String,VarFuncDeclarations,VarFuncDeclarations,VarFuncDeclarations)>,
 	
 	pub handling_module_attributes: bool,
 	pub header_include_line: Option<usize>,
@@ -150,7 +152,7 @@ impl<'a> Transpiler<'a> {
 		}
 	}
 
-	pub fn parse_declarations(&mut self, declarations: &mut Vec<DeclarationType>, mut class_declarations: Option<(&str, &mut VarFuncDeclarations, &mut VarFuncDeclarations)>) {
+	pub fn parse_declarations(&mut self, declarations: &mut Vec<DeclarationType>, global_context: &GlobalContext, mut class_declarations: Option<(&str, &mut VarFuncDeclarations, &mut VarFuncDeclarations, &mut VarFuncDeclarations)>) {
 		let is_class_declare = !class_declarations.is_none();
 		for declaration in declarations {
 			// Module Attributes
@@ -168,6 +170,11 @@ impl<'a> Transpiler<'a> {
 			// All Others
 			match declaration {
 				DeclarationType::Class(class_declare, attributes) => {
+					if attributes.is_some() {
+						AttributeDeclaration::flatten_attributes(attributes.as_mut().unwrap(), global_context, self.parser.content.as_str());
+					}
+
+					let mut construct_declares = VarFuncDeclarations::new();
 					let mut public_declares = VarFuncDeclarations::new();
 					let mut private_declares = VarFuncDeclarations::new();
 
@@ -176,7 +183,7 @@ impl<'a> Transpiler<'a> {
 						context.typing.push_context();
 						context.typing.add_variable("this".to_string(), VariableType::this());
 					}
-					self.parse_declarations(&mut class_declare.declarations, Some((&class_declare.name, &mut public_declares, &mut private_declares)));
+					self.parse_declarations(&mut class_declare.declarations, global_context, Some((&class_declare.name, &mut construct_declares, &mut public_declares, &mut private_declares)));
 					{
 						let mut context = self.module_contexts.get_mut(self.access_file_path).unwrap();
 						context.typing.pop_context();
@@ -195,7 +202,7 @@ impl<'a> Transpiler<'a> {
 						class_content += "\n";
 					}
 
-					self.class_declarations.push((class_content, public_declares, private_declares));
+					self.class_declarations.push((class_content, construct_declares, public_declares, private_declares));
 				},
 				DeclarationType::Assume(assume, attributes) => {
 				},
@@ -205,6 +212,8 @@ impl<'a> Transpiler<'a> {
 						let mut context = self.module_contexts.get_mut(self.access_file_path).unwrap();
 						let mut typing = &mut context.typing;
 						typing.add(&module);
+						let mut line = if context.align_lines { import.line } else { self.output_lines.len() };
+						insert_output_line(&mut self.output_lines, format!("#include \"{}.hpp\"", import.path).as_str(), line, false);
 					} else {
 						let pos = Position::new(self.file.to_string(), Some(import.line + 1), 7, Some(7 + import.path.len()));
 						print_code_error("Import Not Found", "could not find Tasty Fresh source file", &pos, &self.parser.content)
@@ -218,15 +227,21 @@ impl<'a> Transpiler<'a> {
 							self.header_system_includes.push(include.path.clone());
 						}
 					} else {
+						let mut context = self.module_contexts.get_mut(self.access_file_path).unwrap();
+						let mut line = if context.align_lines { include.line } else { self.output_lines.len() };
 						insert_output_line(&mut self.output_lines, format!("#include {}", if include.inc_type.is_local() {
 							format!("\"{}\"", include.path)
 						} else {
 							format!("<{}>", include.path)
-						}).as_str(), include.line, false);
+						}).as_str(), line, false);
 					}
 					
 				},
 				DeclarationType::Function(func_data, attributes) => {
+					if attributes.is_some() {
+						AttributeDeclaration::flatten_attributes(attributes.as_mut().unwrap(), global_context, self.parser.content.as_str());
+					}
+
 					let mut context = self.module_contexts.get_mut(self.access_file_path).unwrap();
 					let mut func_content: Option<String> = None;
 					let mut line = if context.align_lines { func_data.line } else { self.output_lines.len() + 1 };
@@ -279,19 +294,35 @@ impl<'a> Transpiler<'a> {
 								true
 							);
 						} else {
-							let temp = &mut class_declarations.as_mut().unwrap().1;
-							configure_declaration_with_attributes(
-								&mut temp.function_declarations,
-								&mut temp.function_declarations_isolated,
-								&header_func_declare,
-								&attributes,
-								&self.parser.content,
-								true
-							);
+							if func_data.function_type.is_constructor_or_destructor() {
+								let temp = &mut class_declarations.as_mut().unwrap().1;
+								configure_declaration_with_attributes(
+									&mut temp.function_declarations,
+									&mut temp.function_declarations_isolated,
+									&header_func_declare,
+									&attributes,
+									&self.parser.content,
+									true
+								);
+							} else {
+								let temp = &mut class_declarations.as_mut().unwrap().2;
+								configure_declaration_with_attributes(
+									&mut temp.function_declarations,
+									&mut temp.function_declarations_isolated,
+									&header_func_declare,
+									&attributes,
+									&self.parser.content,
+									true
+								);
+							}
 						}
 					}
 				},
 				DeclarationType::Variable(var_data, attributes) => {
+					if attributes.is_some() {
+						AttributeDeclaration::flatten_attributes(attributes.as_mut().unwrap(), global_context, self.parser.content.as_str());
+					}
+
 					let mut context = self.module_contexts.get_mut(self.access_file_path).unwrap();
 					let mut reason = ExpressionEndReason::Unknown;
 					let mut expr: Option<Rc<Expression>> = None;
@@ -315,7 +346,11 @@ impl<'a> Transpiler<'a> {
 							&var_data.to_cpp(&expr,
 								&self.config_data.operators,
 								&mut context,
-								if is_class_declare && var_data.is_only_static() { Some(class_declarations.as_ref().unwrap().0) } else { None }
+								if is_class_declare && var_data.is_only_static() {
+									VariableExportType::ClassSource(class_declarations.as_ref().unwrap().0)
+								} else {
+									VariableExportType::ModuleSource
+								}
 							),
 							line,
 							false,
@@ -346,9 +381,13 @@ impl<'a> Transpiler<'a> {
 							let var_declaraction = if is_class_declare && var_data.is_only_static() {
 								format!("static {} {} ", var_type.to_cpp(), var_data.name)
 							} else {
-								var_data.to_cpp(&expr, &self.config_data.operators, &mut context, None)
+								var_data.to_cpp(&expr, &self.config_data.operators, &mut context, if is_class_declare {
+									VariableExportType::ClassHeader
+								} else {
+									VariableExportType::ModuleHeader
+								})
 							};
-							let temp = &mut class_declarations.as_mut().unwrap().1;
+							let temp = &mut class_declarations.as_mut().unwrap().2;
 							configure_declaration_with_attributes(
 								&mut temp.variable_declarations,
 								&mut temp.variable_declarations_isolated,

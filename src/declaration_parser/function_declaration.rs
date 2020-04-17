@@ -53,6 +53,10 @@ impl FunctionType {
 		return self.is_normal() || self.is_operator();
 	}
 
+	pub fn is_constructor_or_destructor(&self) -> bool {
+		return self.is_constructor() || self.is_destructor();
+	}
+
 	pub fn is_normal(&self) -> bool {
 		if let FunctionType::Normal = self {
 			return true;

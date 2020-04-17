@@ -48,6 +48,7 @@ use expression::Expression;
 use expression::expression_parser::{ ExpressionParser, ExpressionEndReason };
 
 use context_management::position::Position;
+use context_management::global_context::GlobalContext;
 
 use declaration_parser::parser::Parser;
 use declaration_parser::module_declaration::{ ModuleDeclaration, DeclarationType };
@@ -227,11 +228,14 @@ fn get_output_dirs(arguments: &BTreeMap<String,Vec<String>>) -> Option<Vec<Strin
 /// # Return
 ///
 /// The `ModuleDeclaration` for the file is returned.
-fn parse_source_file(file: &str, output_dirs: &Vec<String>, config_data: &ConfigData, module_contexts: &mut BTreeMap<String,Context>, parser: &mut Parser) -> ModuleDeclaration {
+fn parse_source_file(file: &str, source_location: &str, output_dirs: &Vec<String>, config_data: &ConfigData, module_contexts: &mut BTreeMap<String,Context>, parser: &mut Parser, global_context: &mut GlobalContext) -> ModuleDeclaration {
 	let content = std::fs::read_to_string(file).expect("Could not read source file.");
+	if !file.ends_with(".tasty") { panic!("File is not a .tasty. You should be ashamed."); }
 	*parser = Parser::new(content);
+	let mut curr_index = 0;
 	let mut context = Context::new();
-	let module_declaration = ModuleDeclaration::new(parser, file);
+	let mut module_declaration = ModuleDeclaration::new(parser, file);
+	let mut attribute_class_indexes = Vec::new();
 	for declaration in &module_declaration.declarations {
 		match declaration {
 			DeclarationType::Function(d, attributes) => {
@@ -245,15 +249,25 @@ fn parse_source_file(file: &str, output_dirs: &Vec<String>, config_data: &Config
 				context.module.add_variable(d.name.clone(), d.var_type.clone());
 				context.register_type(&d.var_type);
 			},
+			DeclarationType::AttributeClass(d, attributes) => {
+				attribute_class_indexes.push(curr_index);
+			}
 			_ => {
 			}
 		}
+		curr_index += 1;
 	}
-	module_contexts.insert(if file.ends_with(".tasty") {
-		(&file[0..file.len() - 6]).to_string()
-	} else {
-		file.to_string()
-	}, context);
+	module_contexts.insert((&file[source_location.len() + 1..file.len() - 6]).to_string(), context);
+
+	let mut attribute_classes_processed = 0;
+	for attribute_index in attribute_class_indexes {
+		let mut attribute_class_declare = module_declaration.declarations.remove(attribute_index - attribute_classes_processed);
+		if let DeclarationType::AttributeClass(d, _) = attribute_class_declare {
+			global_context.add_attribute_class(d);
+		}
+		attribute_classes_processed += 1;
+	}
+
 	return module_declaration;
 }
 
@@ -268,42 +282,24 @@ fn parse_source_file(file: &str, output_dirs: &Vec<String>, config_data: &Config
 /// # Return
 ///
 /// If successful, `true` is returned; otherwise `false`.
-fn transpile_source_file(file: &str, output_dirs: &Vec<String>, config_data: &ConfigData, module_contexts: &mut BTreeMap<String,Context>, module_declaration: &mut ModuleDeclaration, parser: &mut Parser) -> bool {
-	let access_file_path = if file.ends_with(".tasty") {
-		&file[0..file.len() - 6]
-	} else {
-		file
-	};
+fn transpile_source_file(file: &str, source_location: &str, output_dirs: &Vec<String>, config_data: &ConfigData, module_contexts: &mut BTreeMap<String,Context>, module_declaration: &mut ModuleDeclaration, parser: &mut Parser, global_context: &mut GlobalContext) -> bool {
+	let access_file_path = &file[source_location.len() + 1..file.len() - 6];
 	{
 		let mut context = module_contexts.get_mut(access_file_path).unwrap();
 		let mut typing = &mut context.typing;
 		typing.add(&context.module);
 	}
 
-	/*
-	let mut output_lines = Vec::new();
-
-	let mut variable_declarations = Vec::<String>::new();
-	let mut function_declarations = Vec::<String>::new();
-	let mut variable_declarations_isolated = Vec::<String>::new();
-	let mut function_declarations_isolated = Vec::<String>::new();
-	
-	let mut handling_module_attributes = true;
-	let mut header_include_line: Option<usize> = None;
-	let mut end_line = 0;
-
-	let mut header_system_includes = Vec::new();
-	let mut header_local_includes = Vec::new();
-	*/
-
 	let mut transpile_context = Transpiler::new(file, access_file_path, config_data, module_contexts, parser);
-	transpile_context.parse_declarations(&mut module_declaration.declarations, None);
+	transpile_context.parse_declarations(&mut module_declaration.declarations, global_context, None);
+
+	if transpile_context.output_lines.is_empty() { return true; }
 
 	if transpile_context.header_include_line.is_none() {
 		if !transpile_context.output_lines[0].is_empty() {
 			transpile_context.output_lines.insert(0, "".to_string());
 		}
-		if !transpile_context.output_lines[1].is_empty() {
+		if transpile_context.output_lines.len() > 1 && !transpile_context.output_lines[1].is_empty() {
 			transpile_context.output_lines.insert(0, "".to_string());
 		}
 		transpile_context.header_include_line = Some(0);
@@ -335,14 +331,19 @@ fn transpile_source_file(file: &str, output_dirs: &Vec<String>, config_data: &Co
 		transpile_context.declarations.export_to_lines(&mut header_lines, 0, true);
 		for cls in transpile_context.class_declarations {
 			header_lines.push(cls.0);
-			if !cls.1.is_empty() {
+			if !cls.1.is_empty() || !cls.2.is_empty() {
 				header_lines.push("public:".to_string());
-				cls.1.export_to_lines(&mut header_lines, 1, false);
-				header_lines.pop();
+				if !cls.1.is_empty() {
+					cls.1.export_to_lines(&mut header_lines, 1, false);
+				}
+				if !cls.2.is_empty() {
+					cls.2.export_to_lines(&mut header_lines, 1, false);
+					header_lines.pop();
+				}
 			}
-			if !cls.2.is_empty() {
+			if !cls.3.is_empty() {
 				header_lines.push("private:".to_string());
-				cls.2.export_to_lines(&mut header_lines, 1, false);
+				cls.3.export_to_lines(&mut header_lines, 1, false);
 				header_lines.pop();
 			}
 			header_lines.push("};".to_string());
@@ -360,8 +361,8 @@ fn transpile_source_file(file: &str, output_dirs: &Vec<String>, config_data: &Co
 			let header_path = path_base.clone() + "hpp";
 			if transpile_context.header_include_line.is_some() {
 				insert_output_line(&mut transpile_context.output_lines, format!("#include \"{}\"", if header_path.starts_with("./") {
-					&header_path[2..]
-				} else { &header_path }).as_str(), transpile_context.header_include_line.unwrap(), true);
+					&header_path[source_location.len() + 3..]
+				} else { &header_path[source_location.len() + 1..] }).as_str(), transpile_context.header_include_line.unwrap(), true);
 			}
 			std::fs::write(path_base + "cpp", transpile_context.output_lines.join("\n"));
 			std::fs::write(header_path, header_lines.join("\n"));
@@ -373,21 +374,17 @@ fn transpile_source_file(file: &str, output_dirs: &Vec<String>, config_data: &Co
 }
 
 fn get_configure_declaration_with_attributes(isolated: &mut bool, declaration: &str, attributes: &Option<Vec<AttributeDeclaration>>, content: &str, semicolon: bool) -> String {
-	let mut prepend = "".to_string();
-	let mut append = "".to_string();
+	let mut prepend = Vec::new();
+	let mut append = Vec::new();
 	if attributes.is_some() {
 		for a in attributes.as_ref().unwrap() {
 			if a.name == "DeclarePrepend" {
-				if a.parameters.is_some() {
-					for param in a.parameters.as_ref().unwrap() {
-						prepend += &content[param.0..param.1];
-					}
+				for i in 0..a.params_length() {
+					prepend.push(a.get_param(i, content));
 				}
 			} else if a.name == "DeclareAppend" {
-				if a.parameters.is_some() {
-					for param in a.parameters.as_ref().unwrap() {
-						append += &content[param.0..param.1];
-					}
+				for i in 0..a.params_length() {
+					append.push(a.get_param(i, content));
 				}
 			} else if a.name == "Isolated" {
 				*isolated = true;
@@ -395,10 +392,10 @@ fn get_configure_declaration_with_attributes(isolated: &mut bool, declaration: &
 		}
 	}
 	let mut result = format!("{}{}{}{}", 
-		if prepend.is_empty() { "".to_string() } else { format!("{}\n", prepend) }, 
+		if prepend.is_empty() { "".to_string() } else { format!("{}\n", prepend.join("\n")) }, 
 		declaration,
 		if semicolon { ";" } else { "" },
-		if append.is_empty() { "".to_string() } else { format!("\n{}", append) }
+		if append.is_empty() { "".to_string() } else { format!("\n{}", append.join("\n")) }
 	);
 	return result;
 }
@@ -450,142 +447,19 @@ fn main() {
 	let mut file_declarations = BTreeMap::new();
 	let mut file_parsers = BTreeMap::new();
 
+	let mut global_context = GlobalContext::new();
+
 	for files in &source_files {
 		for f in files.1 {
 			let mut parser: Parser = Parser::new("".to_string());
-			file_declarations.insert(f.clone(), parse_source_file(&f, &output_dirs, &data, &mut file_contexts, &mut parser));
+			file_declarations.insert(f.clone(), parse_source_file(&f, &files.0, &output_dirs, &data, &mut file_contexts, &mut parser, &mut global_context));
 			file_parsers.insert(f, parser);
 		}
 	}
 
 	for files in &source_files {
 		for f in files.1 {
-			transpile_source_file(&f, &output_dirs, &data, &mut file_contexts, file_declarations.get_mut(f).unwrap(), file_parsers.get_mut(f).unwrap());
+			transpile_source_file(&f, &files.0, &output_dirs, &data, &mut file_contexts, file_declarations.get_mut(f).unwrap(), file_parsers.get_mut(f).unwrap(), &mut global_context);
 		}
 	}
-
-	//let mut ender = ExpressionEnder { until_chars: Vec::new(), end_index: 0, end_char: ' ' };
-	//let test = Expression::new("++!&&a(!~dfjks.jfdk[32.help],12,ew)()+sd", &operators_data, &mut ender);
-
-	/*
-	let temp_expr_content = "(++&&&a++++ - a);";
-	let mut parser = Parser::new(temp_expr_content);
-	let bla = ExpressionParser::new(&mut parser, Position::new("test.tasty".to_string(), Some(1), 0, None), &data, None);
-	println!("{}", match bla.end_data.reason {
-		ExpressionEndReason::EndOfExpression => "enx od epxression",
-		_ => "other"
-	});
-	*/
-
-	//"++!&&a(!~dfjks.jfdk[32.help],12,ew)()+sd"
-	//" + ++ !& ^^^& (!~dfjks.  jfdk[32.help]  ,  12, ew) () + sd"
-	//println!("{:?}", test.components);
-
-	return;
-	//content: &str, index: &mut usize, position: Position, line_offset: &mut usize
-
-	//let files = list_all_files(".".to_string(), "tasty".to_string());
-
-	//let c = "u8\"fdsfdsfd 3 \\\\ \\x1a \\n \\r\"";
-
-	// VARIABLE INIT
-	let c = "const static copy a: int = 32;";
-	let mut parser = Parser::new(c.to_string());
-	let result = crate::declaration_parser::variable_declaration::VariableDeclaration::new(&mut parser);
-	if result.is_error() {
-		result.print_error("tast2.tasty".to_string(), c);
-		return;
-	}
-	let rr = result.as_ref().unwrap();
-	println!("---- Initialize ----");
-	for a in &rr.var_type.var_properties.unwrap_or(Vec::new()) { println!("{}", a.get_name()); }
-	println!("{}", rr.var_type.var_style.get_name());
-	println!("{}", rr.var_type.var_type.to_cpp());
-	println!("{}", rr.name);
-	let val = rr.value.unwrap();
-	println!("RESULT: {}", &c[val.0..val.1]);
-
-	// ATTRIBUTE
-	let attribute_content = " fdjs fdsjkldfs @Test(fds fdksleqw 21l dsfd, 999)";
-	let mut parser2 = Parser::new(attribute_content.to_string());
-	parser2.index = 16;
-	let result2 = AttributeDeclaration::new(&mut parser2);
-	if result2.is_error() {
-		result2.print_error("atttribute.tasty".to_string(), attribute_content);
-		return;
-	}
-	let rr2 = result2.as_ref().unwrap();
-	println!("---- Attribute ----");
-	println!("{}", rr2.name);
-	println!("{:?}", rr2.parameters);
-
-	// INCLUDE
-	let include_content = "include local hjkj/sdfdsf\\qrewre.h;";
-	let mut parser3 = Parser::new(include_content.to_string());
-	parser3.index = 0;
-	let result3 = IncludeDeclaration::new(&mut parser3);
-	if result3.is_error() {
-		result3.print_error("include.tasty".to_string(), include_content);
-		return;
-	}
-	let rr3 = result3.as_ref().unwrap();
-	println!("---- Include ----");
-	println!("{}", rr3.path);
-	println!("{}", (rr3.inc_type as i32));
-
-	// IMPORT
-	let import_content = "import test/bla;";
-	let mut parser4 = Parser::new(import_content.to_string());
-	parser4.index = 0;
-	let result4 = ImportDeclaration::new(&mut parser4);
-	if result4.is_error() {
-		result4.print_error("include.tasty".to_string(), import_content);
-		return;
-	}
-	let rr4 = result4.as_ref().unwrap();
-	println!("---- Import ----");
-	println!("{}", rr4.path);
-
-	// FUNCTION
-	let func_content = "static inline fn test(copy a: vector<unsigned char>, ptr b: Bla) -> unsigned int { return 0; }";
-	let mut parser5 = Parser::new(func_content.to_string());
-	parser5.index = 0;
-	let result5 = FunctionDeclaration::new(&mut parser5, FunctionDeclarationType::ModuleLevel);
-	if result5.is_error() {
-		result5.print_error("include.tasty".to_string(), func_content);
-		return;
-	}
-	let rr5 = result5.as_ref().unwrap();
-	println!("---- Function ----");
-	println!("{}", rr5.name);
-	println!(",");
-	println!("{}", rr5.return_type.var_style.get_name());
-	println!("{}", rr5.return_type.var_type.to_cpp());
-	println!(",");
-	for prop in &rr5.props {
-		println!("{}", prop.get_name());
-	}
-	for param in &rr5.parameters {
-		println!(",");
-		println!("{}", param.0.var_style.get_name());
-		println!("{}", param.0.var_type.to_cpp());
-		println!("{}", param.1);
-	}
-	if rr5.start_index.is_some() { println!("RESULT: {}", &func_content[rr5.start_index.unwrap()..rr5.end_index.unwrap()]); }
-/*
-	let mut index: usize = 0;
-	let pos = Position::new("test2.tasty".to_string(), Some(1), 0, None);
-	let mut line_offset: usize = 0;
-	let the_code = "copy test: QVector   <  QString    , int   g > = 32 + 5;";
-	let result = crate::declaration_parser::variable_declaration::VariableDeclaration::new(the_code, &mut index, pos, &mut line_offset);
-
-	if result.is_error() {
-		result.print_error("tast2.tasty".to_string());
-		return;
-	}
-	let rr = result.as_ref().unwrap();
-	println!("{}", rr.name);
-	println!("{}", rr.var_type.var_type.to_cpp());
-	println!("{}", rr.var_type.var_style.get_name());
-	println!("RESULT: {}", &the_code[rr.start_index..rr.end_index]);*/
 }

@@ -1,6 +1,4 @@
-
-include system iostream;
-
-fn altfunc() {
-	std.cout << "test" << std.endl;
+attribute QObject {
+	@DeclareAppend(	Q_OBJECT)
+	@Isolated
 }
