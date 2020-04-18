@@ -1,1 +1,1 @@
-cargo run -- --src:examples/hello_world
+cargo run -- --src:examples/dev_testing

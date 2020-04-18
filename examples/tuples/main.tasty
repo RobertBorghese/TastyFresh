@@ -1,0 +1,12 @@
+
+include system iostream;
+
+fn printMyTuple(ref tuple: (int, text)) {
+	std.cout << "Number is: " << tuple.0 << std.endl;
+	std.cout << "String is: " << tuple.1 << std.endl;
+}
+
+fn main() -> int {
+	let myTuple = (12, "Blabla");
+	printMyTuple(myTuple);
+}

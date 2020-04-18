@@ -1,35 +1,5 @@
 include system iostream;
-contain system vector;
 
-class Bla {
-	let vec = new std.vector@int(32);
-}
-
-fn main() {
-	let vec = new std.vector@int(32);
-	vec.push_back(32);
-
-	for i in vec {
-		
-	}
-
-	inc i from 0 to vec.size() by 2 {
-
-	}
-
-	dec j from 10 to 0 {
-
-	}
-
-	incto i from 0 to vec.size() by 2 {
-
-	}
-
-	decto j from 10 to 0 {
-
-	}
-
-	if test fds = 32;
-	else if fds fds = 32;
-	else dfs = 43;
+fn main() -> int {
+	std.cout << "Hello, world?" << std.endl;
 }

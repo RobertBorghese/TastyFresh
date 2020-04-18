@@ -1,0 +1,23 @@
+
+include system iostream;
+
+fn main() -> int {
+
+	let myVar = 0;
+
+	if myVar == 10 myVar += 10;
+	else if myVar == 0 myVar++;
+	else myVar -= 10;
+
+	inc i from 0 to 100 myVar += i;
+
+	dec i from 99 to 0 myVar -= i;
+
+	while myVar < 110 myVar += 2;
+
+	do myVar -= 5; while myVar > 80;
+
+	// Can you guess what the final value is?
+	std.cout << myVar << std.endl;
+
+}

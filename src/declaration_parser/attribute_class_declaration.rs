@@ -160,7 +160,7 @@ impl AttributeClassDeclaration {
 				let mut changed_arg = false;
 				for j in 0..cls_args.len() {
 					if j >= new_args.len() { break; }
-					let should_trim = cls_args[j].1;
+					let should_trim = !cls_args[j].1;
 					if p == cls_args[j].0 {
 						for arg in &new_args[j] {
 							attr_params.push(Right(if should_trim { arg.trim().to_string() } else { arg.to_string() }));
@@ -174,15 +174,12 @@ impl AttributeClassDeclaration {
 								search_str_result.push(arg.to_string());
 							}
 							let final_content = search_str_result.join(",");
-							let final_param = p.replace(search_str.as_str(), if should_trim { final_content.trim() } else { final_content.as_str() });
-							attr_params.push(Right(final_param));
+							p = p.replace(search_str.as_str(), if should_trim { final_content.trim() } else { final_content.as_str() });
 							changed_arg = true;
 						}
 					}
 				}
-				if !changed_arg {
-					attr_params.push(Right(p.to_string()));
-				}
+				attr_params.push(Right(p.to_string()));
 			}
 			a.parameters = Some(attr_params);
 			result.push(a);

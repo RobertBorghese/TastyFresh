@@ -1,0 +1,33 @@
+
+// Include some data structures.
+include system vector;
+include system map;
+
+// Do things with template parameters.
+fn main() -> int {
+
+	let numberVec = new std.vector@int();
+
+	inc i from 0 to 10 numberVec.push_back(i);
+
+	std.cout << "[[Vector info]]" << std.endl;
+	std.cout << "SIZE:     " << numberVec.size()     << std.endl;
+	std.cout << "CAPACITY: " << numberVec.size()     << std.endl;
+	std.cout << "MAX SIZE: " << numberVec.max_size() << std.endl;
+	std.cout << "FIRST:    " << numberVec[0]         << std.endl;
+
+	// ---
+
+	let textToIntMap = new std.map@(text, int)();
+
+	textToIntMap["one"] = 1;
+	textToIntMap["two"] = 2;
+	textToIntMap["three"] = 3;
+
+	convertStringToNumber("two", textToIntMap);
+}
+
+// Function that takes argument with specific template parameters.
+fn convertStringToNumber(str: text, ref map: std.map@(text, int)) {
+	std.cout << "The number \"" << str << "\" is " << map[str] << "." << std.cout;
+}

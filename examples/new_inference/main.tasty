@@ -1,0 +1,29 @@
+
+// Include "list" as an example class being constructed.
+include system list;
+
+// The way a class is constructed with "new" depends on the context.
+
+// CLASS VARIABLE
+class MyClass {
+	let classList1 = new std.list();
+	let classList2 = new std.list(2, 4);
+}
+
+// VARIABLES IN FUNCTIONS
+fn main() -> int {
+
+	// "copy"
+	let classList1 = new std.list();
+	let classList2 = new std.list(2, 4);
+
+	// "ptr"
+	ptr classListPtr = new std.list(2, 4);
+	delete classListPtr;
+
+	// "autoptr"
+	autoptr classListAuto = new std.list(2, 4);
+
+	// "uniqueptr"
+	uniqueptr classListUnique = new std.list(2, 4);
+}

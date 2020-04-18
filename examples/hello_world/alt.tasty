@@ -1,4 +1,0 @@
-attribute QObject {
-	@DeclareAppend(	Q_OBJECT)
-	@Isolated
-}

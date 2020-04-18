@@ -1,0 +1,30 @@
+
+include system QLineEdit;
+
+// Create attributes by combining existing attributes.
+attribute QObject {
+	@Isolated
+	@DeclareAppend(	Q_OBJECT)
+}
+
+// Use arguments to add more configuration to the attribute.
+attribute QProperty(propertyType, propertyName) {
+	@Isolated
+	@DeclareAppend(	Q_PROPERTY([propertyType] [propertyName] READ get_[propertyName] WRITE set_[propertyName]))
+}
+
+// Apply attributes to a class.
+@QObject
+@QProperty(int, count)
+class MyLineEdit extends QLineEdit {
+	let _count = 0;
+
+	fn get_count() -> int {
+		return _count;
+	}
+
+	fn set_count(v: int) {
+		_count = v;
+		repaint();
+	}
+}

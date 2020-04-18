@@ -1,24 +1,37 @@
+
+// #include <iostream>
 include system iostream;
 
-assume std is a namespace;
-
+// Class that counts the number of times "increment" is called.
 class Counter {
+	let count = 0;
 
-	copy count = 0;
+	constructor() {
+		std.cout << "Created Counter!" << std.endl;
+	}
+
+	destructor {
+		std.cout << "Destroyed Counter!" << std.endl;
+	}
+
+	fn getCount() -> int {
+		return count;
+	}
 
 	fn increment() {
 		count++;
 	}
 }
 
+// Create Counter and increment ten times.
 fn main() -> int {
-	copy c = new Counter();
+	let c = new Counter();
 
-	for i in 0..10 {
+	std.cout << c.getCount() << std.endl;
+
+	inc i from 0 to 10 {
 		c.increment();
 	}
 
-	std.cout << c.count << std.endl;
-
-	return 0;
+	std.cout << c.getCount() << std.endl;
 }
