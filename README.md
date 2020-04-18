@@ -3,9 +3,8 @@
 </p>
 <p align="center">
 	<a href="https://github.com/RobertBorghese/TastyFresh/actions?query=workflow%3ARust"><img src="https://github.com/RobertBorghese/TastyFresh/workflows/Rust/badge.svg" /></a>
-	<a href="https://discord.gg/2RTssnA"><img src="https://img.shields.io/discord/701041775267020820.svg?logo=discord" alt="Discord" />
 	<a href="https://github.com/RobertBorghese/TastyFresh/blob/master/LICENSE"><img src="https://img.shields.io/github/license/RobertBorghese/TastyFresh" alt="License" /></a>
-</a>
+	<a href="https://discord.gg/2RTssnA"><img src="https://img.shields.io/discord/701041775267020820.svg?logo=discord" alt="Discord" /></a>
 </p>
 
 ---
