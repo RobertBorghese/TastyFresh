@@ -30,7 +30,7 @@ pub enum ExpressionPiece {
 	InitializerList(Rc<Vec<Rc<Expression>>>, Position),
 	FunctionParameters(Rc<Vec<Rc<Expression>>>, Position),
 	ArrayAccessParameters(Rc<Vec<Rc<Expression>>>, Position),
-	Type(Type, Position)
+	Type(VariableType, Position)
 }
 
 impl ExpressionPiece {
@@ -105,7 +105,7 @@ impl ExpressionPiece {
 				if *index == 9 {
 					if let ExpressionPiece::Type(tf_type, _) = &parser.parts[1] {
 						if let ExpressionPiece::FunctionParameters(exprs, _) = &parser.parts[2] {
-							return Rc::new(Expression::ConstructCall(tf_type.clone(), Rc::clone(exprs), VariableType::copy(tf_type.clone()), pos.clone()));
+							return Rc::new(Expression::ConstructCall(tf_type.var_type.clone(), Rc::clone(exprs), tf_type.clone(), pos.clone()));
 						}
 					}
 				}
@@ -242,7 +242,7 @@ impl ExpressionPiece {
 				if operator_id == 8 {
 					VariableType::copy(Type::Number(NumberType::UInt))
 				} else if tf_type.is_some() {
-					VariableType::copy((*tf_type.unwrap()).clone())
+					(*tf_type.unwrap()).clone()
 				} else {
 					VariableType::inferred()
 				}, position)))), None);
@@ -266,8 +266,10 @@ impl ExpressionPiece {
 
 	fn parse_infix(parser: &ExpressionParser, part_index: &usize, operator_id: usize, context: &Option<&mut Context>, position: Position) -> (Option<ExpressionPiece>,Option<Position>) {
 		let left_result = Self::get_expression_from_piece(&parser.parts[part_index - 1], context);
+		let right_result = Self::get_expression_from_piece(&parser.parts[*part_index], context);
 		let mut final_type = VariableType::inferred();
-		if left_result.is_some() && operator_id <= 4 {
+
+		if left_result.is_some() && operator_id <= 4 && operator_id != 1 {
 			let left_type = left_result.as_ref().unwrap().get_type();
 			let access_name = Self::get_access_from_piece(&left_type, &parser.parts[*part_index], context);
 			if access_name.is_some() {
@@ -276,8 +278,21 @@ impl ExpressionPiece {
 					final_type = temp_type.unwrap();
 				}
 			}
+		} else if left_result.is_some() && right_result.is_some() && operator_id >= 6 && operator_id <= 9 {
+			let left_type = left_result.as_ref().unwrap().get_type();
+			let right_type = right_result.as_ref().unwrap().get_type();
+			if right_type.is_inferred_style() {
+				final_type = VariableType {
+					var_type: right_type.var_type,
+					var_style: left_type.var_style,
+					var_properties: right_type.var_properties,
+					var_optional: right_type.var_optional
+				};
+			} else {
+				final_type = right_type.clone();
+			}
 		}
-		let right_result = Self::get_expression_from_piece(&parser.parts[*part_index], context);
+		
 		if left_result.is_some() && right_result.is_some() {
 			return (Some(ExpressionPiece::Expression(Rc::new(Expression::Infix(left_result.unwrap(), right_result.unwrap(), operator_id, final_type, position)))), None);
 		}
@@ -349,13 +364,13 @@ impl ExpressionPiece {
 				Some(Rc::new(Expression::InitializerList(Rc::clone(expressions), piece.get_encapsulated_type().unwrap_or(VariableType::inferred()), position.clone())))
 			},
 			ExpressionPiece::Type(tf_type, position) => {
-				Some(Rc::new(Expression::Value(tf_type.to_cpp(), VariableType::copy((*tf_type).clone()), position.clone())))
+				Some(Rc::new(Expression::Value(tf_type.to_cpp(), (*tf_type).clone(), position.clone())))
 			},
 			_ => None
 		};
 	}
 
-	fn get_type_from_piece(piece: &ExpressionPiece, context: &Option<&mut Context>) -> Option<Rc<Type>> {
+	fn get_type_from_piece(piece: &ExpressionPiece, context: &Option<&mut Context>) -> Option<Rc<VariableType>> {
 		return match piece {
 			ExpressionPiece::Type(tf_type, position) => {
 				Some(Rc::new((*tf_type).clone()))

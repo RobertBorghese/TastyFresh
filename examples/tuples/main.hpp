@@ -4,7 +4,7 @@
 #include <tuple>
 #include <iostream>
 
-void printMyTuple(std::tuple<int, const char*>& tuple);
+void printMyTuple(const std::tuple<int, const char*>& tuple);
 int main();
 
 #endif

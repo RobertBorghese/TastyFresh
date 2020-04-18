@@ -1,7 +1,7 @@
 
 include system iostream;
 
-fn printMyTuple(ref tuple: (int, text)) {
+fn printMyTuple(borrow tuple: (int, text)) {
 	std.cout << "Number is: " << tuple.0 << std.endl;
 	std.cout << "String is: " << tuple.1 << std.endl;
 }

@@ -145,7 +145,7 @@ impl Expression {
 			Expression::Suffix(expr, id, _, _) => {
 				format!("{}{}", expr.to_string(operators, context), operators["suffix"][*id].name.as_ref().unwrap_or(&"".to_string()))
 			},
-			Expression::Infix(expr_left, expr_right, id, _, _) => {
+			Expression::Infix(expr_left, expr_right, id, tf_type, _) => {
 				if *id == 1 {
 					let insides = expr_right.to_string(operators, context);
 					format!("{}<{}>", expr_left.to_string(operators, context), 
@@ -157,19 +157,30 @@ impl Expression {
 					)
 				} else if *id == 2 {
 					let expr_right_str = expr_right.to_string(operators, context);
-					let op = expr_left.get_type().access_operator(&expr_right_str);
-					format!("{}{}{}", expr_left.to_string(operators, context), op, expr_right_str)
-				} else if *id == 6 {
-					let right = expr_right.to_string(operators, context);
+					if expr_right.get_type().is_int() {
+						format!("std::get<{}>({})", expr_right_str, expr_left.to_string(operators, context))
+					} else {
+						let op = expr_left.get_type().access_operator(&expr_right_str);
+						format!("{}{}{}", expr_left.to_string(operators, context), op, expr_right_str)
+					}
+				} else if *id >= 6 && *id <= 9 {
+					let mut right = tf_type.to_cpp(); // expr_right.to_string(operators, context);
+					right = match *id {
+						6 => format!("({})", right),
+						7 => format!("static_cast<{}>", right),
+						8 => format!("reinterpret_cast<{}>", right),
+						9 => format!("dynamic_cast<{}>", right),
+						_ => "".to_string()
+					};
 					let left = expr_left.to_string(operators, context);
 					if let Expression::Expressions(..) = **expr_left {
-						format!("({}){}", right, left)
+						format!("{}{}", right, left)
 					} else {
-						format!("({})({})", right, left)
+						format!("{}({})", right, left)
 					}
-				} else if *id == 26 || *id == 27 {
+				} else if *id == 29 || *id == 30 {
 					let right_str = expr_right.to_string(operators, context);
-					let right_str_final = if *id == 26 {
+					let right_str_final = if *id == 29 {
 						expr_right.get_type().convert_between_styles(&expr_left.get_type(), &right_str).unwrap_or(right_str.to_string())
 					} else {
 						right_str

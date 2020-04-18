@@ -1,8 +1,8 @@
 #include "main.hpp"
 
-void printMyTuple(std::tuple<int, const char*>& tuple) {
-	std::cout << "Number is: " << tuple.0 << std::endl;
-	std::cout << "String is: " << tuple.1 << std::endl;
+void printMyTuple(const std::tuple<int, const char*>& tuple) {
+	std::cout << "Number is: " << std::get<0>(tuple) << std::endl;
+	std::cout << "String is: " << std::get<1>(tuple) << std::endl;
 }
 
 int main() {

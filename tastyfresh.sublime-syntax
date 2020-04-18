@@ -135,10 +135,10 @@ contexts:
         1: storage.type.import.tasty-fresh
         2: variable.parameter.tasty-fresh
 
-    - match: '\b(unsigned|bool|char|short|int|long|float|double|text)\b'
+    - match: '\b(void|unsigned|bool|char|short|int|long|float|double|text)\b'
       scope: storage.type.numeric.tasty-fresh
 
-    - match: '\b(-)?[0-9\.ful]+\b'
+    - match: '\b(?:0[xb])?(-)?[0-9\.]+[ful]*\b'
       scope: constant.numeric.tasty-fresh
 
     - match: '\b(true|false)\b'

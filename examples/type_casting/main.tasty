@@ -1,0 +1,38 @@
+
+class Base {
+	constructor() { }
+}
+
+class Child extends Base {
+	constructor() { }
+}
+
+fn main() -> int {
+	let myInt = 10;
+	let myFloat = 20f;
+	let myDouble = 30.0;
+	ptr myChild = new Child();
+
+
+	let castedToInt = myFloat#int;
+	let castedToInt2 = myDouble#int;
+	let castedToInt3 = 12f#int;
+
+
+	let castedToDouble = myInt#double;
+	let castedToDouble2 = myFloat#double;
+	let castedToDouble3 = 100#double;
+
+
+	let castedToBase = myChild#Base;
+	let castedToPointer = 0x000123#(ptr void);
+	let castedToValue = myChild#(copy Base);
+
+
+	let staticCastToBase = myChild##Base;
+	let dynamicCastToBase = myChild#~Base;
+	let reinterpretCastToBase = myChild#*Base;
+
+
+	delete myChild;
+}

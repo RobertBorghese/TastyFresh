@@ -169,10 +169,28 @@ impl<'a> ExpressionParser<'a> {
 				if self.expect_type {
 					self.expect_type = false;
 					let start_index = parser.index;
+					let mut include_style = false;
+					if parser.get_curr() == '(' {
+						include_style = true;
+						parser.increment();
+					}
+
 					let mut unexpected_char = false;
 					let mut specifier_error: Option<&'static str> = None;
-					let tf_type = parser.parse_type(&mut unexpected_char, &mut specifier_error);
+					let tf_type = if include_style {
+						VariableType::from_type_style(parser.parse_type_and_style(&mut unexpected_char, &mut specifier_error))
+					} else {
+						VariableType::of_inferred_style(parser.parse_type(&mut unexpected_char, &mut specifier_error))
+					};
 					self.add_type(tf_type, start_index, parser.index);
+
+					if include_style {
+						parser.parse_whitespace();
+						if parser.get_curr() == ')' {
+							parser.increment();
+						}
+					}
+
 					*state = ParseState::Suffix;
 				} else if !self.parse_value(parser, context) {
 					self.set_end_reason(ExpressionEndReason::NoValueError);
@@ -243,7 +261,7 @@ impl<'a> ExpressionParser<'a> {
 
 	fn add_infix_op(&mut self, op: usize, start: usize, end: usize) {
 		//println!("Added infix: {}", op);
-		if op == 6 {
+		if op >= 6 && op <= 9 {
 			self.expect_type = true;
 		}
 		self.parts.push(ExpressionPiece::Infix(op, self.generate_pos(start, Some(end))));
@@ -270,7 +288,7 @@ impl<'a> ExpressionParser<'a> {
 		self.parts.push(ExpressionPiece::ArrayAccessParameters(Rc::new(expressions), self.generate_pos(start, Some(end))));
 	}
 
-	fn add_type(&mut self, tf_type: Type, start: usize, end: usize) {
+	fn add_type(&mut self, tf_type: VariableType, start: usize, end: usize) {
 		self.parts.push(ExpressionPiece::Type(tf_type, self.generate_pos(start, Some(end))));
 	}
 

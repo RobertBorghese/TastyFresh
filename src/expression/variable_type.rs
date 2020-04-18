@@ -61,8 +61,24 @@ impl VariableType {
 		};
 	}
 
+	pub fn of_inferred_style(tf_type: Type) -> VariableType {
+		return VariableType {
+			var_type: tf_type,
+			var_style: VarStyle::Infer,
+			var_properties: None,
+			var_optional: false
+		};
+	}
+
 	pub fn is_inferred(&self) -> bool {
 		if let Type::Inferred = self.var_type {
+			return true;
+		}
+		return false;
+	}
+
+	pub fn is_inferred_style(&self) -> bool {
+		if let VarStyle::Infer = self.var_style {
 			return true;
 		}
 		return false;
@@ -334,6 +350,15 @@ impl VariableType {
 			},
 			_ => None
 		}
+	}
+
+	pub fn is_int(&self) -> bool {
+		if let Type::Number(num_type) = &self.var_type {
+			if let NumberType::Int = num_type {
+				return true;
+			}
+		}
+		return false;
 	}
 }
 
