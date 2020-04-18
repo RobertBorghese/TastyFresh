@@ -3,7 +3,7 @@
 </p>
 <p align="center">
 	<a><img src="https://github.com/RobertBorghese/TastyFresh/workflows/Rust/badge.svg" /></a>
-	<a href="https://discord.gg/2RTssnA"><img src="https://img.shields.io/discord/701041775724199947.svg?logo=discord" alt="Discord"></a>
+	<a href="https://discord.gg/2RTssnA"><img src="https://img.shields.io/discord/701041775267020820.svg?logo=discord" alt="Discord"></a>
 </p>
 
 ---
