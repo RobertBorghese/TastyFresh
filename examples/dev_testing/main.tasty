@@ -1,0 +1,16 @@
+
+attribute Test {
+	@Isolated
+	@DeclareAppend(fdkslfdkjsfds)
+}
+
+@Test
+fn main() -> int {
+	let a = 32;
+
+	let test = 0 < a <= -32;
+
+	if 0 < a <= -32 && test {
+		print("worked");
+	}
+}

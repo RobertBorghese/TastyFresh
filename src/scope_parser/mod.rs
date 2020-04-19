@@ -19,14 +19,14 @@ use crate::declaration_parser::variable_declaration::{ VariableDeclaration, Vari
 
 use crate::expression::Expression;
 use crate::expression::expression_parser::ExpressionEndReason;
-use crate::expression::variable_type::{ VariableType, Type };
+use crate::expression::variable_type::VariableType;
 
 use crate::scope_parser::return_parser::ReturnParser;
 use crate::scope_parser::if_parser::{ IfParser, IfType };
 use crate::scope_parser::while_parser::WhileParser;
 use crate::scope_parser::loop_parser::LoopParser;
 use crate::scope_parser::dowhile_parser::DoWhileParser;
-use crate::scope_parser::for_parser::{ ForParser, ForType };
+use crate::scope_parser::for_parser::ForParser;
 
 use crate::config_management::ConfigData;
 use crate::config_management::operator_data::OperatorDataStructure;
@@ -66,7 +66,7 @@ impl ScopeExpression {
 			}
 			parser.parse_whitespace();
 			if ReturnParser::is_declaration(parser) {
-				let mut result = ReturnParser::new(parser, file.to_string(), config_data, context, expected_return_type.clone());
+				let result = ReturnParser::new(parser, file.to_string(), config_data, context, expected_return_type.clone());
 				if result.is_error() {
 					result.print_error(file.to_string(), &parser.content);
 					break;
@@ -79,7 +79,7 @@ impl ScopeExpression {
 					}
 				}
 			} else if IfParser::is_declaration(parser) {
-				let mut result = IfParser::new(parser, file.to_string(), config_data, context);
+				let result = IfParser::new(parser, file.to_string(), config_data, context);
 				if result.is_error() {
 					result.print_error(file.to_string(), &parser.content);
 					break;
@@ -89,7 +89,7 @@ impl ScopeExpression {
 					scope_exprs.push(ScopeExpression::If(if_declare.if_type, if_declare.expression, if_declare.scope, if_declare.line, if_declare.end_line));
 				}
 			} else if WhileParser::is_declaration(parser) {
-				let mut result = WhileParser::new(parser, file.to_string(), config_data, context);
+				let result = WhileParser::new(parser, file.to_string(), config_data, context);
 				if result.is_error() {
 					result.print_error(file.to_string(), &parser.content);
 					break;
@@ -99,7 +99,7 @@ impl ScopeExpression {
 					scope_exprs.push(ScopeExpression::While(while_declare.expression, while_declare.scope, while_declare.line, while_declare.end_line));
 				}
 			} else if LoopParser::is_declaration(parser) {
-				let mut result = LoopParser::new(parser, file.to_string(), config_data, context);
+				let result = LoopParser::new(parser, file.to_string(), config_data, context);
 				if result.is_error() {
 					result.print_error(file.to_string(), &parser.content);
 					break;
@@ -109,7 +109,7 @@ impl ScopeExpression {
 					scope_exprs.push(ScopeExpression::Loop(loop_declare.scope, loop_declare.line, loop_declare.end_line));
 				}
 			} else if DoWhileParser::is_declaration(parser) {
-				let mut result = DoWhileParser::new(parser, file.to_string(), config_data, context);
+				let result = DoWhileParser::new(parser, file.to_string(), config_data, context);
 				if result.is_error() {
 					result.print_error(file.to_string(), &parser.content);
 					break;
@@ -119,7 +119,7 @@ impl ScopeExpression {
 					scope_exprs.push(ScopeExpression::DoWhile(do_while_declare.expression, do_while_declare.scope, do_while_declare.line, do_while_declare.end_line, do_while_declare.while_offset));
 				}
 			} else if ForParser::is_declaration(parser) {
-				let mut result = ForParser::new(parser, file.to_string(), config_data, context);
+				let result = ForParser::new(parser, file.to_string(), config_data, context);
 				if result.is_error() {
 					result.print_error(file.to_string(), &parser.content);
 					break;
@@ -161,7 +161,7 @@ impl ScopeExpression {
 					}
 				}
 			} else if VariableDeclaration::is_declaration(parser) {
-				let mut result = VariableDeclaration::new(parser);
+				let result = VariableDeclaration::new(parser);
 				if result.is_error() {
 					result.print_error(file.to_string(), &parser.content);
 					break;
@@ -321,7 +321,7 @@ impl ScopeExpression {
 					if context.align_lines {
 						let tabs = String::from_utf8(vec![b'\t'; tab_offset]).unwrap_or("".to_string());
 						let mut result = "".to_string();
-						for i in 0..*while_offset {
+						for _ in 0..*while_offset {
 							result += format!("{}\n", tabs).as_str();
 						}
 						result
@@ -347,7 +347,7 @@ impl ScopeExpression {
 				let end_str = end_expr.to_string(operators, context);
 				let by_str = if by_expr.is_none() { None } else { Some(by_expr.as_ref().unwrap().to_string(operators, context)) };
 				let scope_str = scope.to_string(operators, *line, tab_offset, context);
-				format!("for({} {} = {}; i {} {}; {}) {}", start_expr.get_type().to_cpp(), name, if context.align_lines {
+				format!("for({} {} = {}; i {} {}; {}) {}", start_expr.get_type().to_cpp(false), name, if context.align_lines {
 					&start_str
 				} else {
 					start_str.trim()
@@ -373,7 +373,7 @@ impl ScopeExpression {
 				let end_str = end_expr.to_string(operators, context);
 				let by_str = if by_expr.is_none() { None } else { Some(by_expr.as_ref().unwrap().to_string(operators, context)) };
 				let scope_str = scope.to_string(operators, *line, tab_offset, context);
-				format!("for({} {} = {}; i {} {}; {}) {}", start_expr.get_type().to_cpp(), name, if context.align_lines {
+				format!("for({} {} = {}; i {} {}; {}) {}", start_expr.get_type().to_cpp(false), name, if context.align_lines {
 					&start_str
 				} else {
 					start_str.trim()

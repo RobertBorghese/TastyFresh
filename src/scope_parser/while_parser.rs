@@ -6,9 +6,7 @@
 
 use crate::{
 	declare_parse_whitespace,
-	declare_parse_required_whitespace,
-	declare_parse_ascii,
-	declare_parse_until_char
+	declare_parse_ascii
 };
 
 use crate::config_management::ConfigData;
@@ -19,7 +17,6 @@ use crate::expression::variable_type::VariableType;
 
 use crate::declaration_parser::declaration::{ Declaration, DeclarationResult };
 use crate::declaration_parser::parser::Parser;
-use crate::declaration_parser::cpp_transpiler::CPPTranspiler;
 
 use crate::context_management::context::Context;
 
@@ -66,7 +63,7 @@ impl WhileParser {
 
 		declare_parse_whitespace!(parser);
 
-		let mut scope: Option<ScopeExpression> = None;
+		let scope: Option<ScopeExpression>;
 		if parser.get_curr() == '{' {
 			scope = Some(ScopeExpression::new(parser, None, parser.index + 1, parser.line, &file_name, config_data, context, None));
 			if parser.get_curr() == '}' {

@@ -10,9 +10,6 @@ use crate::{
 	declare_parse_until_char
 };
 
-use crate::expression::variable_type::VariableType;
-use crate::expression::variable_type::{ Type, VarStyle };
-
 use crate::declaration_parser::declaration::{ Declaration, DeclarationResult };
 use crate::declaration_parser::parser::Parser;
 use crate::declaration_parser::cpp_transpiler::CPPTranspiler;
@@ -93,7 +90,7 @@ impl IncludeDeclaration {
 
 		// Parse Var Style
 		let mut explicit_type = false;
-		let mut inc_type: IncludeType;
+		let inc_type: IncludeType;
 		let mut type_keyword = "".to_string();
 		declare_parse_ascii!(type_keyword, parser);
 		if type_keyword == "local" {

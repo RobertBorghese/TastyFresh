@@ -19,7 +19,6 @@ use std::rc::Rc;
 
 use crate::expression::Expression;
 use crate::expression::variable_type::{ VariableType, Type, VarStyle, VarProps };
-use crate::expression::value_type::{ Function, Property };
 
 use crate::declaration_parser::declaration::{ Declaration, DeclarationResult };
 use crate::declaration_parser::parser::Parser;
@@ -53,7 +52,7 @@ impl VariableDeclaration {
 		let mut pure_assign = false;
 
 		// Parse Variable Properties and Style
-		let mut name = "".to_string();
+		let mut name;
 		while Self::is_var_declaration(&parser.content, parser.index) {
 			name = "".to_string();
 			declare_parse_ascii!(name, parser);
@@ -151,7 +150,7 @@ impl VariableDeclaration {
 	}
 
 	pub fn is_var_declaration(content: &str, index: usize) -> bool {
-		let mut declare = &content[index..];
+		let declare = &content[index..];
 		let props = VarProps::properties();
 		for prop in props {
 			if declare.starts_with(prop) {
@@ -195,8 +194,8 @@ impl VariableDeclaration {
 			let is_construction = expr.as_ref().unwrap().is_construction_call();
 
 			if is_construction {
-				let var_type_output = var_type.to_cpp();
-				let var_type_name = var_type.var_type.to_cpp();
+				let var_type_output = var_type.to_cpp(false);
+				let var_type_name = var_type.var_type.to_cpp(false);
 				let params = expr.as_ref().unwrap().get_parameters(operators, context);
 				let params_str = params.join(", ");
 				match var_type.var_style {
@@ -232,7 +231,7 @@ impl VariableDeclaration {
 			let right_str = expr.as_ref().unwrap().to_string(operators, context);
 			return format!("{}{} {} = {};",
 				props,
-				var_type.to_cpp(),
+				var_type.to_cpp(false),
 				final_name,
 				if self.pure_assign {
 					right_str
@@ -241,9 +240,9 @@ impl VariableDeclaration {
 				}
 			);
 		} else if default_value.is_some() {
-			return format!("{}{} {} = {};", props, var_type.to_cpp(), final_name, default_value.unwrap());
+			return format!("{}{} {} = {};", props, var_type.to_cpp(false), final_name, default_value.unwrap());
 		} else {
-			return format!("{}{} {};", props, var_type.to_cpp(), final_name);
+			return format!("{}{} {};", props, var_type.to_cpp(false), final_name);
 		};
 	}
 }
@@ -265,7 +264,7 @@ impl<'a> VariableExportType<'a> {
 	}
 
 	pub fn is_class_source(&self) -> bool {
-		if let VariableExportType::ClassSource(name) = self {
+		if let VariableExportType::ClassSource(_) = self {
 			return true;
 		}
 		return false;

@@ -26,8 +26,8 @@ pub struct VariableType {
 }
 
 impl VariableType {
-	pub fn to_cpp(&self) -> String {
-		return self.var_style.to_cpp(&self.var_type);
+	pub fn to_cpp(&self, declare: bool) -> String {
+		return self.var_style.to_cpp(&self.var_type, declare);
 	}
 
 	pub fn from_type_style(info: (VarStyle, Type, bool)) -> VariableType {
@@ -172,7 +172,7 @@ impl VariableType {
 		};
 	}
 
-	pub fn access_operator(&self, access_name: &str) -> &'static str {
+	pub fn access_operator(&self) -> &'static str {
 		return if self.is_namespace() {
 			"::"
 		} else if self.var_style.is_ptr().unwrap_or(false) {
@@ -191,19 +191,6 @@ impl VariableType {
 		return None;
 	}
 
-	pub fn convert_construct_type(&self, type_name: &str) -> Option<String> {
-		return match self.var_style {
-			VarStyle::Copy => Some(type_name.to_string()),
-			VarStyle::Ref => None,
-			VarStyle::Borrow => None,
-			VarStyle::Move => None,
-			VarStyle::Ptr(self_size) => Some(format!("new {}", type_name)),
-			VarStyle::AutoPtr => Some(format!("std::make_shared<{}>", type_name)),
-			VarStyle::UniquePtr => Some(format!("std::make_unique<{}>", type_name)),
-			_ => None
-		}
-	}
-
 	pub fn convert_between_styles(&self, other: &VariableType, content: &str) -> Option<String> {
 		return match self.var_style {
 			VarStyle::Copy |
@@ -216,8 +203,8 @@ impl VariableType {
 					VarStyle::Borrow => Some(content.to_string()),
 					VarStyle::Move => Some(format!("std::move({})", content)),
 					VarStyle::Ptr(size) => Some(format!("{}{}", String::from_utf8(vec![b'&'; size]).unwrap(), content)),
-					VarStyle::AutoPtr => Some(format!("std::make_shared<{}>({})", other.to_cpp(), content)),
-					VarStyle::UniquePtr => Some(format!("std::make_unique<{}>({})", other.to_cpp(), content)),
+					VarStyle::AutoPtr => Some(format!("std::make_shared<{}>({})", other.to_cpp(false), content)),
+					VarStyle::UniquePtr => Some(format!("std::make_unique<{}>({})", other.to_cpp(false), content)),
 					_ => None
 				}
 			},
@@ -236,8 +223,8 @@ impl VariableType {
 							Some(content.to_string())
 						}
 					},
-					VarStyle::AutoPtr => Some(format!("std::make_shared<{}>({}{})", other.to_cpp(), stars, content)),
-					VarStyle::UniquePtr => Some(format!("std::make_unique<{}>({}{})", other.to_cpp(), stars, content)),
+					VarStyle::AutoPtr => Some(format!("std::make_shared<{}>({}{})", other.to_cpp(false), stars, content)),
+					VarStyle::UniquePtr => Some(format!("std::make_unique<{}>({}{})", other.to_cpp(false), stars, content)),
 					_ => None
 				}
 			},
@@ -275,7 +262,7 @@ impl VariableType {
 		}
 	}
 
-	pub fn check_accessor_content(&self, content: &str, context: &Option<&mut Context>) -> Option<VariableType> {
+	pub fn check_accessor_content(&self, content: &str, _context: &Option<&mut Context>) -> Option<VariableType> {
 		return match &self.var_type {
 			Type::Class(cls_type) => {
 				Some(cls_type.get_field(content))
@@ -332,6 +319,7 @@ impl VariableType {
 						}
 					}
 					possible_functions = new_possible_functions;
+					index += 1;
 				}
 				if possible_functions.len() == 1 {
 					return Ok(VariableType::function(possible_functions.remove(0)));
@@ -381,34 +369,34 @@ pub enum Type {
 }
 
 impl Type {
-	pub fn to_cpp(&self) -> String {
+	pub fn to_cpp(&self, declare: bool) -> String {
 		return match self {
 			Type::Unknown(name) => name.clone(),
 			Type::Void => "void".to_string(),
 			Type::Boolean => "bool".to_string(),
 			Type::Number(num_type) => num_type.to_cpp().to_string(),
 			Type::String(string_type) => string_type.to_cpp().to_string(),
-			Type::Class(class_type) => class_type.name.clone(),
+			Type::Class(class_type) => if declare { format!("class {}", class_type.name.clone()) } else { class_type.name.clone() },
 			Type::Function(func) => {
 				let params = &func.parameters;
 				let mut params_output = "".to_string();
 				for i in 0..params.len() {
-					params_output += &params[i].prop_type.to_cpp();
+					params_output += &params[i].prop_type.to_cpp(false);
 					if i < params.len() - 1 {
 						params_output += ", ";
 					}
 				}
-				format!("std::function<{}({})>", func.return_type.to_cpp(), params_output)
+				format!("std::function<{}({})>", func.return_type.to_cpp(false), params_output)
 			},
 			Type::QuantumFunction(funcs) => {
 				if !funcs.is_empty() {
-					Type::Function(Box::new(funcs.first().unwrap().clone())).to_cpp()
+					Type::Function(Box::new(funcs.first().unwrap().clone())).to_cpp(false)
 				} else {
 					"".to_string()
 				}
 			},
 			Type::InitializerList(init_type) => {
-				format!("std::initializer_list<{}>", init_type.to_cpp())
+				format!("std::initializer_list<{}>", init_type.to_cpp(false))
 			}
 			Type::Tuple(types) => {
 				let mut is_inferred = false;
@@ -421,7 +409,7 @@ impl Type {
 				if is_inferred {
 					"auto".to_string()
 				} else {
-					format!("std::tuple<{}>", types.iter().map(|t| t.to_cpp()).collect::<Vec<String>>().join(", "))
+					format!("std::tuple<{}>", types.iter().map(|t| t.to_cpp(false)).collect::<Vec<String>>().join(", "))
 				}
 			}
 			Type::Inferred => "auto".to_string(),
@@ -433,7 +421,7 @@ impl Type {
 					}
 					result += &names[i];
 				}
-				result
+				if declare { format!("class {}", result) } else { result }
 			},
 			Type::UndeclaredWParams(names, type_args) => {
 				let mut result = "".to_string();
@@ -447,7 +435,7 @@ impl Type {
 				let mut i = 0;
 				loop {
 					if i < type_args.len() {
-						result += type_args[i].to_cpp().as_str();
+						result += type_args[i].to_cpp(false).as_str();
 						i += 1;
 						if i < type_args.len() {
 							result += ", ";
@@ -472,19 +460,19 @@ impl Type {
 
 	pub fn default_value(&self) -> Option<&'static str> {
 		return match self {
-			Type::Unknown(name) => None,
+			Type::Unknown(_) => None,
 			Type::Void => None,
 			Type::Boolean => Some("false"),
-			Type::Number(num_type) => Some("0"),
-			Type::String(string_type) => Some("\"\""),
-			Type::Class(class_type) => None,
-			Type::Function(func) => Some("nullptr"),
-			Type::QuantumFunction(funcs) => Some("nullptr"),
-			Type::InitializerList(init_type) => Some("{}"),
-			Type::Tuple(types) => None,
+			Type::Number(_) => Some("0"),
+			Type::String(_) => Some("\"\""),
+			Type::Class(_) => None,
+			Type::Function(_) => Some("nullptr"),
+			Type::QuantumFunction(_) => Some("nullptr"),
+			Type::InitializerList(_) => Some("{}"),
+			Type::Tuple(_) => None,
 			Type::Inferred => None,
-			Type::Undeclared(names) => None,
-			Type::UndeclaredWParams(names, type_args) => None,
+			Type::Undeclared(_) => None,
+			Type::UndeclaredWParams(_, _) => None,
 			Type::This => None
 		}
 	}
@@ -564,30 +552,30 @@ impl VarStyle {
 		return self;
 	}
 
-	pub fn to_cpp(&self, var_type: &Type) -> String {
+	pub fn to_cpp(&self, var_type: &Type, declare: bool) -> String {
 		return match self {
-			VarStyle::Copy => var_type.to_cpp(),
-			VarStyle::Ref => format!("{}&", var_type.to_cpp()),
+			VarStyle::Copy => var_type.to_cpp(declare),
+			VarStyle::Ref => format!("{}&", var_type.to_cpp(declare)),
 			VarStyle::Borrow => {
 				if let Type::String(str_type) = var_type {
 					if let StringType::ConstCharArray = str_type {
-						format!("{}&", var_type.to_cpp())
+						format!("{}&", var_type.to_cpp(declare))
 					} else {
-						format!("const {}&", var_type.to_cpp())
+						format!("const {}&", var_type.to_cpp(declare))
 					}
 				} else {
-					format!("const {}&", var_type.to_cpp())
+					format!("const {}&", var_type.to_cpp(declare))
 				}
 			},
-			VarStyle::Move => format!("{}&&", var_type.to_cpp()),
+			VarStyle::Move => format!("{}&&", var_type.to_cpp(declare)),
 			VarStyle::Ptr(amount) => {
 				let stars = if *amount < 1 { 1 } else if *amount > 9 { 9 } else { *amount };
-				format!("{}{}", var_type.to_cpp(), String::from_utf8(vec![b'*'; stars]).unwrap_or("*".to_string()))
+				format!("{}{}", var_type.to_cpp(declare), String::from_utf8(vec![b'*'; stars]).unwrap_or("*".to_string()))
 			},
-			VarStyle::AutoPtr => format!("std::shared_ptr<{}>", var_type.to_cpp()),
-			VarStyle::UniquePtr => format!("std::unique_ptr<{}>", var_type.to_cpp()),
-			VarStyle::ClassPtr => format!("{}*", var_type.to_cpp()),
-			_ => var_type.to_cpp()
+			VarStyle::AutoPtr => format!("std::shared_ptr<{}>", var_type.to_cpp(declare)),
+			VarStyle::UniquePtr => format!("std::unique_ptr<{}>", var_type.to_cpp(declare)),
+			VarStyle::ClassPtr => format!("{}*", var_type.to_cpp(declare)),
+			_ => var_type.to_cpp(declare)
 		}
 	}
 

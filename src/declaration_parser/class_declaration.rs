@@ -10,14 +10,10 @@ use crate::{
 	declare_parse_ascii,
 	declare_parse_required_ascii,
 	declare_parse_required_next_char,
-	declare_parse_expr_until_next_char,
-	declare_parse_expr_until_either_char,
-	declare_parse_type,
-	delcare_increment
+	declare_parse_type
 };
 
-use crate::expression::variable_type::VariableType;
-use crate::expression::variable_type::{ Type, VarStyle };
+use crate::expression::variable_type::Type;
 
 use crate::declaration_parser::declaration::{ Declaration, DeclarationResult };
 use crate::declaration_parser::parser::Parser;
@@ -26,6 +22,7 @@ use crate::declaration_parser::module_declaration::DeclarationType;
 use crate::declaration_parser::attribute_declaration::AttributeDeclaration;
 use crate::declaration_parser::function_declaration::{ FunctionDeclaration, FunctionDeclarationType };
 use crate::declaration_parser::variable_declaration::VariableDeclaration;
+use crate::declaration_parser::attributes::Attributes;
 
 /*
 pub enum DeclarationType {
@@ -137,7 +134,7 @@ impl ClassDeclaration {
 			let initial_index = parser.index;
 
 			if AttributeDeclaration::is_declaration(parser) {
-				let mut result = AttributeDeclaration::new(parser, false);
+				let result = AttributeDeclaration::new(parser, false);
 				if result.is_error() {
 					result.print_error(file_name.to_string(), &parser.content);
 				} else {
@@ -147,15 +144,15 @@ impl ClassDeclaration {
 			}
 
 			if FunctionDeclaration::is_declaration(parser) {
-				let mut result = FunctionDeclaration::new(parser, FunctionDeclarationType::ClassLevel);
+				let result = FunctionDeclaration::new(parser, FunctionDeclarationType::ClassLevel);
 				if result.is_error() {
 					result.print_error(file_name.to_string(), &parser.content);
 				} else {
-					declarations.push(DeclarationType::Function(result.unwrap_and_move(), if attributes.is_empty() {
+					declarations.push(DeclarationType::Function(result.unwrap_and_move(), Attributes::new(if attributes.is_empty() {
 						None
 					} else {
 						Some(std::mem::replace(&mut attributes, Vec::new()))
-					}));
+					})));
 				}
 				attributes.clear();
 				parser.increment();
@@ -163,15 +160,15 @@ impl ClassDeclaration {
 			}
 
 			if VariableDeclaration::is_declaration(parser) {
-				let mut result = VariableDeclaration::new(parser);
+				let result = VariableDeclaration::new(parser);
 				if result.is_error() {
 					result.print_error(file_name.to_string(), &parser.content);
 				} else {
-					declarations.push(DeclarationType::Variable(result.unwrap_and_move(), if attributes.is_empty() {
+					declarations.push(DeclarationType::Variable(result.unwrap_and_move(), Attributes::new(if attributes.is_empty() {
 						None
 					} else {
 						Some(std::mem::replace(&mut attributes, Vec::new()))
-					}));
+					})));
 				}
 				attributes.clear();
 				parser.increment();
@@ -208,14 +205,29 @@ impl ClassDeclaration {
 		return declare.starts_with("class ") || declare.starts_with("abstract ") || declare.starts_with("enum ");
 	}
 
-	pub fn to_cpp(&self) -> String {
-		return format!("{} {}{}{{",
+	pub fn to_cpp(&self, attributes: &Attributes, content: &str) -> String {
+		return format!("{}{}{}{}{}{}{{",
 			self.class_type.get_name(),
-			self.name,
-			if self.extensions.is_none() {
-				" ".to_string()
+			if attributes.has_attribute("DeclarePreName") {
+				format!(" {} ", attributes.get_attribute_parameters("DeclarePreName", content).join(" "))
 			} else {
-				format!(": {} ", self.extensions.as_ref().unwrap().iter().map(|cls| format!("public {}", cls.to_cpp())).collect::<Vec<String>>().join(", "))
+				" ".to_string()
+			},
+			self.name,
+			if attributes.has_attribute("DeclarePostName") {
+				format!(" {} ", attributes.get_attribute_parameters("DeclarePostName", content).join(" "))
+			} else {
+				"".to_string()
+			},
+			if self.extensions.is_none() {
+				"".to_string()
+			} else {
+				format!(": {}", self.extensions.as_ref().unwrap().iter().map(|cls| format!("public {}", cls.to_cpp(false))).collect::<Vec<String>>().join(", "))
+			},
+			if attributes.has_attribute("DeclarePreBracket") {
+				format!(" {} ", attributes.get_attribute_parameters("DeclarePreBracket", content).join(" "))
+			} else {
+				" ".to_string()
 			}
 		);
 	}

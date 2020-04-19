@@ -10,9 +10,6 @@ use crate::{
 	declare_parse_until_char
 };
 
-use crate::expression::variable_type::VariableType;
-use crate::expression::variable_type::{ Type, VarStyle };
-
 use crate::declaration_parser::declaration::{ Declaration, DeclarationResult };
 use crate::declaration_parser::parser::Parser;
 use crate::declaration_parser::cpp_transpiler::CPPTranspiler;
@@ -52,7 +49,7 @@ impl AssumeDeclaration {
 		let content_start = parser.index;
 		declare_parse_until_char!(';', parser);
 
-		let mut assume_path = parser.content[content_start..parser.index].to_string();
+		let assume_path = parser.content[content_start..parser.index].to_string();
 
 		return AssumeDeclarationResult::Ok(AssumeDeclaration {
 			path: assume_path,

@@ -1,23 +1,16 @@
 /**********************************************************
- * --- Variable Declaration ---
+ * --- Attribute Declaration ---
  *
- * Represents a variable declaration prior to being parsed.
+ * Represents a attribute declaration prior to being parsed.
  **********************************************************/
 
 use crate::{
 	declare_parse_whitespace,
-	declare_parse_required_whitespace,
 	declare_parse_ascii,
-	declare_parse_required_ascii,
-	declare_parse_required_next_char,
-	declare_parse_expr_until_either_char,
-	declare_parse_type
+	declare_parse_expr_until_either_char
 };
 
 use crate::context_management::global_context::GlobalContext;
-
-use crate::expression::variable_type::VariableType;
-use crate::expression::variable_type::{ Type, VarStyle };
 
 use crate::declaration_parser::declaration::{ Declaration, DeclarationResult };
 use crate::declaration_parser::parser::Parser;

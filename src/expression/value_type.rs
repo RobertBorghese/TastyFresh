@@ -12,8 +12,6 @@ use crate::expression::function_type::FunStyle;
 
 use crate::declaration_parser::function_declaration::FunctionType;
 
-use either;
-
 /*
 pub enum ValueType {
 	Variable(String, VariableType),
@@ -116,7 +114,6 @@ impl NumberType {
 		let mut bits = false;
 		let mut hex = false;
 
-		let mut complete_number = true;
 		let mut real_number = true;
 
 		let mut index = -1;
@@ -140,8 +137,6 @@ impl NumberType {
 					dot = true;
 					continue;
 				} else {
-					if dot { complete_number = true; }
-					else { complete_number = false; }
 					real_number = false;
 					break;
 				}
@@ -308,8 +303,8 @@ pub struct Property {
 impl Property {
 	pub fn to_cpp(&self) -> String {
 		return match &self.default_value {
-			Some(value) => format!("{} {} = {}", self.prop_type.to_cpp(), self.name, value),
-			None => format!("{} {}", self.prop_type.to_cpp(), self.name)
+			Some(value) => format!("{} {} = {}", self.prop_type.to_cpp(false), self.name, value),
+			None => format!("{} {}", self.prop_type.to_cpp(false), self.name)
 		}
 	}
 }
@@ -342,7 +337,7 @@ impl Function {
 		}
 		format!("{}{}{}{}({})",
 			if style_content.is_empty() { "".to_string() } else { format!("{} ", style_content.join(" ")) },
-			if func_type.is_normal_or_operator() { format!("{} ", self.return_type.to_cpp()) } else { "".to_string() },
+			if func_type.is_normal_or_operator() { format!("{} ", self.return_type.to_cpp(false)) } else { "".to_string() },
 			if header || class_name.is_none() { "".to_string() } else { format!("{}::", class_name.unwrap()) },
 			if func_type.is_constructor() {
 				class_name.unwrap().to_string()

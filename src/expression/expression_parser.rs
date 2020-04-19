@@ -7,21 +7,16 @@
 
 use crate::expression::Expression;
 use crate::expression::expression_piece::ExpressionPiece;
-use crate::expression::variable_type::{ VariableType, Type };
+use crate::expression::variable_type::VariableType;
 
 use crate::config_management::ConfigData;
-use crate::config_management::operator_data::{ Operator, OperatorDataStructure };
+use crate::config_management::operator_data::Operator;
 
-use crate::context_management::print_code_error;
 use crate::context_management::position::Position;
 
 use crate::declaration_parser::parser::Parser;
 
 use crate::context_management::context::Context;
-
-use std::convert::TryInto;
-
-use num::*;
 
 use std::rc::Rc;
 
@@ -306,7 +301,7 @@ impl<'a> ExpressionParser<'a> {
 	}
 
 	fn parse_next_whitespace(&mut self, parser: &mut Parser) -> usize {
-		let mut space_offset = 0;
+		let space_offset;
 		if parser.index >= parser.chars.len() {
 			return 0;
 		}
@@ -440,7 +435,6 @@ impl<'a> ExpressionParser<'a> {
 		if parser.get_curr() == '?' {
 			let end_char = ':';
 			parser.index += 1;
-			let start_pos = parser.index;
 			let chars = vec!(end_char);
 			if self.index_within_bounds(parser) {
 				let expr_parser = ExpressionParser::new(parser, self.generate_pos(parser.index, None), self.config_data, context, Some(chars), None);
@@ -497,7 +491,6 @@ impl<'a> ExpressionParser<'a> {
 		} else {
 			return self.parse_internal_expressions(end_char, false, parser, context);
 		}
-		return false;
 	}
 
 	fn parse_internal_expressions(&mut self, end_char: char, is_value: bool, parser: &mut Parser, context: &mut Option<&mut Context>) -> bool {

@@ -32,6 +32,8 @@
  *
  **********************************************************/
 
+#![allow(dead_code)]
+
 mod config_management;
 mod context_management;
 mod declaration_parser;
@@ -44,21 +46,11 @@ mod transpiler;
 #[macro_use]
 extern crate lazy_static;
 
-use expression::Expression;
-use expression::expression_parser::{ ExpressionParser, ExpressionEndReason };
-
-use context_management::position::Position;
 use context_management::global_context::GlobalContext;
 
 use declaration_parser::parser::Parser;
 use declaration_parser::module_declaration::{ ModuleDeclaration, DeclarationType };
-use declaration_parser::attribute_declaration::AttributeDeclaration;
-use declaration_parser::include_declaration::IncludeDeclaration;
-use declaration_parser::import_declaration::ImportDeclaration;
-use declaration_parser::function_declaration::{ FunctionDeclaration, FunctionDeclarationType };
-use declaration_parser::variable_declaration::VariableDeclaration;
-
-use scope_parser::ScopeExpression;
+use declaration_parser::attributes::Attributes;
 
 use config_management::ConfigData;
 
@@ -67,8 +59,6 @@ use file_system::get_all_tasty_files;
 use transpiler::Transpiler;
 
 use context_management::context::Context;
-use context_management::typing_context::TypingContext;
-use context_management::print_code_error;
 
 use std::env;
 use std::env::Args;
@@ -76,8 +66,6 @@ use std::collections::BTreeMap;
 
 use std::path::Path;
 use std::ffi::OsStr;
-
-use std::rc::Rc;
 
 use regex::Regex;
 
@@ -221,14 +209,12 @@ fn get_output_dirs(arguments: &BTreeMap<String,Vec<String>>) -> Option<Vec<Strin
 /// # Arguments
 ///
 /// * `file` - The relative or absolute path to the source file.
-/// * `output_dirs` - The list of output directories to write the C++ files to.
-/// * `config_data` - The configuration data for the transpiler.
 /// * `module_contexts` - A reference to store the file declarations within.
 ///
 /// # Return
 ///
 /// The `ModuleDeclaration` for the file is returned.
-fn parse_source_file(file: &str, source_location: &str, output_dirs: &Vec<String>, config_data: &ConfigData, module_contexts: &mut BTreeMap<String,Context>, parser: &mut Parser, global_context: &mut GlobalContext) -> ModuleDeclaration {
+fn parse_source_file(file: &str, source_location: &str, module_contexts: &mut BTreeMap<String,Context>, parser: &mut Parser, global_context: &mut GlobalContext) -> ModuleDeclaration {
 	let content = std::fs::read_to_string(file).expect("Could not read source file.");
 	if !file.ends_with(".tasty") { panic!("File is not a .tasty. You should be ashamed."); }
 	*parser = Parser::new(content);
@@ -238,18 +224,18 @@ fn parse_source_file(file: &str, source_location: &str, output_dirs: &Vec<String
 	let mut attribute_class_indexes = Vec::new();
 	for declaration in &module_declaration.declarations {
 		match declaration {
-			DeclarationType::Function(d, attributes) => {
+			DeclarationType::Function(d, _) => {
 				context.module.add_function(d.name.clone(), d.to_function(&parser.content));
 				for p in &d.parameters {
 					context.register_type(&p.0);
 				}
 				context.register_type(&d.return_type);
 			},
-			DeclarationType::Variable(d, attributes) => {
+			DeclarationType::Variable(d, _) => {
 				context.module.add_variable(d.name.clone(), d.var_type.clone());
 				context.register_type(&d.var_type);
 			},
-			DeclarationType::AttributeClass(d, attributes) => {
+			DeclarationType::AttributeClass(_, _) => {
 				attribute_class_indexes.push(curr_index);
 			}
 			_ => {
@@ -261,7 +247,7 @@ fn parse_source_file(file: &str, source_location: &str, output_dirs: &Vec<String
 
 	let mut attribute_classes_processed = 0;
 	for attribute_index in attribute_class_indexes {
-		let mut attribute_class_declare = module_declaration.declarations.remove(attribute_index - attribute_classes_processed);
+		let attribute_class_declare = module_declaration.declarations.remove(attribute_index - attribute_classes_processed);
 		if let DeclarationType::AttributeClass(d, _) = attribute_class_declare {
 			global_context.add_attribute_class(d);
 		}
@@ -285,8 +271,8 @@ fn parse_source_file(file: &str, source_location: &str, output_dirs: &Vec<String
 fn transpile_source_file(file: &str, source_location: &str, output_dirs: &Vec<String>, config_data: &ConfigData, module_contexts: &mut BTreeMap<String,Context>, module_declaration: &mut ModuleDeclaration, parser: &mut Parser, global_context: &mut GlobalContext) -> bool {
 	let access_file_path = &file[source_location.len() + 1..file.len() - 6];
 	{
-		let mut context = module_contexts.get_mut(access_file_path).unwrap();
-		let mut typing = &mut context.typing;
+		let context = module_contexts.get_mut(access_file_path).unwrap();
+		let typing = &mut context.typing;
 		typing.add(&context.module);
 	}
 
@@ -360,12 +346,25 @@ fn transpile_source_file(file: &str, source_location: &str, output_dirs: &Vec<St
 			let path_base = path_str_unwrap[..(path_str_unwrap.len() - path.extension().and_then(OsStr::to_str).unwrap_or("").len())].to_string();
 			let header_path = path_base.clone() + "hpp";
 			if transpile_context.header_include_line.is_some() {
-				insert_output_line(&mut transpile_context.output_lines, format!("#include \"{}\"", if header_path.starts_with("./") {
+				insert_output_line(&mut transpile_context.output_lines, format!("#include \"{}\"",
+				if header_path.starts_with(format!("./{}/", source_location).as_str()) {
 					&header_path[source_location.len() + 3..]
-				} else { &header_path[source_location.len() + 1..] }).as_str(), transpile_context.header_include_line.unwrap(), true);
+				} else if header_path.starts_with(format!("{}/", source_location).as_str()) {
+					&header_path[source_location.len() + 1..]
+				} else {
+					&header_path
+				}).as_str(), transpile_context.header_include_line.unwrap(), true);
 			}
-			std::fs::write(path_base + "cpp", transpile_context.output_lines.join("\n"));
-			std::fs::write(header_path, header_lines.join("\n"));
+			let full_source_path = path_base + "cpp";
+			let full_header_path = header_path;
+			let source_write = std::fs::write(&full_source_path, transpile_context.output_lines.join("\n"));
+			let header_write = std::fs::write(&full_header_path, header_lines.join("\n"));
+			if !source_write.is_ok() {
+				println!("Could not write to file: {}\n{}", full_source_path, source_write.err().unwrap());
+			}
+			if !header_write.is_ok() {
+				println!("Could not write to file: {}\n{}", full_header_path, header_write.err().unwrap());
+			}
 		} else {
 			println!("\nCOULD NOT WRITE TO FILE: {}", format!("{}{}", dir, file));
 		}
@@ -373,25 +372,11 @@ fn transpile_source_file(file: &str, source_location: &str, output_dirs: &Vec<St
 	return true;
 }
 
-fn get_configure_declaration_with_attributes(isolated: &mut bool, declaration: &str, attributes: &Option<Vec<AttributeDeclaration>>, content: &str, semicolon: bool) -> String {
-	let mut prepend = Vec::new();
-	let mut append = Vec::new();
-	if attributes.is_some() {
-		for a in attributes.as_ref().unwrap() {
-			if a.name == "DeclarePrepend" {
-				for i in 0..a.params_length() {
-					prepend.push(a.get_param(i, content));
-				}
-			} else if a.name == "DeclareAppend" {
-				for i in 0..a.params_length() {
-					append.push(a.get_param(i, content));
-				}
-			} else if a.name == "Isolated" {
-				*isolated = true;
-			}
-		}
-	}
-	let mut result = format!("{}{}{}{}", 
+fn get_configure_declaration_with_attributes(isolated: &mut bool, declaration: &str, attributes: &Attributes, content: &str, semicolon: bool) -> String {
+	let prepend = attributes.get_attribute_parameters("DeclarePrepend", content);
+	let append = attributes.get_attribute_parameters("DeclareAppend", content);
+	*isolated = attributes.has_attribute("Isolated");
+	let result = format!("{}{}{}{}", 
 		if prepend.is_empty() { "".to_string() } else { format!("{}\n", prepend.join("\n")) }, 
 		declaration,
 		if semicolon { ";" } else { "" },
@@ -400,7 +385,7 @@ fn get_configure_declaration_with_attributes(isolated: &mut bool, declaration: &
 	return result;
 }
 
-fn configure_declaration_with_attributes(delcarations: &mut Vec<String>, declarations_isolated: &mut Vec<String>, declaration: &str, attributes: &Option<Vec<AttributeDeclaration>>, content: &str, semicolon: bool) {
+fn configure_declaration_with_attributes(delcarations: &mut Vec<String>, declarations_isolated: &mut Vec<String>, declaration: &str, attributes: &Attributes, content: &str, semicolon: bool) {
 	let mut isolated = false;
 	let result = get_configure_declaration_with_attributes(&mut isolated, declaration, attributes, content, semicolon);
 	if isolated {
@@ -452,7 +437,7 @@ fn main() {
 	for files in &source_files {
 		for f in files.1 {
 			let mut parser: Parser = Parser::new("".to_string());
-			file_declarations.insert(f.clone(), parse_source_file(&f, &files.0, &output_dirs, &data, &mut file_contexts, &mut parser, &mut global_context));
+			file_declarations.insert(f.clone(), parse_source_file(&f, &files.0, &mut file_contexts, &mut parser, &mut global_context));
 			file_parsers.insert(f, parser);
 		}
 	}

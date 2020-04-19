@@ -10,7 +10,7 @@ use crate::declaration_parser::parser::Parser;
 use crate::expression::Expression;
 use crate::expression::expression_parser::ExpressionParser;
 use crate::expression::value_type::{ NumberType, StringType };
-use crate::expression::variable_type::{ VariableType, Type, VarStyle };
+use crate::expression::variable_type::{ VariableType, Type };
 
 use crate::context_management::print_code_error;
 use crate::context_management::position::Position;
@@ -92,7 +92,7 @@ impl ExpressionPiece {
 		};
 	}
 
-	pub fn parse_expr_parts(parser: &mut ExpressionParser, context: &mut Option<&mut Context>, file_content: &str, final_desired_type: Option<VariableType>) -> Rc<Expression> {
+	pub fn parse_expr_parts(parser: &mut ExpressionParser, context: &mut Option<&mut Context>, file_content: &str, _final_desired_type: Option<VariableType>) -> Rc<Expression> {
 		let mut error = false;
 		if parser.parts.len() == 1 {
 			match Self::get_expression_from_piece(&parser.parts[0], context) {
@@ -120,7 +120,7 @@ impl ExpressionPiece {
 						let expr_and_pos = Self::parse_prefix(parser, &part_index, index, context, position);
 						if expr_and_pos.0.is_some() {
 							parser.parts.insert(part_index, expr_and_pos.0.unwrap());
-							for i in 0..1 { parser.parts.remove(part_index + 1); }
+							for _ in 0..1 { parser.parts.remove(part_index + 1); }
 						} else {
 							let pos = expr_and_pos.1.unwrap();
 							print_code_error("Expected Expression", "expected expression after this operator", &pos, file_content);
@@ -132,7 +132,7 @@ impl ExpressionPiece {
 						let expr_and_pos = Self::parse_suffix(parser, &part_index, index, context, position);
 						if expr_and_pos.0.is_some() {
 							parser.parts.insert(part_index - 1, expr_and_pos.0.unwrap());
-							for i in 0..1 { parser.parts.remove(part_index); }
+							for _ in 0..1 { parser.parts.remove(part_index); }
 						} else {
 							let pos = expr_and_pos.1.unwrap();
 							print_code_error("Expected Expression", "expected expression before this operator", &pos, file_content);
@@ -144,7 +144,7 @@ impl ExpressionPiece {
 						let expr_and_pos = Self::parse_infix(parser, &part_index, index, context, position);
 						if expr_and_pos.0.is_some() {
 							parser.parts.insert(part_index - 1, expr_and_pos.0.unwrap());
-							for i in 0..2 { parser.parts.remove(part_index); }
+							for _ in 0..2 { parser.parts.remove(part_index); }
 						} else {
 							let pos = expr_and_pos.1.unwrap();
 							print_code_error("Expected Expression", "expected expressions to surrond this operator", &pos, file_content);
@@ -156,7 +156,7 @@ impl ExpressionPiece {
 						let expr_and_pos = Self::parse_ternary(parser, &part_index, expr, index, context, position);
 						if expr_and_pos.0.is_some() {
 							parser.parts.insert(part_index - 1, expr_and_pos.0.unwrap());
-							for i in 0..2 { parser.parts.remove(part_index); }
+							for _ in 0..2 { parser.parts.remove(part_index); }
 						} else {
 							let pos = expr_and_pos.1.unwrap();
 							let err_type = expr_and_pos.2.unwrap();
@@ -173,7 +173,7 @@ impl ExpressionPiece {
 						let expr_and_pos = Self::parse_function_call(parser, &part_index, exprs, context, position, file_content);
 						if expr_and_pos.0.is_some() {
 							parser.parts.insert(part_index - 1, expr_and_pos.0.unwrap());
-							for i in 0..1 { parser.parts.remove(part_index); }
+							for _ in 0..1 { parser.parts.remove(part_index); }
 						} else {
 							let pos = expr_and_pos.1.unwrap();
 							print_code_error("Expected Expression", "expected expression before function call", &pos, file_content);
@@ -185,7 +185,7 @@ impl ExpressionPiece {
 						let expr_and_pos = Self::parse_array_access(parser, &part_index, exprs, context, position);
 						if expr_and_pos.0.is_some() {
 							parser.parts.insert(part_index - 1, expr_and_pos.0.unwrap());
-							for i in 0..1 { parser.parts.remove(part_index); }
+							for _ in 0..1 { parser.parts.remove(part_index); }
 						} else {
 							let pos = expr_and_pos.1.unwrap();
 							print_code_error("Expected Expression", "expected expression before array access", &pos, file_content);
@@ -212,7 +212,7 @@ impl ExpressionPiece {
 				match parser.parts.remove(0) {
 					ExpressionPiece::Expression(expr) => {
 						if context.is_some() {
-							let c = context.as_mut().unwrap();
+							//let c = context.as_mut().unwrap();
 							//println!("Expression: {}", expr.to_string(&parser.config_data.operators, c));
 						}
 						return expr;
@@ -235,7 +235,7 @@ impl ExpressionPiece {
 
 	fn parse_prefix(parser: &ExpressionParser, part_index: &usize, operator_id: usize, context: &Option<&mut Context>, position: Position) -> (Option<ExpressionPiece>,Option<Position>) {
 		if Self::expect_type(operator_id, true) {
-			let tf_type = Self::get_type_from_piece(&parser.parts[*part_index], context);
+			let tf_type = Self::get_type_from_piece(&parser.parts[*part_index]);
 			let result = Self::get_expression_from_piece(&parser.parts[*part_index], context);
 			if result.is_some() {
 				return (Some(ExpressionPiece::Expression(Rc::new(Expression::Prefix(result.unwrap(), operator_id,
@@ -271,7 +271,7 @@ impl ExpressionPiece {
 
 		if left_result.is_some() && operator_id <= 4 && operator_id != 1 {
 			let left_type = left_result.as_ref().unwrap().get_type();
-			let access_name = Self::get_access_from_piece(&left_type, &parser.parts[*part_index], context);
+			let access_name = Self::get_access_from_piece(&parser.parts[*part_index]);
 			if access_name.is_some() {
 				let temp_type = left_type.check_accessor_content(&access_name.unwrap(), context);
 				if temp_type.is_some() {
@@ -293,6 +293,27 @@ impl ExpressionPiece {
 			}
 		}
 		
+		if left_result.is_some() && right_result.is_some() && operator_id >= 18 && operator_id <= 21 {
+			let left_expr = left_result.as_ref().unwrap();
+			let mut center_expr: Option<(Expression,Expression)> = None;
+			if let Expression::Infix(expr1, expr2, op, _, _) = &**left_expr {
+				if (operator_id < 20 && *op < 20) || (operator_id >= 20 && *op >= 20) {
+					center_expr = Some(((**expr1).clone(), (**expr2).clone()));
+				}
+			}
+
+			if center_expr.is_some() {
+				return (Some(ExpressionPiece::Expression(Rc::new(Expression::Infix(
+					Rc::new(Expression::Infix(Rc::new(center_expr.as_ref().unwrap().1.clone()), Rc::new(center_expr.as_ref().unwrap().0.clone()), if operator_id < 20 { operator_id + 2 } else { operator_id - 2 }, VariableType::boolean(), position.clone())),
+					Rc::new(Expression::Infix(Rc::new(center_expr.unwrap().1), right_result.unwrap(), operator_id, VariableType::boolean(), position.clone())),
+					27, VariableType::boolean(), position)))), None);
+			}
+			
+
+			//Infix
+			//18, 19, 20, 21
+		}
+
 		if left_result.is_some() && right_result.is_some() {
 			return (Some(ExpressionPiece::Expression(Rc::new(Expression::Infix(left_result.unwrap(), right_result.unwrap(), operator_id, final_type, position)))), None);
 		}
@@ -320,7 +341,7 @@ impl ExpressionPiece {
 		if result.is_some() {
 			let left_expr = result.unwrap();
 			let mut is_new_call = false;
-			if let Expression::Prefix(_, op_id, _, _) = *left_expr {
+			if let Expression::Prefix(_, _, _, _) = *left_expr {
 				is_new_call = true;
 			}
 			let mut left_type = left_expr.get_type();
@@ -364,24 +385,24 @@ impl ExpressionPiece {
 				Some(Rc::new(Expression::InitializerList(Rc::clone(expressions), piece.get_encapsulated_type().unwrap_or(VariableType::inferred()), position.clone())))
 			},
 			ExpressionPiece::Type(tf_type, position) => {
-				Some(Rc::new(Expression::Value(tf_type.to_cpp(), (*tf_type).clone(), position.clone())))
+				Some(Rc::new(Expression::Value(tf_type.to_cpp(false), (*tf_type).clone(), position.clone())))
 			},
 			_ => None
 		};
 	}
 
-	fn get_type_from_piece(piece: &ExpressionPiece, context: &Option<&mut Context>) -> Option<Rc<VariableType>> {
+	fn get_type_from_piece(piece: &ExpressionPiece) -> Option<Rc<VariableType>> {
 		return match piece {
-			ExpressionPiece::Type(tf_type, position) => {
+			ExpressionPiece::Type(tf_type, _) => {
 				Some(Rc::new((*tf_type).clone()))
 			},
 			_ => None
 		};
 	}
 
-	fn get_access_from_piece(access_type: &VariableType, piece: &ExpressionPiece, context: &Option<&mut Context>) -> Option<String> {
+	fn get_access_from_piece(piece: &ExpressionPiece) -> Option<String> {
 		return match piece {
-			ExpressionPiece::Value(value, position) => Some(value.clone()),
+			ExpressionPiece::Value(value, _) => Some(value.clone()),
 			_ => None
 		};
 	}
@@ -406,7 +427,7 @@ impl ExpressionPiece {
 					ContextType::Function(function) => VariableType::function(function),
 					ContextType::QuantumFunction(functions) => VariableType::quantum_function(functions),
 					ContextType::Class(class_type) => VariableType::class(class_type),
-					ContextType::Namespace(content) => VariableType::namespace(),
+					ContextType::Namespace(_) => VariableType::namespace(),
 					_ => VariableType::inferred()
 				}
 			}

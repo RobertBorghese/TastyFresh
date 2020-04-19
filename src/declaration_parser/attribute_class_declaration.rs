@@ -9,23 +9,13 @@ use crate::{
 	declare_parse_required_whitespace,
 	declare_parse_ascii,
 	declare_parse_required_ascii,
-	declare_parse_required_next_char,
-	declare_parse_expr_until_next_char,
-	declare_parse_expr_until_either_char,
-	declare_parse_type,
-	delcare_increment
+	declare_parse_required_next_char
 };
-
-use crate::expression::variable_type::VariableType;
-use crate::expression::variable_type::{ Type, VarStyle };
 
 use crate::declaration_parser::declaration::{ Declaration, DeclarationResult };
 use crate::declaration_parser::parser::Parser;
 
-use crate::declaration_parser::module_declaration::DeclarationType;
 use crate::declaration_parser::attribute_declaration::AttributeDeclaration;
-use crate::declaration_parser::function_declaration::{ FunctionDeclaration, FunctionDeclarationType };
-use crate::declaration_parser::variable_declaration::VariableDeclaration;
 
 use either::*;
 
@@ -102,7 +92,7 @@ impl AttributeClassDeclaration {
 			let initial_index = parser.index;
 
 			if AttributeDeclaration::is_declaration(parser) {
-				let mut result = AttributeDeclaration::new(parser, true);
+				let result = AttributeDeclaration::new(parser, true);
 				if result.is_error() {
 					result.print_error(file_name.to_string(), &parser.content);
 				} else {
@@ -157,7 +147,6 @@ impl AttributeClassDeclaration {
 			let mut a = new_attr.clone();
 			for i in 0..a.params_length() {
 				let mut p = a.get_param(i, content);
-				let mut changed_arg = false;
 				for j in 0..cls_args.len() {
 					if j >= new_args.len() { break; }
 					let should_trim = !cls_args[j].1;
@@ -165,7 +154,6 @@ impl AttributeClassDeclaration {
 						for arg in &new_args[j] {
 							attr_params.push(Right(if should_trim { arg.trim().to_string() } else { arg.to_string() }));
 						}
-						changed_arg = true;
 					} else {
 						let search_str = format!("[{}]", cls_args[j].0);
 						if p.contains(&search_str) {
@@ -175,7 +163,6 @@ impl AttributeClassDeclaration {
 							}
 							let final_content = search_str_result.join(",");
 							p = p.replace(search_str.as_str(), if should_trim { final_content.trim() } else { final_content.as_str() });
-							changed_arg = true;
 						}
 					}
 				}

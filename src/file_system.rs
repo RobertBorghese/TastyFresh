@@ -5,7 +5,7 @@
  * required for the Tasty Fresh compiler.
  **********************************************************/
 
-use std::path::{ Path, PathBuf };
+use std::path::Path;
 
 use path_slash::PathExt;
 

@@ -5,21 +5,11 @@
  **********************************************************/
 
 use crate::{
-	declare_parse_whitespace,
-	declare_parse_required_whitespace,
-	declare_parse_ascii,
-	declare_parse_required_ascii,
-	declare_parse_required_next_char,
-	declare_parse_expr_until_either_char,
-	declare_parse_type
+	declare_parse_ascii
 };
-
-use crate::expression::variable_type::VariableType;
-use crate::expression::variable_type::{ Type, VarStyle };
 
 use crate::declaration_parser::declaration::{ Declaration, DeclarationResult };
 use crate::declaration_parser::parser::Parser;
-use crate::declaration_parser::cpp_transpiler::CPPTranspiler;
 
 type ModuleAttributeDeclarationResult = DeclarationResult<ModuleAttributeDeclaration>;
 
@@ -73,7 +63,7 @@ impl ModuleAttributeDeclaration {
 					if c == '\n' {
 						return was_end_char;
 					}
-					was_end_char = (c == '%');
+					was_end_char = c == '%';
 				}
 			}
 		}

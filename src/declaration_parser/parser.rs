@@ -355,8 +355,8 @@ impl Parser {
 				_ => ()
 			}
 			if brackets <= 0 && parentheses <= 0 {
-				if (self.get_curr() == c && ((c != '}' || brackets < 0) && (c != ')' || parentheses < 0)) ||
-					self.get_curr() == c2 && ((c2 != '}' || brackets < 0) && (c2 != ')' || parentheses < 0))) {
+				if self.get_curr() == c && ((c != '}' || brackets < 0) && (c != ')' || parentheses < 0)) ||
+					self.get_curr() == c2 && ((c2 != '}' || brackets < 0) && (c2 != ')' || parentheses < 0)) {
 					*result = self.get_curr();
 					break;
 				}
@@ -495,7 +495,7 @@ impl Parser {
 	}
 
 	pub fn next_x_chars_are_numeric(&mut self, x: i32) -> bool {
-		for i in 0..x {
+		for _ in 0..x {
 			if self.increment() || !self.curr_is_numeric() {
 				return false;
 			}
@@ -504,7 +504,7 @@ impl Parser {
 	}
 
 	pub fn next_x_chars_are_hex(&mut self, x: i32) -> bool {
-		for i in 0..x {
+		for _ in 0..x {
 			if self.increment() || !self.curr_is_hex_numeric() {
 				return false;
 			}
@@ -545,7 +545,6 @@ impl Parser {
 		if self.check_for_end() { return Type::Inferred; }
 
 		// Check const
-		let mut is_const = false;
 		let mut unsigned: Option<bool> = None;
 		let mut long = false;
 		let mut name_chain: Vec<String> = Vec::new();
@@ -582,9 +581,6 @@ impl Parser {
 			let content = self.parse_ascii_char_name();
 			if self.out_of_space { return Type::Inferred; }
 			match content.as_str() {
-				"const" => {
-					is_const = true;
-				},
 				"unsigned" => {
 					if let None = unsigned {
 						unsigned = Some(true);

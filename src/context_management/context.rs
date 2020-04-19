@@ -33,8 +33,8 @@ impl Context {
 
 	pub fn register_type(&mut self, var_type: &VariableType) {
 		match &var_type.var_type {
-			Type::Function(func) => self.add_header("functional", true),
-			Type::Tuple(types) => self.add_header("tuple", true),
+			Type::Function(_) => self.add_header("functional", true),
+			Type::Tuple(_) => self.add_header("tuple", true),
 			_ => ()
 		}
 		match &var_type.var_style {

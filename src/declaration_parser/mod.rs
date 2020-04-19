@@ -20,3 +20,4 @@ pub mod attribute_class_declaration;
 pub mod include_declaration;
 pub mod import_declaration;
 pub mod cpp_transpiler;
+pub mod attributes;

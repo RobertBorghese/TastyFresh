@@ -23,6 +23,7 @@ use std::rc::Rc;
 
 /// Stores the expression and its components recursively. 
 /// The `usize` represents the operators' index in the JSON data.
+#[derive(Clone)]
 pub enum Expression {
 	Invalid,
 	Value(String, VariableType, Position),
@@ -160,11 +161,11 @@ impl Expression {
 					if expr_right.get_type().is_int() {
 						format!("std::get<{}>({})", expr_right_str, expr_left.to_string(operators, context))
 					} else {
-						let op = expr_left.get_type().access_operator(&expr_right_str);
+						let op = expr_left.get_type().access_operator();
 						format!("{}{}{}", expr_left.to_string(operators, context), op, expr_right_str)
 					}
 				} else if *id >= 6 && *id <= 9 {
-					let mut right = tf_type.to_cpp(); // expr_right.to_string(operators, context);
+					let mut right = tf_type.to_cpp(false); // expr_right.to_string(operators, context);
 					right = match *id {
 						6 => format!("({})", right),
 						7 => format!("static_cast<{}>", right),
@@ -213,7 +214,7 @@ impl Expression {
 						"".to_string()
 					} else {
 						let mut result = "".to_string();
-						for i in 0..prefix_lines {
+						for _ in 0..prefix_lines {
 							result += "\n\t";
 						}
 						result
@@ -233,12 +234,12 @@ impl Expression {
 				}
 				format!("{{ {} }}", expr_list.join(", "))
 			},
-			Expression::FunctionCall(expr, exprs, _, _) => {
-				let mut expr_list = self.get_parameters(operators, context);
+			Expression::FunctionCall(expr, _, _, _) => {
+				let expr_list = self.get_parameters(operators, context);
 				format!("{}({})", expr.to_string(operators, context), expr_list.join(", "))
 			},
-			Expression::ConstructCall(tf_type, exprs, _, _) => {
-				format!("{}({})", tf_type.to_cpp(), self.get_parameters(operators, context).join(", "))
+			Expression::ConstructCall(tf_type, _, _, _) => {
+				format!("{}({})", tf_type.to_cpp(false), self.get_parameters(operators, context).join(", "))
 			},
 			Expression::ArrayAccess(expr, exprs, _, _) => {
 				let mut expr_list = Vec::new();

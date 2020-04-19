@@ -13,8 +13,6 @@ pub mod global_context;
 
 use position::Position;
 
-use num::*;
-
 pub fn print_code_error(title: &str, message: &str, position: &Position, file_content: &str) {
 	let mut output = String::from("");
 

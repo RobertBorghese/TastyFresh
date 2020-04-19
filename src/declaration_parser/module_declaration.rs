@@ -5,10 +5,6 @@
  * individual Tasty Fresh source file.
  **********************************************************/
 
-use crate::expression::variable_type::VariableType;
-use crate::expression::variable_type::{ Type, VarStyle };
-
-use crate::declaration_parser::declaration::{ Declaration, DeclarationResult };
 use crate::declaration_parser::parser::Parser;
 
 use crate::declaration_parser::module_attribute_declaration::ModuleAttributeDeclaration;
@@ -20,16 +16,17 @@ use crate::declaration_parser::include_declaration::IncludeDeclaration;
 use crate::declaration_parser::variable_declaration::VariableDeclaration;
 use crate::declaration_parser::class_declaration::ClassDeclaration;
 use crate::declaration_parser::attribute_class_declaration::AttributeClassDeclaration;
+use crate::declaration_parser::attributes::Attributes;
 
 pub enum DeclarationType {
 	ModuleAttribute(ModuleAttributeDeclaration),
-	Assume(AssumeDeclaration, Option<Vec<AttributeDeclaration>>),
-	Function(FunctionDeclaration, Option<Vec<AttributeDeclaration>>),
-	Import(ImportDeclaration, Option<Vec<AttributeDeclaration>>),
-	Include(IncludeDeclaration, Option<Vec<AttributeDeclaration>>),
-	Variable(VariableDeclaration, Option<Vec<AttributeDeclaration>>),
-	Class(ClassDeclaration, Option<Vec<AttributeDeclaration>>),
-	AttributeClass(AttributeClassDeclaration, Option<Vec<AttributeDeclaration>>)
+	Assume(AssumeDeclaration, Attributes),
+	Function(FunctionDeclaration, Attributes),
+	Import(ImportDeclaration, Attributes),
+	Include(IncludeDeclaration, Attributes),
+	Variable(VariableDeclaration, Attributes),
+	Class(ClassDeclaration, Attributes),
+	AttributeClass(AttributeClassDeclaration, Attributes)
 }
 
 pub struct ModuleDeclaration {
@@ -39,15 +36,15 @@ pub struct ModuleDeclaration {
 macro_rules! parse_declaration {
 	($DeclarationClass:ty, $DeclarationType:ident, $parser:expr, $file_name:expr, $declarations:expr, $attributes:expr) => {
 		if <$DeclarationClass>::is_declaration($parser) {
-			let mut result = <$DeclarationClass>::new($parser);
+			let result = <$DeclarationClass>::new($parser);
 			if result.is_error() {
 				result.print_error($file_name.to_string(), &$parser.content);
 			} else {
-				$declarations.push(DeclarationType::$DeclarationType(result.unwrap_and_move(), if $attributes.is_empty() {
+				$declarations.push(DeclarationType::$DeclarationType(result.unwrap_and_move(), Attributes::new(if $attributes.is_empty() {
 					None
 				} else {
 					Some(std::mem::replace(&mut $attributes, Vec::new()))
-				}));
+				})));
 			}
 			$attributes.clear();
 			continue;
@@ -58,15 +55,15 @@ macro_rules! parse_declaration {
 macro_rules! parse_declaration_w_file_name {
 	($DeclarationClass:ty, $DeclarationType:ident, $parser:expr, $file_name:expr, $declarations:expr, $attributes:expr) => {
 		if <$DeclarationClass>::is_declaration($parser) {
-			let mut result = <$DeclarationClass>::new($parser, $file_name);
+			let result = <$DeclarationClass>::new($parser, $file_name);
 			if result.is_error() {
 				result.print_error($file_name.to_string(), &$parser.content);
 			} else {
-				$declarations.push(DeclarationType::$DeclarationType(result.unwrap_and_move(), if $attributes.is_empty() {
+				$declarations.push(DeclarationType::$DeclarationType(result.unwrap_and_move(), Attributes::new(if $attributes.is_empty() {
 					None
 				} else {
 					Some(std::mem::replace(&mut $attributes, Vec::new()))
-				}));
+				})));
 			}
 			$attributes.clear();
 			continue;
@@ -83,7 +80,7 @@ impl ModuleDeclaration {
 			parser.parse_whitespace();
 
 			if ModuleAttributeDeclaration::is_declaration(parser) {
-				let mut result = ModuleAttributeDeclaration::new(parser);
+				let result = ModuleAttributeDeclaration::new(parser);
 				if result.is_error() {
 					result.print_error(file_name.to_string(), &parser.content);
 				} else {
@@ -100,7 +97,7 @@ impl ModuleDeclaration {
 			let initial_index = parser.index;
 
 			if AttributeDeclaration::is_declaration(parser) {
-				let mut result = AttributeDeclaration::new(parser, false);
+				let result = AttributeDeclaration::new(parser, false);
 				if result.is_error() {
 					result.print_error(file_name.to_string(), &parser.content);
 				} else {
@@ -110,15 +107,15 @@ impl ModuleDeclaration {
 			}
 
 			if FunctionDeclaration::is_declaration(parser) {
-				let mut result = FunctionDeclaration::new(parser, FunctionDeclarationType::ModuleLevel);
+				let result = FunctionDeclaration::new(parser, FunctionDeclarationType::ModuleLevel);
 				if result.is_error() {
 					result.print_error(file_name.to_string(), &parser.content);
 				} else {
-					declarations.push(DeclarationType::Function(result.unwrap_and_move(), if attributes.is_empty() {
+					declarations.push(DeclarationType::Function(result.unwrap_and_move(), Attributes::new(if attributes.is_empty() {
 						None
 					} else {
 						Some(std::mem::replace(&mut attributes, Vec::new()))
-					}));
+					})));
 				}
 				attributes.clear();
 				continue;

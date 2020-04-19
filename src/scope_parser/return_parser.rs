@@ -6,9 +6,7 @@
 
 use crate::{
 	declare_parse_whitespace,
-	declare_parse_required_whitespace,
-	declare_parse_ascii,
-	declare_parse_until_char
+	declare_parse_ascii
 };
 
 use crate::config_management::ConfigData;
@@ -67,8 +65,8 @@ impl ReturnParser {
 
 		match reason {
 			ExpressionEndReason::Unknown => return ReturnParserResult::Err("Unknown Error", "unknown expression parsing error", parser.index - 1, parser.index),
-			ExpressionEndReason::ReachedChar(c) => (),
 			ExpressionEndReason::EndOfContent =>  return ReturnParserResult::Err("Unexpected End of Expression", "unexpected end of expression", parser.index - 1, parser.index),
+			ExpressionEndReason::NoValueError => return ReturnParserResult::Err("Value Expected", "expression value expected here", parser.index - 1, parser.index),
 			ExpressionEndReason::EndOfExpression => {
 				let old_index = parser.index;
 				declare_parse_whitespace!(parser);
@@ -76,35 +74,13 @@ impl ReturnParser {
 					return ReturnParserResult::Err("Semicolon Needed", "there should be a ; here", old_index - 1, old_index);
 				}
 			},
-			ExpressionEndReason::NoValueError => return ReturnParserResult::Err("Value Expected", "expression value expected here", parser.index - 1, parser.index)
+			_ => ()
 		}
 
 		return ReturnParserResult::Ok(ReturnParser {
 			expression: expression,
 			line: initial_line
 		});
-		/*
-		let initial_line = parser.line;
-
-		// Parse Var Style
-		let mut return_keyword = "".to_string();
-		declare_parse_ascii!(return_keyword, parser);
-		if return_keyword != "return" {
-			return ReturnParserResult::Err("Unexpected Keyword", "\"return\" keyword expected", parser.index - return_keyword.len(), parser.index);
-		}
-
-		declare_parse_required_whitespace!(parser);
-
-		let content_start = parser.index;
-		declare_parse_until_char!(';', parser);
-
-		let mut return_path = parser.content[content_start..parser.index].to_string();
-
-		return ReturnParserResult::Ok(ReturnParser {
-			path: return_path,
-			line: initial_line
-		});
-		*/
 	}
 
 	pub fn is_declaration(parser: &Parser) -> bool {

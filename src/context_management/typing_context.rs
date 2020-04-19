@@ -75,10 +75,14 @@ impl TypingContext {
 	pub fn add_function(&mut self, name: String, func: Function) {
 		let data = self.known_data.last_mut().unwrap();
 		if data.contains_key(&name) {
+			let mut old_function: Option<Function> = None;
 			if let ContextType::Function(old_func) = data.get(&name).unwrap() {
-				data.insert(name, ContextType::QuantumFunction(vec!(old_func.clone(), func)));
-			} else if let ContextType::QuantumFunction(funcs) = data.get_mut(&name).unwrap() {
+				old_function = Some(old_func.clone());
+			}
+			if let ContextType::QuantumFunction(funcs) = data.get_mut(&name).unwrap() {
 				funcs.push(func);
+			} else if old_function.is_some() {
+				data.insert(name, ContextType::QuantumFunction(vec!(old_function.unwrap(), func)));
 			}
 		} else {
 			data.insert(name, ContextType::Function(func));
@@ -88,7 +92,7 @@ impl TypingContext {
 	pub fn print_everything(&self) {
 		for data in &self.known_data {
 			println!("-- SCOPE --");
-			for (key, value) in data.iter() {
+			for (key, _value) in data.iter() {
 				println!("{}", key);
 			}
 		}

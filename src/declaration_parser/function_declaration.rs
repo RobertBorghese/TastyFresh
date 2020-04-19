@@ -18,7 +18,7 @@ use crate::{
 	delcare_increment
 };
 
-use crate::expression::variable_type::{ VariableType, Type, VarStyle, VarProps };
+use crate::expression::variable_type::{ VariableType, Type, VarStyle };
 
 use crate::expression::value_type::{ Function, Property };
 
@@ -129,7 +129,7 @@ impl FunctionDeclaration {
 
 		// Parse Function Properties and Style
 		let mut successfully_parsed = false;
-		let mut name = "".to_string();
+		let mut name;
 		let mut is_extern = false;
 		while Self::is_func_declaration(&parser.content, parser.index) {
 			name = "".to_string();
@@ -228,7 +228,7 @@ impl FunctionDeclaration {
 				} else {
 					let mut param_name: String;
 					let mut param_type_str = "".to_string();
-					let mut param_type = VarStyle::Unknown;
+					let param_type;
 					declare_parse_ascii!(param_type_str, parser);
 
 					if VarStyle::styles().contains(&param_type_str.as_str()) {

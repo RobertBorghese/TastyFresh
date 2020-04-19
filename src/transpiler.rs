@@ -5,20 +5,15 @@
  **********************************************************/
 
 use crate::expression::Expression;
-use crate::expression::expression_parser::{ ExpressionParser, ExpressionEndReason };
+use crate::expression::expression_parser::ExpressionEndReason;
 use crate::expression::variable_type::VariableType;
 
 use crate::context_management::position::Position;
 use crate::context_management::global_context::GlobalContext;
 
 use crate::declaration_parser::parser::Parser;
-use crate::declaration_parser::module_declaration::{ ModuleDeclaration, DeclarationType };
-use crate::declaration_parser::attribute_declaration::AttributeDeclaration;
-use crate::declaration_parser::attribute_class_declaration::AttributeClassDeclaration;
-use crate::declaration_parser::include_declaration::IncludeDeclaration;
-use crate::declaration_parser::import_declaration::ImportDeclaration;
-use crate::declaration_parser::function_declaration::{ FunctionDeclaration, FunctionDeclarationType };
-use crate::declaration_parser::variable_declaration::{ VariableDeclaration, VariableExportType };
+use crate::declaration_parser::module_declaration::DeclarationType;
+use crate::declaration_parser::variable_declaration::VariableExportType;
 
 use crate::config_management::ConfigData;
 
@@ -157,7 +152,7 @@ impl<'a> Transpiler<'a> {
 		for declaration in declarations {
 			// Module Attributes
 			if let DeclarationType::ModuleAttribute(module_attribute) = declaration {
-				let mut context = self.module_contexts.get_mut(self.access_file_path).unwrap();
+				let context = self.module_contexts.get_mut(self.access_file_path).unwrap();
 				context.register_module_attribute(&module_attribute.name);
 				if context.align_lines {
 					self.header_include_line = Some(module_attribute.line);
@@ -170,29 +165,27 @@ impl<'a> Transpiler<'a> {
 			// All Others
 			match declaration {
 				DeclarationType::Class(class_declare, attributes) => {
-					if attributes.is_some() {
-						AttributeDeclaration::flatten_attributes(attributes.as_mut().unwrap(), global_context, self.parser.content.as_str());
-					}
+					attributes.flatten_attributes(global_context, self.parser.content.as_str());
 
 					let mut construct_declares = VarFuncDeclarations::new();
 					let mut public_declares = VarFuncDeclarations::new();
 					let mut private_declares = VarFuncDeclarations::new();
 
 					{
-						let mut context = self.module_contexts.get_mut(self.access_file_path).unwrap();
+						let context = self.module_contexts.get_mut(self.access_file_path).unwrap();
 						context.typing.push_context();
 						context.typing.add_variable("this".to_string(), VariableType::this());
 					}
 					self.parse_declarations(&mut class_declare.declarations, global_context, Some((&class_declare.name, &mut construct_declares, &mut public_declares, &mut private_declares)));
 					{
-						let mut context = self.module_contexts.get_mut(self.access_file_path).unwrap();
+						let context = self.module_contexts.get_mut(self.access_file_path).unwrap();
 						context.typing.pop_context();
 					}
 
 					let mut isolated = false;
 					let mut class_content = get_configure_declaration_with_attributes(
 						&mut isolated,
-						&class_declare.to_cpp(),
+						&class_declare.to_cpp(attributes, self.parser.content.as_str()),
 						&attributes,
 						&self.parser.content,
 						false
@@ -204,22 +197,22 @@ impl<'a> Transpiler<'a> {
 
 					self.class_declarations.push((class_content, construct_declares, public_declares, private_declares));
 				},
-				DeclarationType::Assume(assume, attributes) => {
+				DeclarationType::Assume(_assume, _attributes) => {
 				},
-				DeclarationType::Import(import, attributes) => {
+				DeclarationType::Import(import, _attributes) => {
 					if self.module_contexts.contains_key(&import.path) {
 						let module = self.module_contexts.get(&import.path).unwrap().module.clone();
-						let mut context = self.module_contexts.get_mut(self.access_file_path).unwrap();
-						let mut typing = &mut context.typing;
+						let context = self.module_contexts.get_mut(self.access_file_path).unwrap();
+						let typing = &mut context.typing;
 						typing.add(&module);
-						let mut line = if context.align_lines { import.line } else { self.output_lines.len() };
+						let line = if context.align_lines { import.line } else { self.output_lines.len() };
 						insert_output_line(&mut self.output_lines, format!("#include \"{}.hpp\"", import.path).as_str(), line, false);
 					} else {
 						let pos = Position::new(self.file.to_string(), Some(import.line + 1), 7, Some(7 + import.path.len()));
 						print_code_error("Import Not Found", "could not find Tasty Fresh source file", &pos, &self.parser.content)
 					}
 				},
-				DeclarationType::Include(include, attributes) => {
+				DeclarationType::Include(include, _attributes) => {
 					if include.location.is_header() {
 						if include.inc_type.is_local() {
 							self.header_local_includes.push(include.path.clone());
@@ -227,8 +220,8 @@ impl<'a> Transpiler<'a> {
 							self.header_system_includes.push(include.path.clone());
 						}
 					} else {
-						let mut context = self.module_contexts.get_mut(self.access_file_path).unwrap();
-						let mut line = if context.align_lines { include.line } else { self.output_lines.len() };
+						let context = self.module_contexts.get_mut(self.access_file_path).unwrap();
+						let line = if context.align_lines { include.line } else { self.output_lines.len() };
 						insert_output_line(&mut self.output_lines, format!("#include {}", if include.inc_type.is_local() {
 							format!("\"{}\"", include.path)
 						} else {
@@ -238,14 +231,12 @@ impl<'a> Transpiler<'a> {
 					
 				},
 				DeclarationType::Function(func_data, attributes) => {
-					if attributes.is_some() {
-						AttributeDeclaration::flatten_attributes(attributes.as_mut().unwrap(), global_context, self.parser.content.as_str());
-					}
+					attributes.flatten_attributes(global_context, self.parser.content.as_str());
 
 					let mut context = self.module_contexts.get_mut(self.access_file_path).unwrap();
 					let mut func_content: Option<String> = None;
 					let mut line = if context.align_lines { func_data.line } else { self.output_lines.len() + 1 };
-					let mut add_to_header = true;
+					let add_to_header = !attributes.has_attribute("NoHeader");
 					self.end_line = line;
 					if !func_data.header_only() {
 						if func_data.start_index.is_some() && func_data.end_index.is_some() {
@@ -270,13 +261,6 @@ impl<'a> Transpiler<'a> {
 							insert_output_line(&mut self.output_lines, ";", line, false);
 						}
 						self.end_line = func_data.line + (line - self.end_line);
-						if attributes.is_some() {
-							for a in attributes.as_ref().unwrap() {
-								if a.name == "NoHeader" {
-									add_to_header = false;
-								}
-							}
-						}
 					}
 					if add_to_header {
 						let header_func_declare = func_data.to_function(&self.file).to_cpp(true,
@@ -319,9 +303,7 @@ impl<'a> Transpiler<'a> {
 					}
 				},
 				DeclarationType::Variable(var_data, attributes) => {
-					if attributes.is_some() {
-						AttributeDeclaration::flatten_attributes(attributes.as_mut().unwrap(), global_context, self.parser.content.as_str());
-					}
+					attributes.flatten_attributes(global_context, self.parser.content.as_str());
 
 					let mut context = self.module_contexts.get_mut(self.access_file_path).unwrap();
 					let mut reason = ExpressionEndReason::Unknown;
@@ -357,18 +339,12 @@ impl<'a> Transpiler<'a> {
 						);
 					}
 					self.end_line = var_data.line;
-					let mut add_to_header = true;
-					if attributes.is_some() {
-						for a in attributes.as_ref().unwrap() {
-							if a.name == "NoHeader" {
-								add_to_header = false;
-							}
-						}
-					}
+					let add_to_header = !attributes.has_attribute("NoHeader");
 					if add_to_header {
 						//variable_declarations.push(format!("{} {};", var_type.to_cpp(), var_data.name));
+						let is_declare = attributes.has_attribute("DeclareType");
 						if !is_class_declare {
-							let var_declaraction = format!("extern {} {}", var_type.to_cpp(), var_data.name);
+							let var_declaraction = format!("extern {} {}", var_type.to_cpp(is_declare), var_data.name);
 							configure_declaration_with_attributes(
 								&mut self.declarations.variable_declarations,
 								&mut self.declarations.variable_declarations_isolated,
@@ -379,7 +355,7 @@ impl<'a> Transpiler<'a> {
 							);
 						} else {
 							let var_declaraction = if is_class_declare && var_data.is_only_static() {
-								format!("static {} {} ", var_type.to_cpp(), var_data.name)
+								format!("static {} {} ", var_type.to_cpp(is_declare), var_data.name)
 							} else {
 								var_data.to_cpp(&expr, &self.config_data.operators, &mut context, if is_class_declare {
 									VariableExportType::ClassHeader
