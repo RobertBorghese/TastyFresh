@@ -257,7 +257,7 @@ impl ScopeExpression {
 						curr_line += 1;
 					}
 					last_line_offset = curr_line - 1;
-					real_last_line_offset = real_line_number;
+					real_last_line_offset = e.get_end_line().unwrap_or(real_line_number + line_offset) - line_offset;
 				}
 				let tabs = String::from_utf8(vec![b'\t'; tab_offset]).unwrap_or("".to_string());
 				let mut content = Vec::new();
@@ -437,6 +437,21 @@ impl ScopeExpression {
 			ScopeExpression::For(_, _, _, line, _) => Some(*line),
 			ScopeExpression::Increment(_, _, _, _, _, _, line, _) => Some(*line),
 			ScopeExpression::Decrement(_, _, _, _, _, _, line, _) => Some(*line),
+			_ => None
+		};
+	}
+
+	pub fn get_end_line(&self) -> Option<usize> {
+		return match self {
+			ScopeExpression::Expression(expr) => expr.get_line_number(),
+			ScopeExpression::SubScope(_, _, end_line) => Some(*end_line),
+			ScopeExpression::If(_, _, _, _, end_line) => Some(*end_line),
+			ScopeExpression::While(_, _, _, end_line) => Some(*end_line),
+			ScopeExpression::Loop(_, _, end_line) => Some(*end_line),
+			ScopeExpression::DoWhile(_, _, _, _, end_line) => Some(*end_line),
+			ScopeExpression::For(_, _, _, _, end_line) => Some(*end_line),
+			ScopeExpression::Increment(_, _, _, _, _, _, _, end_line) => Some(*end_line),
+			ScopeExpression::Decrement(_, _, _, _, _, _, _, end_line) => Some(*end_line),
 			_ => None
 		};
 	}

@@ -1,15 +1,12 @@
-attribute Test {
-	@DeclarePostName(fdksl)
-}
-
-@DeclareType forever let fds = new vector();
-
-@DeclarePreBracket(LLLL)
-class Test extends fds {
-	@DeclareType forever let fds = new vector();
-
-	fn test() {
-		let a = 32;
-		a++;
+fn myTest(charCount: int) -> std.string {
+	let result = new std.string("");
+	inc i from 0 to charCount {
+		result += "*";
 	}
+	a = fds;
+	if a == 32 v = 32;
+	else if a == 21 b = 333;
+	else p = 0;
+	let v = new vector@int();
+	let fds = pqwe.ds();
 }
