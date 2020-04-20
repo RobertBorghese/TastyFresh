@@ -279,18 +279,19 @@ fn transpile_source_file(file: &str, source_location: &str, output_dirs: &Vec<St
 	let mut transpile_context = Transpiler::new(file, access_file_path, config_data, module_contexts, parser);
 	transpile_context.parse_declarations(&mut module_declaration.declarations, global_context, None);
 
-	if transpile_context.output_lines.is_empty() { return true; }
-
-	if transpile_context.header_include_line.is_none() {
-		if !transpile_context.output_lines[0].is_empty() {
-			transpile_context.output_lines.insert(0, "".to_string());
+	if !transpile_context.output_lines.is_empty() {
+		if transpile_context.header_include_line.is_none() {
+			if !transpile_context.output_lines[0].is_empty() {
+				transpile_context.output_lines.insert(0, "".to_string());
+			}
+			if transpile_context.output_lines.len() > 1 && !transpile_context.output_lines[1].is_empty() {
+				transpile_context.output_lines.insert(0, "".to_string());
+			}
+			transpile_context.header_include_line = Some(0);
 		}
-		if transpile_context.output_lines.len() > 1 && !transpile_context.output_lines[1].is_empty() {
-			transpile_context.output_lines.insert(0, "".to_string());
-		}
-		transpile_context.header_include_line = Some(0);
 	}
 
+	let declarations_are_empty = transpile_context.class_declarations.is_empty() && transpile_context.declarations.is_empty();
 	let mut header_lines = Vec::new();
 	{
 		let file_path = Path::new(file);
@@ -357,6 +358,14 @@ fn transpile_source_file(file: &str, source_location: &str, output_dirs: &Vec<St
 			}
 			let full_source_path = path_base + "cpp";
 			let full_header_path = header_path;
+
+			if transpile_context.output_lines.is_empty() &&
+				declarations_are_empty &&
+				!Path::new(&full_source_path).exists() &&
+				!Path::new(&full_header_path).exists() {
+				return true;
+			}
+
 			let source_write = std::fs::write(&full_source_path, transpile_context.output_lines.join("\n"));
 			let header_write = std::fs::write(&full_header_path, header_lines.join("\n"));
 			if !source_write.is_ok() {

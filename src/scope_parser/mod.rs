@@ -273,7 +273,7 @@ impl ScopeExpression {
 				format!("{};", expr.to_string(operators, context))
 			},
 			ScopeExpression::VariableDeclaration(declaration, expr) => {
-				declaration.to_cpp(expr, operators, context, VariableExportType::Scoped)
+				declaration.to_cpp(expr, operators, context, VariableExportType::Scoped, false)
 			},
 			ScopeExpression::Return(expr, _) => {
 				format!("return {};", expr.to_string(operators, context))

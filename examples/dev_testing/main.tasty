@@ -1,16 +1,15 @@
-
 attribute Test {
-	@Isolated
-	@DeclareAppend(fdkslfdkjsfds)
+	@DeclarePostName(fdksl)
 }
 
-@Test
-fn main() -> int {
-	let a = 32;
+@DeclareType forever let fds = new vector();
 
-	let test = 0 < a <= -32;
+@DeclarePreBracket(LLLL)
+class Test extends fds {
+	@DeclareType forever let fds = new vector();
 
-	if 0 < a <= -32 && test {
-		print("worked");
+	fn test() {
+		let a = 32;
+		a++;
 	}
 }

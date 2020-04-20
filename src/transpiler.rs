@@ -332,7 +332,8 @@ impl<'a> Transpiler<'a> {
 									VariableExportType::ClassSource(class_declarations.as_ref().unwrap().0)
 								} else {
 									VariableExportType::ModuleSource
-								}
+								},
+								false
 							),
 							line,
 							false,
@@ -341,7 +342,6 @@ impl<'a> Transpiler<'a> {
 					self.end_line = var_data.line;
 					let add_to_header = !attributes.has_attribute("NoHeader");
 					if add_to_header {
-						//variable_declarations.push(format!("{} {};", var_type.to_cpp(), var_data.name));
 						let is_declare = attributes.has_attribute("DeclareType");
 						if !is_class_declare {
 							let var_declaraction = format!("extern {} {}", var_type.to_cpp(is_declare), var_data.name);
@@ -361,7 +361,8 @@ impl<'a> Transpiler<'a> {
 									VariableExportType::ClassHeader
 								} else {
 									VariableExportType::ModuleHeader
-								})
+								},
+								is_declare)
 							};
 							let temp = &mut class_declarations.as_mut().unwrap().2;
 							configure_declaration_with_attributes(

@@ -1,11 +1,10 @@
 #include "main.hpp"
 
-int main() {
+static vector fds = vector();
+
+vector Test::fds = vector();
+
+void Test::test() {
 	int a = 32;
-
-	bool test = a >= 0 && a <= -32;
-
-	if(a >= 0 && a <= -32 && test) {
-		print("worked");
-	}
+	a++;
 }

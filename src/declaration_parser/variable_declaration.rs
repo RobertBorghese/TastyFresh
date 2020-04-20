@@ -170,7 +170,14 @@ impl VariableDeclaration {
 		return self.var_type.is_only_static();
 	}
 
-	pub fn to_cpp(&self, expr: &Option<Rc<Expression>>, operators: &OperatorDataStructure, context: &mut Context, export_type: VariableExportType) -> String {
+	pub fn to_cpp(&self,
+		expr: &Option<Rc<Expression>>,
+		operators: &OperatorDataStructure,
+		context: &mut Context,
+		export_type: VariableExportType,
+		declare_type: bool
+	) -> String {
+
 		let var_type = &self.var_type;
 		let default_value = var_type.default_value();
 		let props = if var_type.var_properties.is_some() && !export_type.is_class_source() {
@@ -194,7 +201,7 @@ impl VariableDeclaration {
 			let is_construction = expr.as_ref().unwrap().is_construction_call();
 
 			if is_construction {
-				let var_type_output = var_type.to_cpp(false);
+				let var_type_output = var_type.to_cpp(declare_type);
 				let var_type_name = var_type.var_type.to_cpp(false);
 				let params = expr.as_ref().unwrap().get_parameters(operators, context);
 				let params_str = params.join(", ");
@@ -231,7 +238,7 @@ impl VariableDeclaration {
 			let right_str = expr.as_ref().unwrap().to_string(operators, context);
 			return format!("{}{} {} = {};",
 				props,
-				var_type.to_cpp(false),
+				var_type.to_cpp(declare_type),
 				final_name,
 				if self.pure_assign {
 					right_str
@@ -240,9 +247,9 @@ impl VariableDeclaration {
 				}
 			);
 		} else if default_value.is_some() {
-			return format!("{}{} {} = {};", props, var_type.to_cpp(false), final_name, default_value.unwrap());
+			return format!("{}{} {} = {};", props, var_type.to_cpp(declare_type), final_name, default_value.unwrap());
 		} else {
-			return format!("{}{} {};", props, var_type.to_cpp(false), final_name);
+			return format!("{}{} {};", props, var_type.to_cpp(declare_type), final_name);
 		};
 	}
 }

@@ -24,17 +24,6 @@ use crate::declaration_parser::function_declaration::{ FunctionDeclaration, Func
 use crate::declaration_parser::variable_declaration::VariableDeclaration;
 use crate::declaration_parser::attributes::Attributes;
 
-/*
-pub enum DeclarationType {
-	ModuleAttribute(ModuleAttributeDeclaration),
-	Assume(AssumeDeclaration, Option<Vec<AttributeDeclaration>>),
-	Function(FunctionDeclaration, Option<Vec<AttributeDeclaration>>),
-	Import(ImportDeclaration, Option<Vec<AttributeDeclaration>>),
-	Include(IncludeDeclaration, Option<Vec<AttributeDeclaration>>),
-	Variable(VariableDeclaration, Option<Vec<AttributeDeclaration>>)
-}
-*/
-
 type ClassDeclarationResult = DeclarationResult<ClassDeclaration>;
 
 pub struct ClassDeclaration {
@@ -215,7 +204,8 @@ impl ClassDeclaration {
 			},
 			self.name,
 			if attributes.has_attribute("DeclarePostName") {
-				format!(" {} ", attributes.get_attribute_parameters("DeclarePostName", content).join(" "))
+				format!(" {}{}", attributes.get_attribute_parameters("DeclarePostName", content).join(" "),
+					if self.extensions.is_none() { "" } else { " " })
 			} else {
 				"".to_string()
 			},
