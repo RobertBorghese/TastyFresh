@@ -214,13 +214,13 @@ fn get_output_dirs(arguments: &BTreeMap<String,Vec<String>>) -> Option<Vec<Strin
 /// # Return
 ///
 /// The `ModuleDeclaration` for the file is returned.
-fn parse_source_file(file: &str, source_location: &str, module_contexts: &mut BTreeMap<String,Context>, parser: &mut Parser, global_context: &mut GlobalContext) -> ModuleDeclaration {
+fn parse_source_file(file: &str, source_location: &str, config_data: &ConfigData, module_contexts: &mut BTreeMap<String,Context>, parser: &mut Parser, global_context: &mut GlobalContext) -> ModuleDeclaration {
 	let content = std::fs::read_to_string(file).expect("Could not read source file.");
 	if !file.ends_with(".tasty") { panic!("File is not a .tasty. You should be ashamed."); }
 	*parser = Parser::new(content);
 	let mut curr_index = 0;
 	let mut context = Context::new();
-	let mut module_declaration = ModuleDeclaration::new(parser, file);
+	let mut module_declaration = ModuleDeclaration::new(parser, file, &config_data.operators);
 	let mut attribute_class_indexes = Vec::new();
 	for declaration in &module_declaration.declarations {
 		match declaration {
@@ -234,6 +234,10 @@ fn parse_source_file(file: &str, source_location: &str, module_contexts: &mut BT
 			DeclarationType::Variable(d, _) => {
 				context.module.add_variable(d.name.clone(), d.var_type.clone());
 				context.register_type(&d.var_type);
+			},
+			DeclarationType::Class(d, _) => {
+				let class_data = d.to_class(&mut context, &parser.content);
+				context.module.add_class(d.name.clone(), class_data);
 			},
 			DeclarationType::AttributeClass(_, _) => {
 				attribute_class_indexes.push(curr_index);
@@ -446,7 +450,7 @@ fn main() {
 	for files in &source_files {
 		for f in files.1 {
 			let mut parser: Parser = Parser::new("".to_string());
-			file_declarations.insert(f.clone(), parse_source_file(&f, &files.0, &mut file_contexts, &mut parser, &mut global_context));
+			file_declarations.insert(f.clone(), parse_source_file(&f, &files.0, &data, &mut file_contexts, &mut parser, &mut global_context));
 			file_parsers.insert(f, parser);
 		}
 	}

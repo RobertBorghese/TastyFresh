@@ -5,6 +5,8 @@
  * individual Tasty Fresh source file.
  **********************************************************/
 
+use crate::config_management::operator_data::OperatorDataStructure;
+
 use crate::declaration_parser::parser::Parser;
 
 use crate::declaration_parser::module_attribute_declaration::ModuleAttributeDeclaration;
@@ -74,7 +76,7 @@ macro_rules! parse_declaration_w_file_name {
 }
 
 impl ModuleDeclaration {
-	pub fn new(parser: &mut Parser, file_name: &str) -> ModuleDeclaration {
+	pub fn new(parser: &mut Parser, file_name: &str, operator_data: &OperatorDataStructure) -> ModuleDeclaration {
 		let mut declarations = Vec::new();
 		let mut attributes = Vec::new();
 
@@ -109,7 +111,7 @@ impl ModuleDeclaration {
 			}
 
 			if FunctionDeclaration::is_declaration(parser) {
-				let result = FunctionDeclaration::new(parser, FunctionDeclarationType::ModuleLevel);
+				let result = FunctionDeclaration::new(parser, FunctionDeclarationType::ModuleLevel, None);
 				if result.is_error() {
 					result.print_error(file_name.to_string(), &parser.content);
 				} else {
@@ -123,7 +125,20 @@ impl ModuleDeclaration {
 				continue;
 			}
 
-			parse_declaration_w_file_name!(ClassDeclaration, Class, parser, file_name, declarations, attributes);
+			if ClassDeclaration::is_declaration(parser) {
+				let result = ClassDeclaration::new(parser, file_name, operator_data);
+				if result.is_error() {
+					result.print_error(file_name.to_string(), &parser.content);
+				} else {
+					declarations.push(DeclarationType::Class(result.unwrap_and_move(), Attributes::new(if attributes.is_empty() {
+						None
+					} else {
+						Some(std::mem::replace(&mut attributes, Vec::new()))
+					})));
+				}
+				attributes.clear();
+				continue;
+			}
 
 			parse_declaration!(AssumeDeclaration, Assume, parser, file_name, declarations, attributes);
 			parse_declaration!(ImportDeclaration, Import, parser, file_name, declarations, attributes);

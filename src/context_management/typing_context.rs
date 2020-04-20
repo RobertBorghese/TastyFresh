@@ -89,6 +89,10 @@ impl TypingContext {
 		}
 	}
 
+	pub fn add_class(&mut self, name: String, cls_type: ClassType) {
+		self.known_data.last_mut().unwrap().insert(name, ContextType::Class(cls_type));
+	}
+
 	pub fn print_everything(&self) {
 		for data in &self.known_data {
 			println!("-- SCOPE --");

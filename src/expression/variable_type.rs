@@ -11,6 +11,7 @@ use crate::expression::Expression;
 use crate::expression::value_type::{ NumberType, StringType, ClassType, Function };
 
 use crate::context_management::context::Context;
+use crate::context_management::typing_context::ContextType;
 
 lazy_static! {
 	pub static ref STYLE_TYPES: Vec<&'static str> = vec!("copy", "ref", "borrow", "move", "ptr", "autoptr", "uniqueptr", "classptr", "let", "ptr2", "ptr3", "ptr4", "ptr5", "ptr6", "ptr7", "ptr8", "ptr9");
@@ -28,6 +29,22 @@ pub struct VariableType {
 impl VariableType {
 	pub fn to_cpp(&self, declare: bool) -> String {
 		return self.var_style.to_cpp(&self.var_type, declare);
+	}
+
+	pub fn resolve(&mut self, context: &Context) {
+		match &self.var_type {
+			Type::Undeclared(names) => {
+				if names.len() == 1 {
+					let context_type = context.module.get_item(names.first().unwrap());
+					if context_type.is_some() {
+						if let ContextType::Class(cls) = context_type.unwrap() {
+							self.var_type = Type::Class(cls.clone());
+						}
+					}
+				}
+			},
+			_ => ()
+		}
 	}
 
 	pub fn from_type_style(info: (VarStyle, Type, bool)) -> VariableType {
@@ -376,7 +393,9 @@ impl Type {
 			Type::Boolean => "bool".to_string(),
 			Type::Number(num_type) => num_type.to_cpp().to_string(),
 			Type::String(string_type) => string_type.to_cpp().to_string(),
-			Type::Class(class_type) => if declare { format!("class {}", class_type.name.clone()) } else { class_type.name.clone() },
+			Type::Class(class_type) => {
+				if declare { format!("class {}", class_type.name.clone()) } else { class_type.name.clone() }
+			},
 			Type::Function(func) => {
 				let params = &func.parameters;
 				let mut params_output = "".to_string();
@@ -458,6 +477,13 @@ impl Type {
 		return false;
 	}
 
+	pub fn is_undeclared(&self) -> bool {
+		if let Type::Undeclared(..) = self {
+			return true;
+		}
+		return false;
+	}
+
 	pub fn default_value(&self) -> Option<&'static str> {
 		return match self {
 			Type::Unknown(_) => None,
@@ -475,6 +501,13 @@ impl Type {
 			Type::UndeclaredWParams(_, _) => None,
 			Type::This => None
 		}
+	}
+
+	pub fn get_class_type(&self) -> Option<ClassType> {
+		if let Type::Class(cls_type) = self {
+			return Some(cls_type.clone());
+		}
+		return None;
 	}
 }
 

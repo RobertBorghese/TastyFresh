@@ -13,7 +13,12 @@ use crate::{
 	declare_parse_type
 };
 
+use crate::config_management::operator_data::OperatorDataStructure;
+
+use crate::context_management::context::Context;
+
 use crate::expression::variable_type::Type;
+use crate::expression::value_type::{ ClassType, Property, Function };
 
 use crate::declaration_parser::declaration::{ Declaration, DeclarationResult };
 use crate::declaration_parser::parser::Parser;
@@ -24,28 +29,30 @@ use crate::declaration_parser::function_declaration::{ FunctionDeclaration, Func
 use crate::declaration_parser::variable_declaration::VariableDeclaration;
 use crate::declaration_parser::attributes::Attributes;
 
+use std::collections::BTreeMap;
+
 type ClassDeclarationResult = DeclarationResult<ClassDeclaration>;
 
 pub struct ClassDeclaration {
 	pub name: String,
-	pub class_type: ClassType,
+	pub class_type: ClassStyle,
 	pub extensions: Option<Vec<Type>>,
 	pub declarations: Vec<DeclarationType>
 }
 
-pub enum ClassType {
+pub enum ClassStyle {
 	Class,
 	Abstract,
 	Enum
 }
 
-impl ClassType {
+impl ClassStyle {
 	pub fn get_name(&self) -> &str {
-		return match self { ClassType::Class => "class", ClassType::Abstract => "abstract", ClassType::Enum => "enum" };
+		return match self { ClassStyle::Class => "class", ClassStyle::Abstract => "abstract", ClassStyle::Enum => "enum" };
 	}
 
-	pub fn new(index: i32) -> ClassType {
-		return match index { 0 => ClassType::Class, 1 => ClassType::Abstract, 2 => ClassType::Enum, _ => panic!("Could not generate ClassType from number!") };
+	pub fn new(index: i32) -> ClassStyle {
+		return match index { 0 => ClassStyle::Class, 1 => ClassStyle::Abstract, 2 => ClassStyle::Enum, _ => panic!("Could not generate ClassType from number!") };
 	}
 }
 
@@ -56,7 +63,7 @@ impl Declaration<ClassDeclaration> for ClassDeclaration {
 }
 
 impl ClassDeclaration {
-	pub fn new(parser: &mut Parser, file_name: &str) -> ClassDeclarationResult {
+	pub fn new(parser: &mut Parser, file_name: &str, operator_data: &OperatorDataStructure) -> ClassDeclarationResult {
 
 		// Parse Var Style
 		let mut class_keyword = "".to_string();
@@ -133,7 +140,7 @@ impl ClassDeclaration {
 			}
 
 			if FunctionDeclaration::is_declaration(parser) {
-				let result = FunctionDeclaration::new(parser, FunctionDeclarationType::ClassLevel);
+				let result = FunctionDeclaration::new(parser, FunctionDeclarationType::ClassLevel, Some(operator_data));
 				if result.is_error() {
 					result.print_error(file_name.to_string(), &parser.content);
 				} else {
@@ -179,7 +186,7 @@ impl ClassDeclaration {
 
 		return ClassDeclarationResult::Ok(ClassDeclaration {
 			name: class_name,
-			class_type: ClassType::new(class_type),
+			class_type: ClassStyle::new(class_type),
 			declarations: declarations,
 			extensions: if type_extensions.is_empty() { None } else { Some(type_extensions) }
 		});
@@ -220,5 +227,52 @@ impl ClassDeclaration {
 				" ".to_string()
 			}
 		);
+	}
+
+	pub fn to_class(&self, context: &mut Context, content: &str) -> ClassType {
+		let mut properties = Vec::new();
+		let mut functions = Vec::new();
+		let mut operators: BTreeMap<usize,Vec<Function>> = BTreeMap::new();
+		for declaration in &self.declarations {
+			match declaration {
+				DeclarationType::Function(d, _) => {
+					if d.function_type.is_operator() {
+						let op_type = d.function_type.get_operator_type();
+						let base_id = match op_type.as_str() { "suffix" => 100, "prefix" => 200, "infix" => 300, _ => panic!("Invalid operator type") };
+						let op_id = d.function_type.get_operator_id() + base_id;
+						if operators.contains_key(&op_id) {
+							operators.get_mut(&op_id).unwrap().push(d.to_function(content));
+						} else {
+							let op_funcs = vec![d.to_function(content)];
+							operators.insert(op_id, op_funcs);
+						}
+					} else {
+						functions.push(d.to_function(content));
+					}
+					for p in &d.parameters {
+						context.register_type(&p.0);
+					}
+					context.register_type(&d.return_type);
+				},
+				DeclarationType::Variable(d, _) => {
+					let mut prop = d.var_type.clone();
+					prop.resolve(context);
+					properties.push(Property {
+						name: d.name.clone(),
+						prop_type: prop,
+						default_value: None
+					});
+					context.register_type(&d.var_type);
+				},
+				_ => ()
+			}
+		}
+		return ClassType {
+			name: self.name.clone(),
+			type_params: None,
+			properties: properties,
+			functions: functions,
+			operators: operators
+		};
 	}
 }

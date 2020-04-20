@@ -18,10 +18,10 @@ use crate::{
 	delcare_increment
 };
 
+use crate::config_management::operator_data::OperatorDataStructure;
+
 use crate::expression::variable_type::{ VariableType, Type, VarStyle };
-
 use crate::expression::value_type::{ Function, Property };
-
 use crate::expression::function_type::FunStyle;
 
 use crate::declaration_parser::declaration::{ Declaration, DeclarationResult };
@@ -43,7 +43,7 @@ pub struct FunctionDeclaration {
 
 pub enum FunctionType {
 	Normal,
-	Operator,
+	Operator(String, usize),
 	Constructor,
 	Destructor
 }
@@ -65,10 +65,24 @@ impl FunctionType {
 	}
 
 	pub fn is_operator(&self) -> bool {
-		if let FunctionType::Operator = self {
+		if let FunctionType::Operator(..) = self {
 			return true;
 		}
 		return false;
+	}
+
+	pub fn get_operator_type(&self) -> String {
+		if let FunctionType::Operator(op_type, _) = self {
+			return op_type.clone();
+		}
+		return "".to_string();
+	}
+
+	pub fn get_operator_id(&self) -> usize {
+		if let FunctionType::Operator(_, id) = self {
+			return *id;
+		}
+		return 0;
 	}
 
 	pub fn is_constructor(&self) -> bool {
@@ -121,7 +135,7 @@ impl CPPTranspiler for FunctionDeclaration {
 }
 
 impl FunctionDeclaration {
-	pub fn new(parser: &mut Parser, declare_type: FunctionDeclarationType) -> FunctionDeclarationResult {
+	pub fn new(parser: &mut Parser, declare_type: FunctionDeclarationType, operator_data: Option<&OperatorDataStructure>) -> FunctionDeclarationResult {
 		let initial_line = parser.line;
 
 		let mut func_type = FunctionType::Normal;
@@ -162,7 +176,7 @@ impl FunctionDeclaration {
 				if !declare_type.is_class() {
 					return FunctionDeclarationResult::Err("Operators Disallowed", "operator functions can only be used in classes", parser.index - name.len(), parser.index);
 				}
-				func_type = FunctionType::Operator;
+				func_type = FunctionType::Operator("".to_string(), 100);
 				successfully_parsed = true;
 				break;
 			} else if name == "constructor" {
@@ -207,6 +221,27 @@ impl FunctionDeclaration {
 				declare_parse_required_ascii_op!(function_name, "Invalid Operator", "operator requires valid operator symbols", parser);
 			} else {
 				declare_parse_required_ascii!(function_name, "Function Name Missing", "function name missing", parser);
+			}
+		}
+
+		if func_type.is_operator() {
+			if operator_data.is_none() {
+				panic!("No operator data available!");
+			}
+			let mut found_operator = false;
+			for (op_type, ops) in operator_data.unwrap() {
+				let mut index = 0;
+				for op in ops {
+					if *op.name.as_ref().unwrap() == function_name {
+						func_type = FunctionType::Operator(op_type.to_string(), index);
+						found_operator = true;
+						break;
+					}
+					index += 1;
+				}
+			}
+			if !found_operator {
+				return FunctionDeclarationResult::Err("Unknown Operator", "unknown operator", parser.index, parser.index);
 			}
 		}
 

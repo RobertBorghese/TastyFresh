@@ -269,7 +269,8 @@ impl ExpressionPiece {
 		let right_result = Self::get_expression_from_piece(&parser.parts[*part_index], context);
 		let mut final_type = VariableType::inferred();
 
-		if left_result.is_some() && operator_id <= 4 && operator_id != 1 {
+		// all access :: . -> .* ->*
+		if left_result.is_some() && operator_id <= 5 && operator_id != 1 {
 			let left_type = left_result.as_ref().unwrap().get_type();
 			let access_name = Self::get_access_from_piece(&parser.parts[*part_index]);
 			if access_name.is_some() {
@@ -278,40 +279,54 @@ impl ExpressionPiece {
 					final_type = temp_type.unwrap();
 				}
 			}
-		} else if left_result.is_some() && right_result.is_some() && operator_id >= 6 && operator_id <= 9 {
-			let left_type = left_result.as_ref().unwrap().get_type();
-			let right_type = right_result.as_ref().unwrap().get_type();
-			if right_type.is_inferred_style() {
-				final_type = VariableType {
-					var_type: right_type.var_type,
-					var_style: left_type.var_style,
-					var_properties: right_type.var_properties,
-					var_optional: right_type.var_optional
-				};
-			} else {
-				final_type = right_type.clone();
-			}
 		}
-		
-		if left_result.is_some() && right_result.is_some() && operator_id >= 18 && operator_id <= 21 {
-			let left_expr = left_result.as_ref().unwrap();
-			let mut center_expr: Option<(Expression,Expression)> = None;
-			if let Expression::Infix(expr1, expr2, op, _, _) = &**left_expr {
-				if (operator_id < 20 && *op < 20) || (operator_id >= 20 && *op >= 20) {
-					center_expr = Some(((**expr1).clone(), (**expr2).clone()));
+
+		// cast operators # ## #* #~
+		if left_result.is_some() && right_result.is_some() {
+			if operator_id >= 6 && operator_id <= 9 {
+				let left_type = left_result.as_ref().unwrap().get_type();
+				let right_type = right_result.as_ref().unwrap().get_type();
+				if right_type.is_inferred_style() {
+					final_type = VariableType {
+						var_type: right_type.var_type,
+						var_style: left_type.var_style,
+						var_properties: right_type.var_properties,
+						var_optional: right_type.var_optional
+					};
+				} else {
+					final_type = right_type.clone();
 				}
 			}
 
-			if center_expr.is_some() {
-				return (Some(ExpressionPiece::Expression(Rc::new(Expression::Infix(
-					Rc::new(Expression::Infix(Rc::new(center_expr.as_ref().unwrap().1.clone()), Rc::new(center_expr.as_ref().unwrap().0.clone()), if operator_id < 20 { operator_id + 2 } else { operator_id - 2 }, VariableType::boolean(), position.clone())),
-					Rc::new(Expression::Infix(Rc::new(center_expr.unwrap().1), right_result.unwrap(), operator_id, VariableType::boolean(), position.clone())),
-					27, VariableType::boolean(), position)))), None);
-			}
-			
+			// compare operators < <= > >=
+			if operator_id >= 18 && operator_id <= 21 {
+				let left_expr = left_result.as_ref().unwrap();
+				let mut center_expr: Option<(Expression,Expression)> = None;
+				if let Expression::Infix(expr1, expr2, op, _, _) = &**left_expr {
+					if (operator_id < 20 && *op < 20) || (operator_id >= 20 && *op >= 20) {
+						center_expr = Some(((**expr1).clone(), (**expr2).clone()));
+					}
+				}
 
-			//Infix
-			//18, 19, 20, 21
+				if center_expr.is_some() {
+					return (Some(ExpressionPiece::Expression(Rc::new(Expression::Infix(
+						Rc::new(Expression::Infix(Rc::new(center_expr.as_ref().unwrap().1.clone()), Rc::new(center_expr.as_ref().unwrap().0.clone()), if operator_id < 20 { operator_id + 2 } else { operator_id - 2 }, VariableType::boolean(), position.clone())),
+						Rc::new(Expression::Infix(Rc::new(center_expr.unwrap().1), right_result.unwrap(), operator_id, VariableType::boolean(), position.clone())),
+						27, VariableType::boolean(), position)))), None);
+				}
+			}
+
+			// access operators . -> .* ->*
+			if operator_id >= 2 && operator_id <= 5 {
+				let left_type = left_result.as_ref().unwrap().get_type();
+				let left_type_cls = left_type.var_type.get_class_type();
+				if left_type_cls.is_some() {
+					let cls = left_type_cls.unwrap();
+					if let Expression::Value(s, _, _) = &**right_result.as_ref().unwrap() {
+						final_type = cls.get_field(&s);
+					}
+				}
+			}
 		}
 
 		if left_result.is_some() && right_result.is_some() {

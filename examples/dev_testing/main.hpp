@@ -1,6 +1,16 @@
 #ifndef MAIN_TASTYFILE
 #define MAIN_TASTYFILE
 
-std::string myTest(int charCount);
+int main();
+
+class Test {
+public:
+	int a = 32;
+};
+
+class Test2 {
+public:
+	Test b = Test();
+};
 
 #endif
