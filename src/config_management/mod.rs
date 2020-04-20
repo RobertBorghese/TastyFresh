@@ -54,6 +54,17 @@ pub fn read_file(path: &str) -> std::io::Result<String> {
 /// The contents of the file.
 pub fn read_config_files() -> ConfigData {
 	return ConfigData {
-		operators: parse_operators_json("config/operators.json")
+		operators: {
+			let mut dir = std::env::current_exe().expect("Could not get executable directory.");
+			dir.pop();
+			dir.push("config");
+			dir.push("operators.json");
+			let loc = dir.as_path().as_os_str().to_str().unwrap();
+			if std::path::Path::new(loc).exists() {
+				parse_operators_json(loc)
+			} else {
+				parse_operators_json("config/operators.json")
+			}
+		}
 	};
 }
