@@ -164,6 +164,12 @@ impl Expression {
 						let op = expr_left.get_type().access_operator();
 						format!("{}{}{}", expr_left.to_string(operators, context), op, expr_right_str)
 					}
+				} else if *id <= 5 && *id != 1 {
+					format!("{}{}{}",
+						expr_left.to_string(operators, context),
+						operators["infix"][*id].name.as_ref().unwrap_or(&"".to_string()),
+						expr_right.to_string(operators, context)
+					)
 				} else if *id >= 6 && *id <= 9 {
 					let mut right = tf_type.to_cpp(false); // expr_right.to_string(operators, context);
 					right = match *id {

@@ -26,29 +26,26 @@ contexts:
       scope: punctuation.definition.comment.tasty-fresh
       push: line_comment
 
-    - match: '(?<!fn)\s*(?!constructor|super|this)([a-zA-Z_](?:[a-zA-Z0-9_]+|::|\.|\->)+[a-zA-Z0-9_])\s*(?=\()'
+    - match: '(?<![a-zA-Z0-9_])(\@{{identifier}})'
+      scope: variable.parameter.tasty-fresh
+
+    - match: '(?<=[a-zA-Z0-9_])(\@[^\(\)\s]+)'
+      scope: keyword.operator.tasty-fresh
+
+    - match: '(?<=[a-zA-Z0-9_])(\@\([^\)]+\))'
+      scope: keyword.operator.tasty-fresh
+
+    - match: '(?<!fn)\s*(?!constructor|super|this)([a-zA-Z_](?:[a-zA-Z0-9_]+|::|\.|\->)+[a-zA-Z0-9_])\s*(@(?:[a-zA-Z0-9_]+|::|\.|\->)+)?(?=\()'
       scope: meta.function.tasty-fresh
       captures:
         1: entity.name.function.tasty-fresh
+        2: keyword.operator.tasty-fresh
 
     - match: '(fn)\s+({{identifier}})'
       scope: meta.function.tasty-fresh
       captures:
         1: storage.type.function.tasty-fresh
         2: entity.name.function.tasty-fresh
-
-    - match: '(\@{{identifier}})'
-      scope: variable.parameter.tasty-fresh
-
-    - match: '[a-zA-Z0-9_]+(\@[^\(\)\s]+)'
-      scope: meta.template.tasty-fresh
-      captures:
-        1: keyword.operator.tasty-fresh
-
-    - match: '[a-zA-Z0-9_]+(\@\([^\)]+\))'
-      scope: meta.template.tasty-fresh
-      captures:
-        1: keyword.operator.tasty-fresh
 
     - match: '\b(if|else|for|while|do|inc|dec|incto|decto|in|from|to|by)\b'
       scope: keyword.control.tasty-fresh

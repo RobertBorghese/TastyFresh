@@ -16,13 +16,15 @@ use std::fs::File;
 use std::io::prelude::*;
 
 pub struct ConfigData {
-	pub operators: OperatorDataStructure
+	pub operators: OperatorDataStructure,
+	pub pragma_guard: bool
 }
 
 impl ConfigData {
 	pub fn new() -> ConfigData {
 		return ConfigData {
-			operators: BTreeMap::new()
+			operators: BTreeMap::new(),
+			pragma_guard: false
 		};
 	}
 }
@@ -65,6 +67,7 @@ pub fn read_config_files() -> ConfigData {
 			} else {
 				parse_operators_json("config/operators.json")
 			}
-		}
+		},
+		pragma_guard: false
 	};
 }

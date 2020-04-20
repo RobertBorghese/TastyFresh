@@ -296,12 +296,16 @@ fn transpile_source_file(file: &str, source_location: &str, output_dirs: &Vec<St
 	}
 
 	let declarations_are_empty = transpile_context.class_declarations.is_empty() && transpile_context.declarations.is_empty();
-	let mut header_lines = Vec::new();
+	let mut header_lines: Vec<String> = Vec::new();
 	{
 		let file_path = Path::new(file);
 		let marco_name = file_path.file_stem().unwrap().to_str().unwrap().to_uppercase() + "_TASTYFILE";
-		header_lines.push("#ifndef ".to_string() + &marco_name);
-		header_lines.push("#define ".to_string() + &marco_name);
+		if config_data.pragma_guard {
+			header_lines.push("#pragma once".to_string());
+		} else {
+			header_lines.push("#ifndef ".to_string() + &marco_name);
+			header_lines.push("#define ".to_string() + &marco_name);
+		}
 		header_lines.push("".to_string());
 		let context = transpile_context.module_contexts.get_mut(access_file_path).unwrap();
 		if !context.headers.is_empty() || !transpile_context.header_system_includes.is_empty() {
@@ -340,7 +344,9 @@ fn transpile_source_file(file: &str, source_location: &str, output_dirs: &Vec<St
 			header_lines.push("};".to_string());
 			header_lines.push("".to_string());
 		}
-		header_lines.push("#endif".to_string());
+		if !config_data.pragma_guard {
+			header_lines.push("#endif".to_string());
+		}
 	}
 
 	for dir in output_dirs {
@@ -439,7 +445,9 @@ fn main() {
 		None => return
 	};
 
-	let data = config_management::read_config_files();
+	let mut data = config_management::read_config_files();
+
+	data.pragma_guard = arguments.contains_key("pragma-guard");
 
 	let mut file_contexts = BTreeMap::new();
 	let mut file_declarations = BTreeMap::new();
