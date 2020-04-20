@@ -237,7 +237,7 @@ fn parse_source_file(file: &str, source_location: &str, module_contexts: &mut BT
 			},
 			DeclarationType::AttributeClass(_, _) => {
 				attribute_class_indexes.push(curr_index);
-			}
+			},
 			_ => {
 			}
 		}

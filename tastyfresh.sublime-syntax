@@ -71,6 +71,9 @@ contexts:
     - match: '\b(fn|op|constructor|destructor)\b'
       scope: storage.type.function.tasty-fresh
 
+    - match: '\b(inject)\b'
+      scope: storage.type.function.tasty-fresh
+
     - match: '(class|abstract|enum)\s+({{identifier}})'
       scope: meta.assume.tasty-fresh
       captures:

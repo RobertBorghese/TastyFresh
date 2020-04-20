@@ -60,7 +60,7 @@ impl ModuleAttributeDeclaration {
 			if declare_content.starts_with("%") {
 				let mut was_end_char = false;
 				for c in declare_content.chars() {
-					if c == '\n' {
+					if c == '\n' || c == '\r' {
 						return was_end_char;
 					}
 					was_end_char = c == '%';

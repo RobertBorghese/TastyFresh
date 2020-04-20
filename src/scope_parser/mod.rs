@@ -13,6 +13,7 @@ pub mod while_parser;
 pub mod loop_parser;
 pub mod dowhile_parser;
 pub mod for_parser;
+pub mod inject_parser;
 
 use crate::declaration_parser::parser::Parser;
 use crate::declaration_parser::variable_declaration::{ VariableDeclaration, VariableExportType };
@@ -27,6 +28,7 @@ use crate::scope_parser::while_parser::WhileParser;
 use crate::scope_parser::loop_parser::LoopParser;
 use crate::scope_parser::dowhile_parser::DoWhileParser;
 use crate::scope_parser::for_parser::ForParser;
+use crate::scope_parser::inject_parser::InjectParser;
 
 use crate::config_management::ConfigData;
 use crate::config_management::operator_data::OperatorDataStructure;
@@ -49,7 +51,8 @@ pub enum ScopeExpression {
 	DoWhile(Rc<Expression>, Box<ScopeExpression>, usize, usize, usize),
 	For(String, Rc<Expression>, Box<ScopeExpression>, usize, usize),
 	Increment(String, Rc<Expression>, Rc<Expression>, Option<Rc<Expression>>, Box<ScopeExpression>, bool, usize, usize),
-	Decrement(String, Rc<Expression>, Rc<Expression>, Option<Rc<Expression>>, Box<ScopeExpression>, bool, usize, usize)
+	Decrement(String, Rc<Expression>, Rc<Expression>, Option<Rc<Expression>>, Box<ScopeExpression>, bool, usize, usize),
+	Injection(String, usize, usize)
 }
 
 impl ScopeExpression {
@@ -117,6 +120,16 @@ impl ScopeExpression {
 					parser.parse_whitespace();
 					let do_while_declare = result.unwrap_and_move();
 					scope_exprs.push(ScopeExpression::DoWhile(do_while_declare.expression, do_while_declare.scope, do_while_declare.line, do_while_declare.end_line, do_while_declare.while_offset));
+				}
+			} else if InjectParser::is_declaration(parser) {
+				let result = InjectParser::new(parser);
+				if result.is_error() {
+					result.print_error(file.to_string(), &parser.content);
+					break;
+				} else {
+					parser.parse_whitespace();
+					let inject_declare = result.unwrap_and_move();
+					scope_exprs.push(ScopeExpression::Injection(parser.content[inject_declare.start_index..inject_declare.end_index].to_string(), inject_declare.line, inject_declare.end_line));
 				}
 			} else if ForParser::is_declaration(parser) {
 				let result = ForParser::new(parser, file.to_string(), config_data, context);
@@ -247,7 +260,7 @@ impl ScopeExpression {
 							last_line_offset + 1
 						}
 					};
-					let re = Regex::new("(?:\n|\n\r)").unwrap();
+					let re = Regex::new("(?:\n\r|\r\n|\r|\n)").unwrap();
 					let mut curr_line = line_number;
 					for scope_line in re.split(&line) {
 						while curr_line >= lines.len() {
@@ -271,6 +284,36 @@ impl ScopeExpression {
 			},
 			ScopeExpression::Expression(expr) => {
 				format!("{};", expr.to_string(operators, context))
+			},
+			ScopeExpression::Injection(content, _, _) => {
+				let mut result = "".to_string();
+				let re = Regex::new("(?:\n\r|\r\n|\r|\n)").unwrap();
+				let mut initial_tab_offset: Option<usize> = None;
+				for line in re.split(&content) {
+					if line.trim().is_empty() {
+						if initial_tab_offset.is_none() { result += "\n"; }
+						continue;
+					}
+					let chars = line.chars().collect::<Vec<char>>();
+					let mut front_tab_index = 0;
+					while front_tab_index < chars.len() && chars[front_tab_index] == '\t' {
+						front_tab_index += 1;
+					}
+					if initial_tab_offset.is_some() {
+						let init = *initial_tab_offset.as_ref().unwrap();
+						if init < front_tab_index {
+							front_tab_index = init;
+						}
+					} else {
+						initial_tab_offset = Some(front_tab_index);
+					}
+					result += format!("{}{}", &line[front_tab_index..], "\n").as_str();
+				}
+				if context.align_lines {
+					format!("{}", result)
+				} else {
+					format!("{}", result.trim())
+				}
 			},
 			ScopeExpression::VariableDeclaration(declaration, expr) => {
 				declaration.to_cpp(expr, operators, context, VariableExportType::Scoped, false)
@@ -399,7 +442,7 @@ impl ScopeExpression {
 
 	pub fn format_scope_contents(&self, scope_str: &str, context: &mut Context, line: &usize, end_line: &usize) -> String {
 		if context.align_lines {
-			let re = Regex::new("(?:\n|\n\r)").unwrap();
+			let re = Regex::new("(?:\n\r|\r\n|\r|\n)").unwrap();
 			let mut final_line = *line - 1;
 			for _ in re.split(&scope_str) {
 				final_line += 1;
@@ -437,6 +480,7 @@ impl ScopeExpression {
 			ScopeExpression::For(_, _, _, line, _) => Some(*line),
 			ScopeExpression::Increment(_, _, _, _, _, _, line, _) => Some(*line),
 			ScopeExpression::Decrement(_, _, _, _, _, _, line, _) => Some(*line),
+			ScopeExpression::Injection(_, line, _) => Some(*line),
 			_ => None
 		};
 	}
@@ -452,6 +496,7 @@ impl ScopeExpression {
 			ScopeExpression::For(_, _, _, _, end_line) => Some(*end_line),
 			ScopeExpression::Increment(_, _, _, _, _, _, _, end_line) => Some(*end_line),
 			ScopeExpression::Decrement(_, _, _, _, _, _, _, end_line) => Some(*end_line),
+			ScopeExpression::Injection(_, _, end_line) => Some(*end_line),
 			_ => None
 		};
 	}
@@ -459,6 +504,13 @@ impl ScopeExpression {
 	pub fn is_extend(&self) -> bool {
 		return match self {
 			ScopeExpression::If(if_type, _, _, _, _) => if_type.is_elseif() || if_type.is_else(),
+			_ => false
+		};
+	}
+
+	pub fn is_inject(&self) -> bool {
+		return match self {
+			ScopeExpression::Injection(..) => true,
 			_ => false
 		};
 	}

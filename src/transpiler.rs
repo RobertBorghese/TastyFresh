@@ -197,6 +197,21 @@ impl<'a> Transpiler<'a> {
 
 					self.class_declarations.push((class_content, construct_declares, public_declares, private_declares));
 				},
+				DeclarationType::Injection(injection, _attributes) => {
+					let context = self.module_contexts.get_mut(self.access_file_path).unwrap();
+					let mut line = if context.align_lines { injection.line } else { self.output_lines.len() + 1 };
+					let injection = if context.align_lines {
+						&self.parser.content[injection.start_index..injection.end_index]
+					} else {
+						&self.parser.content[injection.start_index..injection.end_index].trim()
+					};
+					let re = Regex::new("(?:\n\r|\r\n|\r|\n)").unwrap();
+					for inject_line in re.split(injection) {
+						if !context.align_lines && inject_line.trim().is_empty() { continue; }
+						insert_output_line(&mut self.output_lines, inject_line, line, false);
+						line += 1;
+					}
+				},
 				DeclarationType::Assume(_assume, _attributes) => {
 				},
 				DeclarationType::Import(import, _attributes) => {
@@ -249,7 +264,7 @@ impl<'a> Transpiler<'a> {
 						);
 						insert_output_line(&mut self.output_lines, &func_declaration, line, false);
 						if func_content.is_some() {
-							let re = Regex::new("(?:\n|\n\r)").unwrap();
+							let re = Regex::new("(?:\n\r|\r\n|\r|\n)").unwrap();
 							let original_line = line;
 							insert_output_line(&mut self.output_lines, "{", line, false);
 							for func_line in re.split(&func_content.unwrap()) {

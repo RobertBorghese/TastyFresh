@@ -1,3 +1,9 @@
+
+
+inject {
+#include <vector>
+}
+
 fn myTest(charCount: int) -> std.string {
 	let result = new std.string("");
 	inc i from 0 to charCount {
@@ -9,4 +15,12 @@ fn myTest(charCount: int) -> std.string {
 	else p = 0;
 	let v = new vector@int();
 	let fds = pqwe.ds();
+
+	inject {
+		int a = 32;
+		if(a == 32) {
+			printf("%d", 32);
+		}
+	}
+	let a = 32;
 }

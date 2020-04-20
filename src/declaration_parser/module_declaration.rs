@@ -16,6 +16,7 @@ use crate::declaration_parser::include_declaration::IncludeDeclaration;
 use crate::declaration_parser::variable_declaration::VariableDeclaration;
 use crate::declaration_parser::class_declaration::ClassDeclaration;
 use crate::declaration_parser::attribute_class_declaration::AttributeClassDeclaration;
+use crate::declaration_parser::inject_declaration::InjectDeclaration;
 use crate::declaration_parser::attributes::Attributes;
 
 pub enum DeclarationType {
@@ -26,7 +27,8 @@ pub enum DeclarationType {
 	Include(IncludeDeclaration, Attributes),
 	Variable(VariableDeclaration, Attributes),
 	Class(ClassDeclaration, Attributes),
-	AttributeClass(AttributeClassDeclaration, Attributes)
+	AttributeClass(AttributeClassDeclaration, Attributes),
+	Injection(InjectDeclaration, Attributes)
 }
 
 pub struct ModuleDeclaration {
@@ -127,6 +129,7 @@ impl ModuleDeclaration {
 			parse_declaration!(ImportDeclaration, Import, parser, file_name, declarations, attributes);
 			parse_declaration!(IncludeDeclaration, Include, parser, file_name, declarations, attributes);
 			parse_declaration!(VariableDeclaration, Variable, parser, file_name, declarations, attributes);
+			parse_declaration!(InjectDeclaration, Injection, parser, file_name, declarations, attributes);
 
 			parse_declaration_w_file_name!(AttributeClassDeclaration, AttributeClass, parser, file_name, declarations, attributes);
 
