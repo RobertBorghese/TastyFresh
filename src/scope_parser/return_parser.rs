@@ -23,6 +23,12 @@ use crate::context_management::context::Context;
 
 use std::rc::Rc;
 
+use regex::Regex;
+
+lazy_static! {
+	pub static ref RETURN_REGEX: Regex = Regex::new(r"^\b(?:return)\b").unwrap();
+}
+
 type ReturnParserResult = DeclarationResult<ReturnParser>;
 
 pub struct ReturnParser {
@@ -89,6 +95,6 @@ impl ReturnParser {
 
 	pub fn is_return_declaration(content: &str, index: usize) -> bool {
 		let declare = &content[index..];
-		return declare.starts_with("return ") || declare.starts_with("return(");
+		return RETURN_REGEX.is_match(declare);
 	}
 }

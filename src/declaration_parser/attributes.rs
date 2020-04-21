@@ -9,6 +9,7 @@ use crate::context_management::global_context::GlobalContext;
 
 use crate::declaration_parser::attribute_declaration::AttributeDeclaration;
 
+#[derive(Clone)]
 pub struct Attributes {
 	data: Option<Vec<AttributeDeclaration>>
 }

@@ -22,12 +22,20 @@ use crate::declaration_parser::parser::Parser;
 use crate::context_management::context::Context;
 
 use crate::scope_parser::ScopeExpression;
+use crate::scope_parser::while_parser::WhileType;
 
 use std::rc::Rc;
+
+use regex::Regex;
+
+lazy_static! {
+	pub static ref DOWHILE_REGEX: Regex = Regex::new(r"^\b(?:do)\b").unwrap();
+}
 
 type DoWhileParserResult = DeclarationResult<DoWhileParser>;
 
 pub struct DoWhileParser {
+	pub while_type: WhileType,
 	pub expression: Rc<Expression>,
 	pub scope: Box<ScopeExpression>,
 	pub line: usize,
@@ -53,13 +61,15 @@ impl DoWhileParser {
 
 		declare_parse_whitespace!(parser);
 
+		let mut next_char = ' ';
 		let mut close_line = 0;
 		let scope: Option<ScopeExpression>;
 		if parser.get_curr() == '{' {
 			scope = Some(ScopeExpression::new(parser, None, parser.index + 1, parser.line, &file_name, config_data, context, None));
+			declare_parse_whitespace!(parser);
 			if parser.get_curr() == '}' {
 				close_line = parser.line;
-				parser.increment();
+				declare_parse_required_next_char!('}', next_char, parser);
 			}
 		} else {
 			scope = Some(ScopeExpression::new(parser, Some(1), parser.index, parser.line, &file_name, config_data, context, None));
@@ -69,10 +79,15 @@ impl DoWhileParser {
 		declare_parse_whitespace!(parser);
 
 		let while_line = parser.line - close_line;
+		let mut while_type = WhileType::While;
 		let mut while_keyword = "".to_string();
 		declare_parse_ascii!(while_keyword, parser);
-		if while_keyword != "while" {
-			return DoWhileParserResult::Err("Unexpected Keyword", "\"while\" keyword expected", parser.index - while_keyword.len(), parser.index);
+		if while_keyword != "while" && while_keyword != "until" {
+			return DoWhileParserResult::Err("Unexpected Keyword", "\"while\" or \"until\" keyword expected", parser.index - while_keyword.len(), parser.index);
+		}
+
+		if while_keyword == "until" {
+			while_type = WhileType::Until;
 		}
 
 		declare_parse_whitespace!(parser);
@@ -89,10 +104,10 @@ impl DoWhileParser {
 
 		declare_parse_whitespace!(parser);
 
-		let mut next_char = ' ';
 		declare_parse_required_next_char!(';', next_char, parser);
 
 		return DoWhileParserResult::Ok(DoWhileParser {
+			while_type: while_type,
 			expression: expression,
 			scope: Box::new(scope.unwrap()),
 			line: initial_line,
@@ -107,6 +122,6 @@ impl DoWhileParser {
 
 	pub fn is_do_while_declaration(content: &str, index: usize) -> bool {
 		let declare = &content[index..];
-		return declare.starts_with("do");
+		return DOWHILE_REGEX.is_match(declare);
 	}
 }

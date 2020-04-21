@@ -144,6 +144,13 @@ impl VariableType {
 		return false;
 	}
 
+	pub fn is_number(&self) -> bool {
+		if let Type::Number(..) = self.var_type {
+			return true;
+		}
+		return false;
+	}
+
 	pub fn boolean() -> VariableType {
 		return VariableType {
 			var_type: Type::Boolean,

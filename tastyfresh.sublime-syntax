@@ -35,11 +35,16 @@ contexts:
     - match: '(?<=[a-zA-Z0-9_])(\@\([^\)]+\))'
       scope: keyword.operator.tasty-fresh
 
-    - match: '(?<!fn)\s*(?!constructor|super|this)([a-zA-Z_](?:[a-zA-Z0-9_]+|::|\.|\->)+[a-zA-Z0-9_])\s*(@(?:[a-zA-Z0-9_]+|::|\.|\->)+)?(?=\()'
+    - match: '(?<!fn)\s*(?!constructor|super|this)({{identifier}})(?=(?:@{{identifier}})?\()'
       scope: meta.function.tasty-fresh
       captures:
         1: entity.name.function.tasty-fresh
         2: keyword.operator.tasty-fresh
+
+    - match: '({{identifier}})(?=(?:::|\.|\->|\.\*|\->\*))'
+      scope: meta.function.tasty-fresh
+      captures:
+        1: entity.name.variable.tasty-fresh
 
     - match: '(fn)\s+({{identifier}})'
       scope: meta.function.tasty-fresh
@@ -47,7 +52,7 @@ contexts:
         1: storage.type.function.tasty-fresh
         2: entity.name.function.tasty-fresh
 
-    - match: '\b(if|else|for|while|do|inc|dec|incto|decto|in|from|to|by)\b'
+    - match: '\b(if|unless|else|for|while|until|do|inc|dec|incto|decto|in|from|to|by)\b'
       scope: keyword.control.tasty-fresh
 
     - match: \breturn\b

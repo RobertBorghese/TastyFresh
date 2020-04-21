@@ -16,6 +16,7 @@ use crate::declaration_parser::cpp_transpiler::CPPTranspiler;
 
 type AssumeDeclarationResult = DeclarationResult<AssumeDeclaration>;
 
+#[derive(Clone)]
 pub struct AssumeDeclaration {
 	pub path: String,
 	pub line: usize

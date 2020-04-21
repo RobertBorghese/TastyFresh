@@ -16,6 +16,7 @@ use crate::declaration_parser::cpp_transpiler::CPPTranspiler;
 
 type ImportDeclarationResult = DeclarationResult<ImportDeclaration>;
 
+#[derive(Clone)]
 pub struct ImportDeclaration {
 	pub path: String,
 	pub line: usize

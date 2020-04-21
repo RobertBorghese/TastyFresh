@@ -29,6 +29,7 @@ use crate::config_management::operator_data::OperatorDataStructure;
 
 type VariableDeclarationResult = DeclarationResult<VariableDeclaration>;
 
+#[derive(Clone)]
 pub struct VariableDeclaration {
 	pub name: String,
 	pub var_type: VariableType,
@@ -240,7 +241,7 @@ impl VariableDeclaration {
 				props,
 				var_type.to_cpp(declare_type),
 				final_name,
-				if self.pure_assign {
+				if self.pure_assign || expr.as_ref().unwrap().get_type().is_inferred(){
 					right_str
 				} else {
 					expr.as_ref().unwrap().get_type().convert_between_styles(var_type, &right_str).unwrap_or(right_str.to_string())

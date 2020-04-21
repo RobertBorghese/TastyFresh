@@ -13,6 +13,7 @@ use crate::declaration_parser::parser::Parser;
 
 type ModuleAttributeDeclarationResult = DeclarationResult<ModuleAttributeDeclaration>;
 
+#[derive(Clone)]
 pub struct ModuleAttributeDeclaration {
 	pub name: String,
 	pub line: usize

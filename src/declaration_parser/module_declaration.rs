@@ -21,6 +21,7 @@ use crate::declaration_parser::attribute_class_declaration::AttributeClassDeclar
 use crate::declaration_parser::inject_declaration::InjectDeclaration;
 use crate::declaration_parser::attributes::Attributes;
 
+#[derive(Clone)]
 pub enum DeclarationType {
 	ModuleAttribute(ModuleAttributeDeclaration),
 	Assume(AssumeDeclaration, Attributes),

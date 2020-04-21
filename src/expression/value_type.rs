@@ -229,12 +229,10 @@ impl NumberType {
 					NumberType::Long
 				}
 			} else {
-				if dot {
-					if float {
-						NumberType::Float
-					} else {
-						NumberType::Double
-					}
+				if float {
+					NumberType::Float
+				} else if dot {
+					NumberType::Double
 				} else if unsigned {
 					NumberType::UInt
 				} else {

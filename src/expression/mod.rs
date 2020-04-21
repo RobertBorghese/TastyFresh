@@ -60,10 +60,23 @@ impl Expression {
 	}
 
 	pub fn get_line_number(&self) -> Option<usize> {
+		if let Expression::Ternary(e, _, _, _, _) = self {
+			return e.get_line_number();
+		} else {
+			let pos = self.get_position();
+			if pos.is_some() {
+				return Some(pos.unwrap().line.unwrap_or(0));
+			} else {
+				return None;
+			}
+		}
+	}
+
+	pub fn get_position(&self) -> Option<Position> {
 		if let Expression::Invalid = self {
 			return None;
-		} else if let Expression::Ternary(e, _, _, _, _) = self {
-			return e.get_line_number();
+		} else if let Expression::Ternary(_, _, _, _, _) = self {
+			return None;
 		} else {
 			return Some(match self {
 				Expression::Value(_, _, p) => p,
@@ -77,7 +90,7 @@ impl Expression {
 				Expression::ConstructCall(_, _, _, p) => p,
 				Expression::ArrayAccess(_, _, _, p) => p,
 				Expression::Invalid => panic!("Invalid!")
-			}.line.unwrap_or(0));
+			}.clone());
 		}
 	}
 
@@ -187,7 +200,7 @@ impl Expression {
 					}
 				} else if *id == 29 || *id == 30 {
 					let right_str = expr_right.to_string(operators, context);
-					let right_str_final = if *id == 29 {
+					let right_str_final = if *id == 29 && !expr_right.get_type().is_inferred() {
 						expr_right.get_type().convert_between_styles(&expr_left.get_type(), &right_str).unwrap_or(right_str.to_string())
 					} else {
 						right_str
@@ -281,4 +294,72 @@ impl Expression {
 		}
 		return result;
 	}
-}
+
+	pub fn reverse_bool(&self) -> Expression {
+		match self {
+			Expression::Prefix(expr, operator_id, _, position) => {
+				if *operator_id == 4 {
+					return (**expr).clone();
+				}
+				return Expression::Prefix(Rc::new(self.clone()), 4, VariableType::boolean(), position.clone());
+			},
+			Expression::Infix(left_expr, right_expr, operator_id, _, position) => {
+				if *operator_id >= 18 && *operator_id <= 23 {
+					return Expression::Infix(Rc::clone(left_expr), Rc::clone(right_expr), match *operator_id {
+						18 => 21,
+						19 => 20,
+						20 => 19,
+						21 => 18,
+						22 => 23,
+						23 => 22,
+						_ => 0
+					}, VariableType::boolean(), position.clone());
+				} else if *operator_id == 27 || *operator_id == 28 {
+					return Expression::Infix(Rc::new(left_expr.reverse_bool()), Rc::new(right_expr.reverse_bool()), if *operator_id == 27 { 28 } else { 27 }, VariableType::boolean(), position.clone());
+				}
+			},
+			_ => ()
+		}
+
+		// If all else fails, wrap with !
+		let curr_pos = self.get_position().unwrap_or(Position::new("".to_string(), Some(0), 0, None));
+		match self {
+			Expression::Expressions(..) |
+			Expression::Value(..) |
+			Expression::FunctionCall(..) |
+			Expression::ArrayAccess(..) => {
+				return Expression::Prefix(Rc::new(self.clone()), 4, VariableType::boolean(), curr_pos.clone());
+			},
+			_ => ()
+		}
+
+		// Or even worse, wrap with !()
+		let exprs = vec![Rc::new(self.clone())];
+		let exprs_expr = Expression::Expressions(Rc::new(exprs), self.get_type(), curr_pos.clone());
+		return Expression::Prefix(Rc::new(exprs_expr), 4, VariableType::boolean(), curr_pos.clone());
+	}
+}/*{ "operator": "<",   "priority": 600 }, -- 18
+		{ "operator": "<=",  "priority": 600 }, -- 19
+		{ "operator": ">",   "priority": 600 }, -- 20
+		{ "operator": ">=",  "priority": 600 }, -- 21
+		{ "operator": "==",  "priority": 550 }, -- 22
+		{ "operator": "!=",  "priority": 550 }, -- 23
+		{ "operator": "&",   "priority": 500 }, -- 24
+		{ "operator": "^",   "priority": 450 }, -- 25
+		{ "operator": "|",   "priority": 400 }, -- 26
+		{ "operator": "&&",  "priority": 350 }, -- 27
+		{ "operator": "||",  "priority": 300 },*/
+
+/*pub enum Expression {
+	Invalid,
+	Value(String, VariableType, Position),
+	Prefix(Rc<Expression>, usize, VariableType, Position),
+	Suffix(Rc<Expression>, usize, VariableType, Position),
+	Infix(Rc<Expression>, Rc<Expression>, usize, VariableType, Position),
+	Ternary(Rc<Expression>, Rc<Expression>, Rc<Expression>, usize, VariableType),
+	Expressions(Rc<Vec<Rc<Expression>>>, VariableType, Position),
+	InitializerList(Rc<Vec<Rc<Expression>>>, VariableType, Position),
+	FunctionCall(Rc<Expression>, Rc<Vec<Rc<Expression>>>, VariableType, Position),
+	ConstructCall(Type, Rc<Vec<Rc<Expression>>>, VariableType, Position),
+	ArrayAccess(Rc<Expression>, Rc<Vec<Rc<Expression>>>, VariableType, Position)
+}*/

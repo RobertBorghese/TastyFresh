@@ -234,6 +234,13 @@ impl ExpressionPiece {
 	}
 
 	fn parse_prefix(parser: &ExpressionParser, part_index: &usize, operator_id: usize, context: &Option<&mut Context>, position: Position) -> (Option<ExpressionPiece>,Option<Position>) {
+		let mut final_type = VariableType::inferred();
+		if operator_id <= 3 {
+			let result = Self::get_expression_from_piece(&parser.parts[*part_index], context);
+			if result.is_some() && result.as_ref().unwrap().get_type().is_number() {
+				final_type = (*result.unwrap()).get_type().clone();
+			}
+		}
 		if Self::expect_type(operator_id, true) {
 			let tf_type = Self::get_type_from_piece(&parser.parts[*part_index]);
 			let result = Self::get_expression_from_piece(&parser.parts[*part_index], context);
@@ -250,7 +257,7 @@ impl ExpressionPiece {
 		} else {
 			let result = Self::get_expression_from_piece(&parser.parts[*part_index], context);
 			if result.is_some() {
-				return (Some(ExpressionPiece::Expression(Rc::new(Expression::Prefix(result.unwrap(), operator_id, VariableType::inferred(), position)))), None);
+				return (Some(ExpressionPiece::Expression(Rc::new(Expression::Prefix(result.unwrap(), operator_id, final_type, position)))), None);
 			}
 		}
 		return (None, Some(position));
@@ -303,7 +310,7 @@ impl ExpressionPiece {
 				let left_expr = left_result.as_ref().unwrap();
 				let mut center_expr: Option<(Expression,Expression)> = None;
 				if let Expression::Infix(expr1, expr2, op, _, _) = &**left_expr {
-					if (operator_id < 20 && *op < 20) || (operator_id >= 20 && *op >= 20) {
+					if (operator_id < 20 && *op >= 18 && *op < 20) || (operator_id >= 20 && *op >= 20 && *op <= 21) {
 						center_expr = Some(((**expr1).clone(), (**expr2).clone()));
 					}
 				}
@@ -493,7 +500,7 @@ impl ExpressionPiece {
 			},
 			ExpressionPiece::FunctionParameters(..) |
 			ExpressionPiece::ArrayAccessParameters(..) => {
-				*priority = 950;
+				*priority = 960;
 			},
 			_ => {
 				*priority = -2;

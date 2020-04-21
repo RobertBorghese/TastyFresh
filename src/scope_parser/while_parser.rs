@@ -24,13 +24,41 @@ use crate::scope_parser::ScopeExpression;
 
 use std::rc::Rc;
 
+use regex::Regex;
+
+lazy_static! {
+	pub static ref WHILE_REGEX: Regex = Regex::new(r"^\b(?:while|until)\b").unwrap();
+}
+
 type WhileParserResult = DeclarationResult<WhileParser>;
 
 pub struct WhileParser {
+	pub while_type: WhileType,
 	pub expression: Rc<Expression>,
 	pub scope: Box<ScopeExpression>,
 	pub line: usize,
 	pub end_line: usize
+}
+
+pub enum WhileType {
+	While,
+	Until
+}
+
+impl WhileType {
+	pub fn is_while(&self) -> bool {
+		if let WhileType::While = self {
+			return true;
+		}
+		return false;
+	}
+
+	pub fn is_until(&self) -> bool {
+		if let WhileType::Until = self {
+			return true;
+		}
+		return false;
+	}
 }
 
 impl Declaration<WhileParser> for WhileParser {
@@ -43,10 +71,15 @@ impl WhileParser {
 	pub fn new(parser: &mut Parser, file_name: String, config_data: &ConfigData, context: &mut Context) -> WhileParserResult {
 		let initial_line = parser.line;
 
+		let mut while_type = WhileType::While;
 		let mut while_keyword = "".to_string();
 		declare_parse_ascii!(while_keyword, parser);
-		if while_keyword != "while" {
-			return WhileParserResult::Err("Unexpected Keyword", "\"while\" keyword expected", parser.index - while_keyword.len(), parser.index);
+		if while_keyword != "while" && while_keyword != "until" {
+			return WhileParserResult::Err("Unexpected Keyword", "\"while\" or \"until\" keyword expected", parser.index - while_keyword.len(), parser.index);
+		}
+
+		if while_keyword == "until" {
+			while_type = WhileType::Until;
 		}
 
 		declare_parse_whitespace!(parser);
@@ -74,6 +107,7 @@ impl WhileParser {
 		}
 
 		return WhileParserResult::Ok(WhileParser {
+			while_type: while_type,
 			expression: expression,
 			scope: Box::new(scope.unwrap()),
 			line: initial_line,
@@ -87,6 +121,6 @@ impl WhileParser {
 
 	pub fn is_while_declaration(content: &str, index: usize) -> bool {
 		let declare = &content[index..];
-		return declare.starts_with("while ") || declare.starts_with("while(");
+		return WHILE_REGEX.is_match(declare);
 	}
 }

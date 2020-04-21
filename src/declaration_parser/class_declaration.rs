@@ -33,6 +33,7 @@ use std::collections::BTreeMap;
 
 type ClassDeclarationResult = DeclarationResult<ClassDeclaration>;
 
+#[derive(Clone)]
 pub struct ClassDeclaration {
 	pub name: String,
 	pub class_type: ClassStyle,
@@ -40,6 +41,7 @@ pub struct ClassDeclaration {
 	pub declarations: Vec<DeclarationType>
 }
 
+#[derive(Clone)]
 pub enum ClassStyle {
 	Class,
 	Abstract,

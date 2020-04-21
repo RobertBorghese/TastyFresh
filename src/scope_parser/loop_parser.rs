@@ -18,6 +18,12 @@ use crate::context_management::context::Context;
 
 use crate::scope_parser::ScopeExpression;
 
+use regex::Regex;
+
+lazy_static! {
+	pub static ref LOOP_REGEX: Regex = Regex::new(r"^\b(?:loop)\b").unwrap();
+}
+
 type LoopParserResult = DeclarationResult<LoopParser>;
 
 pub struct LoopParser {
@@ -67,6 +73,6 @@ impl LoopParser {
 
 	pub fn is_loop_declaration(content: &str, index: usize) -> bool {
 		let declare = &content[index..];
-		return declare.starts_with("loop");
+		return LOOP_REGEX.is_match(declare);
 	}
 }

@@ -14,6 +14,12 @@ use crate::{
 use crate::declaration_parser::declaration::{ Declaration, DeclarationResult };
 use crate::declaration_parser::parser::Parser;
 
+use regex::Regex;
+
+lazy_static! {
+	pub static ref INJECT_REGEX: Regex = Regex::new(r"^\b(?:inject)\b").unwrap();
+}
+
 type InjectParserResult = DeclarationResult<InjectParser>;
 
 pub struct InjectParser {
@@ -63,6 +69,6 @@ impl InjectParser {
 
 	pub fn is_inject_declaration(content: &str, index: usize) -> bool {
 		let declare = &content[index..];
-		return declare.starts_with("inject");
+		return INJECT_REGEX.is_match(declare);
 	}
 }

@@ -149,6 +149,94 @@ impl<'a> Transpiler<'a> {
 
 	pub fn parse_declarations(&mut self, declarations: &mut Vec<DeclarationType>, global_context: &GlobalContext, mut class_declarations: Option<(&str, &mut VarFuncDeclarations, &mut VarFuncDeclarations, &mut VarFuncDeclarations)>) {
 		let is_class_declare = !class_declarations.is_none();
+
+		let mut declarations_clone = declarations.clone();
+		for declaration in &mut declarations_clone {
+			match declaration {
+				DeclarationType::Variable(var_data, attributes) => {
+					attributes.flatten_attributes(global_context, self.parser.content.as_str());
+
+					let mut context = self.module_contexts.get_mut(self.access_file_path).unwrap();
+					let mut reason = ExpressionEndReason::Unknown;
+					let mut expr: Option<Rc<Expression>> = None;
+					if var_data.value.is_some() {
+						self.parser.reset(var_data.value.unwrap().0, var_data.line);
+						expr = Some(self.parser.parse_expression(self.file.to_string(), self.config_data, Some(&mut context), &mut reason, Some(var_data.var_type.clone())));
+						if var_data.var_type.is_inferred() {
+							var_data.var_type.var_type = expr.as_ref().unwrap().get_type().var_type;
+						}
+					}
+					let var_type = &var_data.var_type;
+					let line = if context.align_lines { var_data.line } else {
+						if self.end_line > var_data.line || var_data.line - self.end_line < 2 {
+							self.output_lines.len()
+						} else {
+							self.output_lines.len() + 1
+						}
+					};
+					if is_class_declare {
+						context.typing.add_variable(var_data.name.clone(), var_data.var_type.clone());
+					} else {
+						context.module.add_variable(var_data.name.clone(), var_data.var_type.clone());
+					}
+					if !is_class_declare || var_data.is_only_static() {
+						insert_output_line(&mut self.output_lines,
+							&var_data.to_cpp(&expr,
+								&self.config_data.operators,
+								&mut context,
+								if is_class_declare && var_data.is_only_static() {
+									VariableExportType::ClassSource(class_declarations.as_ref().unwrap().0)
+								} else {
+									VariableExportType::ModuleSource
+								},
+								false
+							),
+							line,
+							false,
+						);
+					}
+					self.end_line = var_data.line;
+					let add_to_header = !attributes.has_attribute("NoHeader");
+					if add_to_header {
+						let is_declare = attributes.has_attribute("DeclareType");
+						if !is_class_declare {
+							let var_declaraction = format!("extern {} {}", var_type.to_cpp(is_declare), var_data.name);
+							configure_declaration_with_attributes(
+								&mut self.declarations.variable_declarations,
+								&mut self.declarations.variable_declarations_isolated,
+								&var_declaraction,
+								&attributes,
+								&self.parser.content,
+								true
+							);
+						} else {
+							let var_declaraction = if is_class_declare && var_data.is_only_static() {
+								format!("static {} {} ", var_type.to_cpp(is_declare), var_data.name)
+							} else {
+								var_data.to_cpp(&expr, &self.config_data.operators, &mut context, if is_class_declare {
+									VariableExportType::ClassHeader
+								} else {
+									VariableExportType::ModuleHeader
+								},
+								is_declare)
+							};
+							let temp = &mut class_declarations.as_mut().unwrap().2;
+							configure_declaration_with_attributes(
+								&mut temp.variable_declarations,
+								&mut temp.variable_declarations_isolated,
+								&var_declaraction[0..var_declaraction.len() - 1],
+								&attributes,
+								&self.parser.content,
+								true
+							);
+						};
+						
+					}
+				},
+				_ => ()
+			}
+		}
+
 		for declaration in declarations {
 			// Module Attributes
 			if let DeclarationType::ModuleAttribute(module_attribute) = declaration {
@@ -255,10 +343,15 @@ impl<'a> Transpiler<'a> {
 					self.end_line = line;
 					if !func_data.header_only() {
 						if func_data.start_index.is_some() && func_data.end_index.is_some() {
+							context.typing.push_context();
+							for param in &func_data.parameters {
+								context.typing.add_variable(param.1.clone(), param.0.clone());
+							}
 							let scope = ScopeExpression::new(self.parser, None, func_data.start_index.unwrap(), func_data.line, self.file, self.config_data, &mut context, Some(func_data.return_type.clone()));
 							func_content = Some(scope.to_string(&self.config_data.operators, func_data.line, 1, &mut context));
+							context.typing.pop_context();
 						}
-						let func_declaration = func_data.to_function(&self.file).to_cpp(false, false,
+						let func_declaration = func_data.to_function(&self.parser.content).to_cpp(false, false,
 							if is_class_declare { Some(class_declarations.as_ref().unwrap().0) } else { None },
 							&func_data.function_type
 						);
@@ -278,7 +371,7 @@ impl<'a> Transpiler<'a> {
 						self.end_line = func_data.line + (line - self.end_line);
 					}
 					if add_to_header {
-						let header_func_declare = func_data.to_function(&self.file).to_cpp(true,
+						let header_func_declare = func_data.to_function(&self.parser.content).to_cpp(true,
 							true,
 							if is_class_declare { Some(class_declarations.as_ref().unwrap().0) } else { None },
 							&func_data.function_type
@@ -315,81 +408,6 @@ impl<'a> Transpiler<'a> {
 								);
 							}
 						}
-					}
-				},
-				DeclarationType::Variable(var_data, attributes) => {
-					attributes.flatten_attributes(global_context, self.parser.content.as_str());
-
-					let mut context = self.module_contexts.get_mut(self.access_file_path).unwrap();
-					let mut reason = ExpressionEndReason::Unknown;
-					let mut expr: Option<Rc<Expression>> = None;
-					if var_data.value.is_some() {
-						self.parser.reset(var_data.value.unwrap().0, var_data.line);
-						expr = Some(self.parser.parse_expression(self.file.to_string(), self.config_data, Some(&mut context), &mut reason, Some(var_data.var_type.clone())));
-						if var_data.var_type.is_inferred() {
-							var_data.var_type.var_type = expr.as_ref().unwrap().get_type().var_type;
-						}
-					}
-					let var_type = &var_data.var_type;
-					let line = if context.align_lines { var_data.line } else {
-						if self.end_line > var_data.line || var_data.line - self.end_line < 2 {
-							self.output_lines.len()
-						} else {
-							self.output_lines.len() + 1
-						}
-					};
-					if !is_class_declare || var_data.is_only_static() {
-						insert_output_line(&mut self.output_lines,
-							&var_data.to_cpp(&expr,
-								&self.config_data.operators,
-								&mut context,
-								if is_class_declare && var_data.is_only_static() {
-									VariableExportType::ClassSource(class_declarations.as_ref().unwrap().0)
-								} else {
-									VariableExportType::ModuleSource
-								},
-								false
-							),
-							line,
-							false,
-						);
-					}
-					self.end_line = var_data.line;
-					let add_to_header = !attributes.has_attribute("NoHeader");
-					if add_to_header {
-						let is_declare = attributes.has_attribute("DeclareType");
-						if !is_class_declare {
-							let var_declaraction = format!("extern {} {}", var_type.to_cpp(is_declare), var_data.name);
-							configure_declaration_with_attributes(
-								&mut self.declarations.variable_declarations,
-								&mut self.declarations.variable_declarations_isolated,
-								&var_declaraction,
-								&attributes,
-								&self.parser.content,
-								true
-							);
-						} else {
-							let var_declaraction = if is_class_declare && var_data.is_only_static() {
-								format!("static {} {} ", var_type.to_cpp(is_declare), var_data.name)
-							} else {
-								var_data.to_cpp(&expr, &self.config_data.operators, &mut context, if is_class_declare {
-									VariableExportType::ClassHeader
-								} else {
-									VariableExportType::ModuleHeader
-								},
-								is_declare)
-							};
-							let temp = &mut class_declarations.as_mut().unwrap().2;
-							configure_declaration_with_attributes(
-								&mut temp.variable_declarations,
-								&mut temp.variable_declarations_isolated,
-								&var_declaraction[0..var_declaraction.len() - 1],
-								&attributes,
-								&self.parser.content,
-								true
-							);
-						};
-						
 					}
 				},
 				_ => {

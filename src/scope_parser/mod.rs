@@ -24,7 +24,7 @@ use crate::expression::variable_type::VariableType;
 
 use crate::scope_parser::return_parser::ReturnParser;
 use crate::scope_parser::if_parser::{ IfParser, IfType };
-use crate::scope_parser::while_parser::WhileParser;
+use crate::scope_parser::while_parser::{ WhileParser, WhileType };
 use crate::scope_parser::loop_parser::LoopParser;
 use crate::scope_parser::dowhile_parser::DoWhileParser;
 use crate::scope_parser::for_parser::ForParser;
@@ -46,9 +46,9 @@ pub enum ScopeExpression {
 	VariableDeclaration(VariableDeclaration, Option<Rc<Expression>>),
 	Return(Rc<Expression>, usize),
 	If(IfType, Option<Rc<Expression>>, Box<ScopeExpression>, usize, usize),
-	While(Rc<Expression>, Box<ScopeExpression>, usize, usize),
+	While(WhileType, Rc<Expression>, Box<ScopeExpression>, usize, usize),
 	Loop(Box<ScopeExpression>, usize, usize),
-	DoWhile(Rc<Expression>, Box<ScopeExpression>, usize, usize, usize),
+	DoWhile(WhileType, Rc<Expression>, Box<ScopeExpression>, usize, usize, usize),
 	For(String, Rc<Expression>, Box<ScopeExpression>, usize, usize),
 	Increment(String, Rc<Expression>, Rc<Expression>, Option<Rc<Expression>>, Box<ScopeExpression>, bool, usize, usize),
 	Decrement(String, Rc<Expression>, Rc<Expression>, Option<Rc<Expression>>, Box<ScopeExpression>, bool, usize, usize),
@@ -99,7 +99,7 @@ impl ScopeExpression {
 				} else {
 					parser.parse_whitespace();
 					let while_declare = result.unwrap_and_move();
-					scope_exprs.push(ScopeExpression::While(while_declare.expression, while_declare.scope, while_declare.line, while_declare.end_line));
+					scope_exprs.push(ScopeExpression::While(while_declare.while_type, while_declare.expression, while_declare.scope, while_declare.line, while_declare.end_line));
 				}
 			} else if LoopParser::is_declaration(parser) {
 				let result = LoopParser::new(parser, file.to_string(), config_data, context);
@@ -119,7 +119,7 @@ impl ScopeExpression {
 				} else {
 					parser.parse_whitespace();
 					let do_while_declare = result.unwrap_and_move();
-					scope_exprs.push(ScopeExpression::DoWhile(do_while_declare.expression, do_while_declare.scope, do_while_declare.line, do_while_declare.end_line, do_while_declare.while_offset));
+					scope_exprs.push(ScopeExpression::DoWhile(do_while_declare.while_type, do_while_declare.expression, do_while_declare.scope, do_while_declare.line, do_while_declare.end_line, do_while_declare.while_offset));
 				}
 			} else if InjectParser::is_declaration(parser) {
 				let result = InjectParser::new(parser);
@@ -327,12 +327,18 @@ impl ScopeExpression {
 				format!("{}", self.format_scope_contents(&scope_str, context, line, end_line))
 			},
 			ScopeExpression::If(if_type, expr, scope, line, end_line) => {
-				let expr_str = if expr.is_some() { expr.as_ref().unwrap().to_string(operators, context) } else { "".to_string() };
+				let expr_str = if expr.is_none() {
+					"".to_string()
+				} else if if_type.is_unless() || if_type.is_elseunless() {
+					expr.as_ref().unwrap().reverse_bool().to_string(operators, context)
+				} else {
+					expr.as_ref().unwrap().to_string(operators, context)
+				};
 				let scope_str = scope.to_string(operators, *line, tab_offset, context);
 				format!("{} {}", if if_type.is_else() {
 						"else".to_string()
 					} else {
-						format!("{}if({})", if if_type.is_elseif() {
+						format!("{}if({})", if if_type.is_elseif() || if_type.is_elseunless() {
 								"else "
 							} else {
 								""
@@ -344,8 +350,12 @@ impl ScopeExpression {
 						)
 					}, self.format_scope_contents(&scope_str, context, line, end_line))
 			},
-			ScopeExpression::While(expr, scope, line, end_line) => {
-				let expr_str = expr.to_string(operators, context);
+			ScopeExpression::While(while_type, expr, scope, line, end_line) => {
+				let expr_str = if while_type.is_until() {
+					expr.reverse_bool().to_string(operators, context)
+				} else {
+					expr.to_string(operators, context)
+				};
 				let scope_str = scope.to_string(operators, *line, tab_offset, context);
 				format!("while({}) {}", if context.align_lines {
 					&expr_str
@@ -357,8 +367,12 @@ impl ScopeExpression {
 				let scope_str = scope.to_string(operators, *line, tab_offset, context);
 				format!("while(true) {}", self.format_scope_contents(&scope_str, context, line, end_line))
 			},
-			ScopeExpression::DoWhile(expr, scope, line, end_line, while_offset) => {
-				let expr_str = expr.to_string(operators, context);
+			ScopeExpression::DoWhile(while_type, expr, scope, line, end_line, while_offset) => {
+				let expr_str = if while_type.is_until() {
+					expr.reverse_bool().to_string(operators, context)
+				} else {
+					expr.to_string(operators, context)
+				};
 				let scope_str = scope.to_string(operators, *line, tab_offset, context);
 				format!("do {}{}while({});",
 					self.format_scope_contents(&scope_str, context, line, end_line),
@@ -475,9 +489,9 @@ impl ScopeExpression {
 			ScopeExpression::VariableDeclaration(declare, _) => Some(declare.line),
 			ScopeExpression::Return(_, line) => Some(*line),
 			ScopeExpression::If(_, _, _, line, _) => Some(*line),
-			ScopeExpression::While(_, _, line, _) => Some(*line),
+			ScopeExpression::While(_, _, _, line, _) => Some(*line),
 			ScopeExpression::Loop(_, line, _) => Some(*line),
-			ScopeExpression::DoWhile(_, _, line, _, _) => Some(*line),
+			ScopeExpression::DoWhile(_, _, _, line, _, _) => Some(*line),
 			ScopeExpression::For(_, _, _, line, _) => Some(*line),
 			ScopeExpression::Increment(_, _, _, _, _, _, line, _) => Some(*line),
 			ScopeExpression::Decrement(_, _, _, _, _, _, line, _) => Some(*line),
@@ -491,9 +505,9 @@ impl ScopeExpression {
 			ScopeExpression::Expression(expr) => expr.get_line_number(),
 			ScopeExpression::SubScope(_, _, end_line) => Some(*end_line),
 			ScopeExpression::If(_, _, _, _, end_line) => Some(*end_line),
-			ScopeExpression::While(_, _, _, end_line) => Some(*end_line),
+			ScopeExpression::While(_, _, _, _, end_line) => Some(*end_line),
 			ScopeExpression::Loop(_, _, end_line) => Some(*end_line),
-			ScopeExpression::DoWhile(_, _, _, _, end_line) => Some(*end_line),
+			ScopeExpression::DoWhile(_, _, _, _, end_line, while_line) => Some(*while_line + *end_line),
 			ScopeExpression::For(_, _, _, _, end_line) => Some(*end_line),
 			ScopeExpression::Increment(_, _, _, _, _, _, _, end_line) => Some(*end_line),
 			ScopeExpression::Decrement(_, _, _, _, _, _, _, end_line) => Some(*end_line),

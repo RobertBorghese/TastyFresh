@@ -21,6 +21,7 @@ use either::*;
 
 type AttributeClassDeclarationResult = DeclarationResult<AttributeClassDeclaration>;
 
+#[derive(Clone)]
 pub struct AttributeClassDeclaration {
 	pub name: String,
 	pub arguments: Vec<(String,bool)>,

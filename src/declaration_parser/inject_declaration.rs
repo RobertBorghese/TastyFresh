@@ -16,6 +16,7 @@ use crate::declaration_parser::parser::Parser;
 
 type InjectDeclarationResult = DeclarationResult<InjectDeclaration>;
 
+#[derive(Clone)]
 pub struct InjectDeclaration {
 	pub line: usize,
 	pub start_index: usize,

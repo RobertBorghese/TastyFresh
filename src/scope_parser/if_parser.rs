@@ -25,6 +25,12 @@ use crate::scope_parser::ScopeExpression;
 
 use std::rc::Rc;
 
+use regex::Regex;
+
+lazy_static! {
+	pub static ref IF_REGEX: Regex = Regex::new(r"^\b(?:if|unless|else)\b").unwrap();
+}
+
 type IfParserResult = DeclarationResult<IfParser>;
 
 pub struct IfParser {
@@ -37,7 +43,9 @@ pub struct IfParser {
 
 pub enum IfType {
 	If,
+	Unless,
 	ElseIf,
+	ElseUnless,
 	Else
 }
 
@@ -49,8 +57,22 @@ impl IfType {
 		return false;
 	}
 
+	pub fn is_unless(&self) -> bool {
+		if let IfType::Unless = self {
+			return true;
+		}
+		return false;
+	}
+
 	pub fn is_elseif(&self) -> bool {
 		if let IfType::ElseIf = self {
+			return true;
+		}
+		return false;
+	}
+
+	pub fn is_elseunless(&self) -> bool {
+		if let IfType::ElseUnless = self {
 			return true;
 		}
 		return false;
@@ -76,12 +98,12 @@ impl IfParser {
 
 		let mut if_keyword = "".to_string();
 		declare_parse_ascii!(if_keyword, parser);
-		if if_keyword != "if" && if_keyword != "else" {
-			return IfParserResult::Err("Unexpected Keyword", "\"if\" or \"else\" keyword expected", parser.index - if_keyword.len(), parser.index);
+		if if_keyword != "if" && if_keyword != "else"  && if_keyword != "unless" {
+			return IfParserResult::Err("Unexpected Keyword", "\"if\", \"else\", or \"unless\" keyword expected", parser.index - if_keyword.len(), parser.index);
 		}
 
-		let mut if_type = IfType::If;
-		let mut obtain_condition = if_keyword == "if";
+		let mut if_type = if if_keyword == "if" { IfType::If } else { IfType::Unless };
+		let mut obtain_condition = if_keyword == "if" || if_keyword == "unless";
 
 		declare_parse_whitespace!(parser);
 
@@ -95,6 +117,10 @@ impl IfParser {
 				declare_parse_whitespace!(parser);
 				obtain_condition = true;
 				if_type = IfType::ElseIf;
+			} else if real_if_keyword == "unless" {
+				declare_parse_whitespace!(parser);
+				obtain_condition = true;
+				if_type = IfType::ElseUnless;
 			} else {
 				parser.reset(curr_index, curr_line);
 				if_type = IfType::Else;
@@ -141,6 +167,6 @@ impl IfParser {
 
 	pub fn is_if_declaration(content: &str, index: usize) -> bool {
 		let declare = &content[index..];
-		return declare.starts_with("if ") || declare.starts_with("if(") || declare.starts_with("else ");
+		return IF_REGEX.is_match(declare);
 	}
 }

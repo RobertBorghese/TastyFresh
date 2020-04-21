@@ -16,6 +16,7 @@ use crate::declaration_parser::cpp_transpiler::CPPTranspiler;
 
 type IncludeDeclarationResult = DeclarationResult<IncludeDeclaration>;
 
+#[derive(Clone)]
 pub struct IncludeDeclaration {
 	pub path: String,
 	pub location: IncludeLocation,

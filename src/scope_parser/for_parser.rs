@@ -26,7 +26,13 @@ use crate::scope_parser::ScopeExpression;
 
 use std::rc::Rc;
 
+use regex::Regex;
+
 use either::*;
+
+lazy_static! {
+	pub static ref FOR_REGEX: Regex = Regex::new(r"^\b(?:for|inc|dec)\b").unwrap();
+}
 
 type ForParserResult = DeclarationResult<ForParser>;
 
@@ -252,6 +258,6 @@ impl ForParser {
 
 	pub fn is_for_declaration(content: &str, index: usize) -> bool {
 		let declare = &content[index..];
-		return declare.starts_with("for ") || declare.starts_with("inc ") || declare.starts_with("dec ");
+		return FOR_REGEX.is_match(declare);
 	}
 }

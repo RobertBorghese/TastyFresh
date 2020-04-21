@@ -1,13 +1,3 @@
 
-class Test {
-	let a: int = 32;
-}
-
-class Test2 {
-	let b: Test = new Test();
-}
-
 fn main() -> int {
-	let test = new Test2();
-	let bleh = test.b.a;
 }

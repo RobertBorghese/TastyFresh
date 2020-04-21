@@ -30,6 +30,7 @@ use crate::declaration_parser::cpp_transpiler::CPPTranspiler;
 
 type FunctionDeclarationResult = DeclarationResult<FunctionDeclaration>;
 
+#[derive(Clone)]
 pub struct FunctionDeclaration {
 	pub name: String,
 	pub props: Vec<FunStyle>,
@@ -41,6 +42,7 @@ pub struct FunctionDeclaration {
 	pub end_index: Option<usize>
 }
 
+#[derive(Clone)]
 pub enum FunctionType {
 	Normal,
 	Operator(String, usize),
