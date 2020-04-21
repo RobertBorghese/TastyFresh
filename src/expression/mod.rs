@@ -184,7 +184,7 @@ impl Expression {
 						expr_right.to_string(operators, context)
 					)
 				} else if *id >= 6 && *id <= 9 {
-					let mut right = tf_type.to_cpp(false); // expr_right.to_string(operators, context);
+					let mut right = tf_type.to_cpp(); // expr_right.to_string(operators, context);
 					right = match *id {
 						6 => format!("({})", right),
 						7 => format!("static_cast<{}>", right),

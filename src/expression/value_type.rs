@@ -254,14 +254,16 @@ impl ClassType {
 pub struct Property {
 	pub name: String,
 	pub prop_type: VariableType,
-	pub default_value: Option<String>
+	pub default_value: Option<String>,
+	pub is_declare: bool
 }
 
 impl Property {
-	pub fn to_cpp(&self) -> String {
+	pub fn to_cpp(&self, is_header: bool) -> String {
+		let declare_text = if self.is_declare && is_header { format!("class ") } else { "".to_string() };
 		return match &self.default_value {
-			Some(value) => format!("{} {} = {}", self.prop_type.to_cpp(false), self.name, value),
-			None => format!("{} {}", self.prop_type.to_cpp(false), self.name)
+			Some(value) => format!("{}{} {} = {}", declare_text, self.prop_type.to_cpp(), self.name, value),
+			None => format!("{}{} {}", declare_text, self.prop_type.to_cpp(), self.name)
 		}
 	}
 }
@@ -294,7 +296,7 @@ impl Function {
 		}
 		format!("{}{}{}{}({})",
 			if style_content.is_empty() { "".to_string() } else { format!("{} ", style_content.join(" ")) },
-			if func_type.is_normal_or_operator() { format!("{} ", self.return_type.to_cpp(false)) } else { "".to_string() },
+			if func_type.is_normal_or_operator() { format!("{} ", self.return_type.to_cpp()) } else { "".to_string() },
 			if header || class_name.is_none() { "".to_string() } else { format!("{}::", class_name.unwrap()) },
 			if func_type.is_constructor() {
 				class_name.unwrap().to_string()
@@ -305,7 +307,7 @@ impl Function {
 			} else {
 				self.name.clone()
 			},
-			self.parameters.iter().map(|param| param.to_cpp()).collect::<Vec<String>>().join(", ")
+			self.parameters.iter().map(|param| param.to_cpp(header)).collect::<Vec<String>>().join(", ")
 		)
 	}
 }

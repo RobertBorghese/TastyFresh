@@ -15,7 +15,7 @@ use crate::context_management::typing_context::ContextType;
 
 lazy_static! {
 	pub static ref STYLE_TYPES: Vec<&'static str> = vec!("copy", "ref", "borrow", "move", "ptr", "autoptr", "uniqueptr", "classptr", "let", "ptr2", "ptr3", "ptr4", "ptr5", "ptr6", "ptr7", "ptr8", "ptr9");
-	pub static ref VARIABLE_PROPS: Vec<&'static str> = vec!("const", "constexpr", "constinit", "extern", "mutable", "forever", "thread_local", "volatile");
+	pub static ref VARIABLE_PROPS: Vec<&'static str> = vec!("const", "constexpr", "constinit", "extern", "mutable", "forever", "thread_local", "volatile", "declare");
 }
 
 #[derive(Clone, PartialEq)]
@@ -27,7 +27,15 @@ pub struct VariableType {
 }
 
 impl VariableType {
-	pub fn to_cpp(&self, declare: bool) -> String {
+	pub fn to_cpp(&self) -> String {
+		let mut declare = false;
+		if self.var_properties.is_some() {
+			for prop in self.var_properties.as_ref().unwrap() {
+				if prop.is_declare() {
+					declare = true;
+				}
+			}
+		}
 		return self.var_style.to_cpp(&self.var_type, declare);
 	}
 
@@ -227,8 +235,8 @@ impl VariableType {
 					VarStyle::Borrow => Some(content.to_string()),
 					VarStyle::Move => Some(format!("std::move({})", content)),
 					VarStyle::Ptr(size) => Some(format!("{}{}", String::from_utf8(vec![b'&'; size]).unwrap(), content)),
-					VarStyle::AutoPtr => Some(format!("std::make_shared<{}>({})", other.to_cpp(false), content)),
-					VarStyle::UniquePtr => Some(format!("std::make_unique<{}>({})", other.to_cpp(false), content)),
+					VarStyle::AutoPtr => Some(format!("std::make_shared<{}>({})", other.to_cpp(), content)),
+					VarStyle::UniquePtr => Some(format!("std::make_unique<{}>({})", other.to_cpp(), content)),
 					_ => None
 				}
 			},
@@ -247,8 +255,8 @@ impl VariableType {
 							Some(content.to_string())
 						}
 					},
-					VarStyle::AutoPtr => Some(format!("std::make_shared<{}>({}{})", other.to_cpp(false), stars, content)),
-					VarStyle::UniquePtr => Some(format!("std::make_unique<{}>({}{})", other.to_cpp(false), stars, content)),
+					VarStyle::AutoPtr => Some(format!("std::make_shared<{}>({}{})", other.to_cpp(), stars, content)),
+					VarStyle::UniquePtr => Some(format!("std::make_unique<{}>({}{})", other.to_cpp(), stars, content)),
 					_ => None
 				}
 			},
@@ -407,12 +415,12 @@ impl Type {
 				let params = &func.parameters;
 				let mut params_output = "".to_string();
 				for i in 0..params.len() {
-					params_output += &params[i].prop_type.to_cpp(false);
+					params_output += &params[i].prop_type.to_cpp();
 					if i < params.len() - 1 {
 						params_output += ", ";
 					}
 				}
-				format!("std::function<{}({})>", func.return_type.to_cpp(false), params_output)
+				format!("std::function<{}({})>", func.return_type.to_cpp(), params_output)
 			},
 			Type::QuantumFunction(funcs) => {
 				if !funcs.is_empty() {
@@ -422,7 +430,7 @@ impl Type {
 				}
 			},
 			Type::InitializerList(init_type) => {
-				format!("std::initializer_list<{}>", init_type.to_cpp(false))
+				format!("std::initializer_list<{}>", init_type.to_cpp())
 			}
 			Type::Tuple(types) => {
 				let mut is_inferred = false;
@@ -435,7 +443,7 @@ impl Type {
 				if is_inferred {
 					"auto".to_string()
 				} else {
-					format!("std::tuple<{}>", types.iter().map(|t| t.to_cpp(false)).collect::<Vec<String>>().join(", "))
+					format!("std::tuple<{}>", types.iter().map(|t| t.to_cpp()).collect::<Vec<String>>().join(", "))
 				}
 			}
 			Type::Inferred => "auto".to_string(),
@@ -461,7 +469,7 @@ impl Type {
 				let mut i = 0;
 				loop {
 					if i < type_args.len() {
-						result += type_args[i].to_cpp(false).as_str();
+						result += type_args[i].to_cpp().as_str();
 						i += 1;
 						if i < type_args.len() {
 							result += ", ";
@@ -593,6 +601,9 @@ impl VarStyle {
 	}
 
 	pub fn to_cpp(&self, var_type: &Type, declare: bool) -> String {
+		if var_type.is_inferred() {
+			return "auto".to_string();
+		}
 		return match self {
 			VarStyle::Copy => var_type.to_cpp(declare),
 			VarStyle::Ref => format!("{}&", var_type.to_cpp(declare)),
@@ -671,7 +682,8 @@ pub enum VarProps {
 	Mutable,
 	Static,
 	Threadlocal,
-	Volatile
+	Volatile,
+	Declare
 }
 
 impl VarProps {
@@ -685,6 +697,7 @@ impl VarProps {
 			"forever" => VarProps::Static,
 			"thread_local" => VarProps::Threadlocal,
 			"volatile" => VarProps::Volatile,
+			"declare" => VarProps::Declare,
 			_ => VarProps::Unknown
 		}
 	}
@@ -703,7 +716,15 @@ impl VarProps {
 			VarProps::Mutable => "mutable",
 			VarProps::Static => "static",
 			VarProps::Threadlocal => "thread_local",
-			VarProps::Volatile => "volatile"
+			VarProps::Volatile => "volatile",
+			VarProps::Declare => ""
 		}
+	}
+
+	pub fn is_declare(&self) -> bool {
+		if let VarProps::Declare = self {
+			return true;
+		}
+		return false;
 	}
 }

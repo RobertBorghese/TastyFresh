@@ -175,8 +175,7 @@ impl VariableDeclaration {
 		expr: &Option<Rc<Expression>>,
 		operators: &OperatorDataStructure,
 		context: &mut Context,
-		export_type: VariableExportType,
-		declare_type: bool
+		export_type: VariableExportType
 	) -> String {
 
 		let var_type = &self.var_type;
@@ -184,7 +183,10 @@ impl VariableDeclaration {
 		let props = if var_type.var_properties.is_some() && !export_type.is_class_source() {
 			let mut result = Vec::new();
 			for prop in var_type.var_properties.as_ref().unwrap() {
-				result.push(prop.get_name());
+				let name = prop.get_name();
+				if !name.is_empty() {
+					result.push(name);
+				}
 			}
 			if result.is_empty() {
 				"".to_string()
@@ -202,7 +204,7 @@ impl VariableDeclaration {
 			let is_construction = expr.as_ref().unwrap().is_construction_call();
 
 			if is_construction {
-				let var_type_output = var_type.to_cpp(declare_type);
+				let var_type_output = var_type.to_cpp();
 				let var_type_name = var_type.var_type.to_cpp(false);
 				let params = expr.as_ref().unwrap().get_parameters(operators, context);
 				let params_str = params.join(", ");
@@ -239,7 +241,7 @@ impl VariableDeclaration {
 			let right_str = expr.as_ref().unwrap().to_string(operators, context);
 			return format!("{}{} {} = {};",
 				props,
-				var_type.to_cpp(declare_type),
+				var_type.to_cpp(),
 				final_name,
 				if self.pure_assign || expr.as_ref().unwrap().get_type().is_inferred(){
 					right_str
@@ -248,9 +250,9 @@ impl VariableDeclaration {
 				}
 			);
 		} else if default_value.is_some() {
-			return format!("{}{} {} = {};", props, var_type.to_cpp(declare_type), final_name, default_value.unwrap());
+			return format!("{}{} {} = {};", props, var_type.to_cpp(), final_name, default_value.unwrap());
 		} else {
-			return format!("{}{} {};", props, var_type.to_cpp(declare_type), final_name);
+			return format!("{}{} {};", props, var_type.to_cpp(), final_name);
 		};
 	}
 }

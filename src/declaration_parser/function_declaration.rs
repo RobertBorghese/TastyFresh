@@ -28,13 +28,20 @@ use crate::declaration_parser::declaration::{ Declaration, DeclarationResult };
 use crate::declaration_parser::parser::Parser;
 use crate::declaration_parser::cpp_transpiler::CPPTranspiler;
 
+use regex::Regex;
+
+lazy_static! {
+	pub static ref FUNC_STYLE_REGEX: Regex = Regex::new(r"^\b(?:static|extern|virtual|inline|meta)\b").unwrap();
+	pub static ref FUNC_REGEX: Regex = Regex::new(r"^\b(?:fn|op|constructor|destructor)\b").unwrap();
+}
+
 type FunctionDeclarationResult = DeclarationResult<FunctionDeclaration>;
 
 #[derive(Clone)]
 pub struct FunctionDeclaration {
 	pub name: String,
 	pub props: Vec<FunStyle>,
-	pub parameters: Vec<(VariableType, String, Option<usize>, Option<usize>)>,
+	pub parameters: Vec<(VariableType, String, Option<usize>, Option<usize>, bool)>,
 	pub return_type: VariableType,
 	pub function_type: FunctionType,
 	pub line: usize,
@@ -263,10 +270,18 @@ impl FunctionDeclaration {
 				if parser.get_curr() == ')' {
 					break;
 				} else {
+					let mut is_declare = false;
 					let mut param_name: String;
 					let mut param_type_str = "".to_string();
 					let param_type;
 					declare_parse_ascii!(param_type_str, parser);
+
+					if param_type_str == "declare" {
+						is_declare = true;
+						declare_parse_required_whitespace!(parser);
+						param_type_str = "".to_string();
+						declare_parse_ascii!(param_type_str, parser);
+					}
 
 					if VarStyle::styles().contains(&param_type_str.as_str()) {
 						param_type = VarStyle::new(param_type_str.as_str());
@@ -282,7 +297,8 @@ impl FunctionDeclaration {
 					// Parse Whitespace
 					declare_parse_whitespace!(parser);
 
-					let mut next_char = parser.get_curr();
+					let mut has_value = false;
+					let next_char = parser.get_curr();
 					let var_type: Type;
 					if next_char == ':' {
 						delcare_increment!(parser);
@@ -291,6 +307,7 @@ impl FunctionDeclaration {
 					} else if next_char == '=' {
 						var_type = Type::Inferred;
 						delcare_increment!(parser);
+						has_value = true;
 					} else {
 						return FunctionDeclarationResult::Err("Unexpected Symbol", "unexpected symbol", parser.index - 1, parser.index);
 					}
@@ -299,34 +316,34 @@ impl FunctionDeclaration {
 					declare_parse_whitespace!(parser);
 
 					// Parse Assignment
-					let mut has_value = false;
-					if let Type::Inferred = var_type {
-						declare_parse_required_next_char!('=', next_char, parser);
+					if parser.get_curr() == '=' {
+						delcare_increment!(parser);
 						has_value = true;
-					} else if parser.get_curr() == '=' {
-						has_value = true;
+						declare_parse_whitespace!(parser);
 					}
 
-					let mut start = Some(parser.index);
-					let mut result = ' ';
-					declare_parse_expr_until_either_char!(',', ')', result, parser);
-					let mut end = Some(parser.index);
-					if result != ')' && result != ',' {
-						return Self::out_of_space(parser.index);
+					let mut start = None;
+					let mut end = None;
+					if has_value {
+						start = Some(parser.index);
+						let mut result = ' ';
+						declare_parse_expr_until_either_char!(',', ')', result, parser);
+						end = Some(parser.index);
+						if result != ')' && result != ',' {
+							return Self::out_of_space(parser.index);
+						}
 					}
-					if result != ')' { delcare_increment!(parser); }
 
-					if !has_value {
-						start = None;
-						end = None;
-					}
+					declare_parse_whitespace!(parser);
+
+					if parser.get_curr() != ')' { delcare_increment!(parser); }
 
 					parameters.push((VariableType {
 						var_type: var_type,
 						var_style: param_type,
 						var_properties: None,
 						var_optional: false
-					}, param_name, start, end));
+					}, param_name, start, end, is_declare));
 				}
 			}
 			//parser.increment();
@@ -394,13 +411,10 @@ impl FunctionDeclaration {
 
 	pub fn is_func_declaration(content: &str, index: usize) -> bool {
 		let declare = &content[index..];
-		let styles = FunStyle::styles();
-		for style in styles {
-			if declare.starts_with(style) {
-				return true;
-			}
+		if FUNC_STYLE_REGEX.is_match(declare) {
+			return true;
 		}
-		return declare.starts_with("fn ") || declare.starts_with("op ") || declare.starts_with("constructor") || declare.starts_with("destructor");
+		return FUNC_REGEX.is_match(declare);
 	}
 
 	pub fn to_function(&self, content: &str) -> Function {
@@ -413,7 +427,8 @@ impl FunctionDeclaration {
 					Some(content[param.2.unwrap()..param.3.unwrap()].to_string())
 				} else {
 					None
-				}
+				},
+				is_declare: param.4
 			});
 		}
 

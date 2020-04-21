@@ -53,12 +53,14 @@ impl ExpressionPiece {
 	pub fn get_encapsulated_type(&self) -> Option<VariableType> {
 		return match self {
 			ExpressionPiece::EncapsulatedValues(exprs, _) => {
-				if exprs.len() > 0 {
+				if exprs.len() > 1 {
 					let mut result = Vec::new();
 					for e in exprs.iter() {
 						result.push(((**e)).get_type());
 					}
 					Some(VariableType::tuple(result))
+				} else if exprs.len() == 1 {
+					return Some((*exprs.first().unwrap()).get_type());
 				} else {
 					None
 				}
@@ -334,6 +336,13 @@ impl ExpressionPiece {
 					}
 				}
 			}
+
+			if (operator_id >= 10 && operator_id <= 14) || (operator_id >= 24 && operator_id <= 26) {
+				let left_type = left_result.as_ref().unwrap().get_type();
+				if left_type.is_number() && final_type.is_inferred() {
+					final_type = left_type.clone();
+				}
+			}
 		}
 
 		if left_result.is_some() && right_result.is_some() {
@@ -407,7 +416,7 @@ impl ExpressionPiece {
 				Some(Rc::new(Expression::InitializerList(Rc::clone(expressions), piece.get_encapsulated_type().unwrap_or(VariableType::inferred()), position.clone())))
 			},
 			ExpressionPiece::Type(tf_type, position) => {
-				Some(Rc::new(Expression::Value(tf_type.to_cpp(false), (*tf_type).clone(), position.clone())))
+				Some(Rc::new(Expression::Value(tf_type.to_cpp(), (*tf_type).clone(), position.clone())))
 			},
 			_ => None
 		};

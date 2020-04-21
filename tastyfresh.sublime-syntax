@@ -67,7 +67,7 @@ contexts:
     - match: '\b(static|inline|extern|virtual|meta)\b'
       scope: storage.type.tasty-fresh
 
-    - match: '\b(const|constexpr|constinit|extern|mutable|forever|thread_local|volatile)\b'
+    - match: '\b(const|constexpr|constinit|extern|mutable|forever|thread_local|volatile|declare)\b'
       scope: storage.type.tasty-fresh
 
     - match: '\b(fn|op|constructor|destructor)\b'

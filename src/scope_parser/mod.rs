@@ -317,7 +317,7 @@ impl ScopeExpression {
 				}
 			},
 			ScopeExpression::VariableDeclaration(declaration, expr) => {
-				declaration.to_cpp(expr, operators, context, VariableExportType::Scoped, false)
+				declaration.to_cpp(expr, operators, context, VariableExportType::Scoped)
 			},
 			ScopeExpression::Return(expr, _) => {
 				format!("return {};", expr.to_string(operators, context))
@@ -405,7 +405,7 @@ impl ScopeExpression {
 				let end_str = end_expr.to_string(operators, context);
 				let by_str = if by_expr.is_none() { None } else { Some(by_expr.as_ref().unwrap().to_string(operators, context)) };
 				let scope_str = scope.to_string(operators, *line, tab_offset, context);
-				format!("for({} {} = {}; i {} {}; {}) {}", start_expr.get_type().to_cpp(false), name, if context.align_lines {
+				format!("for({} {} = {}; i {} {}; {}) {}", start_expr.get_type().to_cpp(), name, if context.align_lines {
 					&start_str
 				} else {
 					start_str.trim()
@@ -431,7 +431,7 @@ impl ScopeExpression {
 				let end_str = end_expr.to_string(operators, context);
 				let by_str = if by_expr.is_none() { None } else { Some(by_expr.as_ref().unwrap().to_string(operators, context)) };
 				let scope_str = scope.to_string(operators, *line, tab_offset, context);
-				format!("for({} {} = {}; i {} {}; {}) {}", start_expr.get_type().to_cpp(false), name, if context.align_lines {
+				format!("for({} {} = {}; i {} {}; {}) {}", start_expr.get_type().to_cpp(), name, if context.align_lines {
 					&start_str
 				} else {
 					start_str.trim()

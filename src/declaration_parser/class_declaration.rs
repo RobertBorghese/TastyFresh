@@ -262,7 +262,8 @@ impl ClassDeclaration {
 					properties.push(Property {
 						name: d.name.clone(),
 						prop_type: prop,
-						default_value: None
+						default_value: None,
+						is_declare: false
 					});
 					context.register_type(&d.var_type);
 				},
