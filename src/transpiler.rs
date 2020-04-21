@@ -314,7 +314,11 @@ impl<'a> Transpiler<'a> {
 						let typing = &mut context.typing;
 						typing.add(&module);
 						let line = if context.align_lines { import.line } else { self.output_lines.len() };
-						insert_output_line(&mut self.output_lines, format!("#include \"{}.hpp\"", import.path).as_str(), line, false);
+						insert_output_line(&mut self.output_lines, if self.config_data.hpp_headers { 
+							format!("#include \"{}.hpp\"", import.path)
+						} else {
+							format!("#include \"{}.h\"", import.path)
+						}.as_str(), line, false);
 					} else {
 						let pos = Position::new(self.file.to_string(), Some(import.line + 1), 7, Some(7 + import.path.len()));
 						print_code_error("Import Not Found", "could not find Tasty Fresh source file", &pos, &self.parser.content)

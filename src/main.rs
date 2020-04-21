@@ -355,7 +355,7 @@ fn transpile_source_file(file: &str, source_location: &str, output_dirs: &Vec<St
 		if path_str.is_some() {
 			let path_str_unwrap = path_str.unwrap();
 			let path_base = path_str_unwrap[..(path_str_unwrap.len() - path.extension().and_then(OsStr::to_str).unwrap_or("").len())].to_string();
-			let header_path = path_base.clone() + "hpp";
+			let header_path = path_base.clone() + (if config_data.hpp_headers { "hpp" } else { "h" });
 			if transpile_context.header_include_line.is_some() {
 				insert_output_line(&mut transpile_context.output_lines, format!("#include \"{}\"",
 				if header_path.starts_with(format!("./{}/", source_location).as_str()) {
@@ -369,11 +369,29 @@ fn transpile_source_file(file: &str, source_location: &str, output_dirs: &Vec<St
 			let full_source_path = path_base + "cpp";
 			let full_header_path = header_path;
 
+			let full_source_path_obj = Path::new(&full_source_path);
+			let full_header_path_obj = Path::new(&full_header_path);
 			if transpile_context.output_lines.is_empty() &&
 				declarations_are_empty &&
-				!Path::new(&full_source_path).exists() &&
-				!Path::new(&full_header_path).exists() {
+				!full_source_path_obj.exists() &&
+				!full_header_path_obj.exists() {
 				return true;
+			}
+
+			let full_source_path_obj_parent = full_source_path_obj.parent();
+			if full_source_path_obj_parent.is_some() && !full_source_path_obj_parent.as_ref().unwrap().exists() {
+				let result = std::fs::create_dir_all(full_source_path_obj_parent.unwrap());
+				if !result.is_ok() {
+					println!("Could not create directories for writing source files: {}\n{}", full_source_path, result.err().unwrap());
+				}
+			}
+
+			let full_header_path_obj_parent = full_header_path_obj.parent();
+			if full_header_path_obj_parent.is_some() && !full_header_path_obj_parent.as_ref().unwrap().exists() {
+				let result = std::fs::create_dir_all(full_header_path_obj_parent.unwrap());
+				if !result.is_ok() {
+					println!("Could not create directories for writing header files: {}\n{}", full_header_path, result.err().unwrap());
+				}
 			}
 
 			let source_write = std::fs::write(&full_source_path, transpile_context.output_lines.join("\n"));
@@ -448,6 +466,7 @@ fn main() {
 	let mut data = config_management::read_config_files();
 
 	data.pragma_guard = arguments.contains_key("pragma-guard");
+	data.hpp_headers = !arguments.contains_key("h-headers");
 
 	let mut file_contexts = BTreeMap::new();
 	let mut file_declarations = BTreeMap::new();

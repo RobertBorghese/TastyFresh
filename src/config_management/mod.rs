@@ -17,14 +17,16 @@ use std::io::prelude::*;
 
 pub struct ConfigData {
 	pub operators: OperatorDataStructure,
-	pub pragma_guard: bool
+	pub pragma_guard: bool,
+	pub hpp_headers: bool
 }
 
 impl ConfigData {
 	pub fn new() -> ConfigData {
 		return ConfigData {
 			operators: BTreeMap::new(),
-			pragma_guard: false
+			pragma_guard: false,
+			hpp_headers: true
 		};
 	}
 }
@@ -68,6 +70,7 @@ pub fn read_config_files() -> ConfigData {
 				parse_operators_json("config/operators.json")
 			}
 		},
-		pragma_guard: false
+		pragma_guard: false,
+		hpp_headers: true
 	};
 }
