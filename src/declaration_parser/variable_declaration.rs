@@ -207,7 +207,7 @@ impl VariableDeclaration {
 				let params = expr.as_ref().unwrap().get_parameters(operators, context);
 				let params_str = params.join(", ");
 				match var_type.var_style {
-					VarStyle::Copy => {
+					VarStyle::Copy | VarStyle::Infer => {
 						if export_type.is_class_header() {
 							return format!("{}{} {} = {}({});", props, var_type_output, final_name, var_type_name, params_str);
 						} else {

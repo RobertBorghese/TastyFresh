@@ -153,6 +153,8 @@ contexts:
       scope: constant.numeric.tasty-fresh
 
   operators:
+    - match: '(?:->|::|\.|\.\*|->\*)'
+      scope: keyword.operator.operator.tasty-fresh
     - match: '[!<>=]=|[<>\.]'
       scope: keyword.operator.comparison.tasty-fresh
     - match: '(?:[-+%/*^&|]|<<|>>)?='

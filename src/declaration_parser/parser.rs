@@ -314,6 +314,8 @@ impl Parser {
 		loop {
 			if self.increment() || self.get_curr() == c {
 				break;
+			} else if self.get_curr() == '\n' {
+				self.line += 1;
 			}
 		}
 		return true;
