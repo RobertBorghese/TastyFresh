@@ -261,9 +261,10 @@ pub struct Property {
 impl Property {
 	pub fn to_cpp(&self, is_header: bool) -> String {
 		let declare_text = if self.is_declare && is_header { format!("class ") } else { "".to_string() };
-		return match &self.default_value {
-			Some(value) => format!("{}{} {} = {}", declare_text, self.prop_type.to_cpp(), self.name, value),
-			None => format!("{}{} {}", declare_text, self.prop_type.to_cpp(), self.name)
+		if self.default_value.is_some() && is_header {
+			format!("{}{} {} = {}", declare_text, self.prop_type.to_cpp(), self.name, self.default_value.as_ref().unwrap())
+		} else {
+			format!("{}{} {}", declare_text, self.prop_type.to_cpp(), self.name)
 		}
 	}
 }
