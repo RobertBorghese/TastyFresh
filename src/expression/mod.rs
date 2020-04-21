@@ -338,28 +338,4 @@ impl Expression {
 		let exprs_expr = Expression::Expressions(Rc::new(exprs), self.get_type(), curr_pos.clone());
 		return Expression::Prefix(Rc::new(exprs_expr), 4, VariableType::boolean(), curr_pos.clone());
 	}
-}/*{ "operator": "<",   "priority": 600 }, -- 18
-		{ "operator": "<=",  "priority": 600 }, -- 19
-		{ "operator": ">",   "priority": 600 }, -- 20
-		{ "operator": ">=",  "priority": 600 }, -- 21
-		{ "operator": "==",  "priority": 550 }, -- 22
-		{ "operator": "!=",  "priority": 550 }, -- 23
-		{ "operator": "&",   "priority": 500 }, -- 24
-		{ "operator": "^",   "priority": 450 }, -- 25
-		{ "operator": "|",   "priority": 400 }, -- 26
-		{ "operator": "&&",  "priority": 350 }, -- 27
-		{ "operator": "||",  "priority": 300 },*/
-
-/*pub enum Expression {
-	Invalid,
-	Value(String, VariableType, Position),
-	Prefix(Rc<Expression>, usize, VariableType, Position),
-	Suffix(Rc<Expression>, usize, VariableType, Position),
-	Infix(Rc<Expression>, Rc<Expression>, usize, VariableType, Position),
-	Ternary(Rc<Expression>, Rc<Expression>, Rc<Expression>, usize, VariableType),
-	Expressions(Rc<Vec<Rc<Expression>>>, VariableType, Position),
-	InitializerList(Rc<Vec<Rc<Expression>>>, VariableType, Position),
-	FunctionCall(Rc<Expression>, Rc<Vec<Rc<Expression>>>, VariableType, Position),
-	ConstructCall(Type, Rc<Vec<Rc<Expression>>>, VariableType, Position),
-	ArrayAccess(Rc<Expression>, Rc<Vec<Rc<Expression>>>, VariableType, Position)
-}*/
+}

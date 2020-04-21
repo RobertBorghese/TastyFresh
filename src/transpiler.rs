@@ -28,6 +28,10 @@ use std::rc::Rc;
 
 use regex::Regex;
 
+lazy_static! {
+	pub static ref LINE_SPLIT: Regex = Regex::new("(?:\n\r|\r\n|\r|\n)").unwrap();
+}
+
 use crate::{
 	configure_declaration_with_attributes,
 	get_configure_declaration_with_attributes,
@@ -53,7 +57,13 @@ impl VarFuncDeclarations {
 
 	fn push_line(d: String, lines: &mut Vec<String>, tab_count: usize, tabs: &str) {
 		if tab_count > 0 {
-			lines.push(format!("{}{}", tabs, d));
+			for line in LINE_SPLIT.split(&d) {
+				if line.trim().is_empty() {
+					lines.push("".to_string());
+				} else {
+					lines.push(format!("{}{}", tabs, line));
+				}
+			}
 		} else {
 			lines.push(d);
 		}
@@ -230,7 +240,6 @@ impl<'a> Transpiler<'a> {
 								true
 							);
 						};
-						
 					}
 				},
 				_ => ()
@@ -293,8 +302,7 @@ impl<'a> Transpiler<'a> {
 					} else {
 						&self.parser.content[injection.start_index..injection.end_index].trim()
 					};
-					let re = Regex::new("(?:\n\r|\r\n|\r|\n)").unwrap();
-					for inject_line in re.split(injection) {
+					for inject_line in LINE_SPLIT.split(injection) {
 						if !context.align_lines && inject_line.trim().is_empty() { continue; }
 						insert_output_line(&mut self.output_lines, inject_line, line, false);
 						line += 1;
@@ -357,10 +365,9 @@ impl<'a> Transpiler<'a> {
 						);
 						insert_output_line(&mut self.output_lines, &func_declaration, line, false);
 						if func_content.is_some() {
-							let re = Regex::new("(?:\n\r|\r\n|\r|\n)").unwrap();
 							let original_line = line;
 							insert_output_line(&mut self.output_lines, "{", line, false);
-							for func_line in re.split(&func_content.unwrap()) {
+							for func_line in LINE_SPLIT.split(&func_content.unwrap()) {
 								insert_output_line(&mut self.output_lines, func_line, line, false);
 								line += 1;
 							}

@@ -12,47 +12,6 @@ use crate::expression::function_type::FunStyle;
 
 use crate::declaration_parser::function_declaration::FunctionType;
 
-/*
-pub enum ValueType {
-	Variable(String, VariableType),
-	NullLiteral,
-	BooleanLiteral(bool),
-	CharLiteral(String),
-	NumberLiteral(String, NumberType),
-	StringLiteral(String, StringType)
-}
-*/
-/*
-#[derive(Clone)]
-pub enum ValueType {
-	Unknown,
-	Null,
-	Boolean,
-	Number(NumberType),
-	String,
-	Class(ClassType)
-}
-
-impl ValueType {
-	pub fn new(expr_str: &str) -> ValueType {
-		if expr_str == "null" { return ValueType::Null; }
-		if expr_str == "true" || expr_str == "false" { return ValueType::Boolean; }
-		let mut all_numbers = true;
-		for a in expr_str.chars() {
-			if !a.is_numeric() {
-				all_numbers = false;
-			}
-		}
-		if all_numbers { return ValueType::Number(NumberType::Int); }
-		return ValueType::Class(ClassType {
-			name: "".to_string(),
-			type_params: None,
-			properties: Vec::new(),
-			functions: Vec::new()
-		});
-	}
-}*/
-
 #[derive(Clone, PartialEq)]
 pub enum NumberType {
 	Byte,
