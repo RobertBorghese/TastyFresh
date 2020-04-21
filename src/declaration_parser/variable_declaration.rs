@@ -27,6 +27,13 @@ use crate::context_management::context::Context;
 
 use crate::config_management::operator_data::OperatorDataStructure;
 
+use regex::Regex;
+
+lazy_static! {
+	pub static ref VAR_PROP_REGEX: Regex = Regex::new(r"^\b(?:copy|ref|borrow|move|ptr|autoptr|uniqueptr|classptr|let|ptr2|ptr3|ptr4|ptr5|ptr6|ptr7|ptr8|ptr9)\b").unwrap();
+	pub static ref VAR_STYLE_REGEX: Regex = Regex::new(r"^\b(?:const|constexpr|constinit|extern|mutable|forever|thread_local|volatile|declare)\b").unwrap();
+}
+
 type VariableDeclarationResult = DeclarationResult<VariableDeclaration>;
 
 #[derive(Clone)]
@@ -152,19 +159,10 @@ impl VariableDeclaration {
 
 	pub fn is_var_declaration(content: &str, index: usize) -> bool {
 		let declare = &content[index..];
-		let props = VarProps::properties();
-		for prop in props {
-			if declare.starts_with(prop) {
-				return true;
-			}
+		if VAR_PROP_REGEX.is_match(declare) {
+			return true;
 		}
-		let styles = VarStyle::styles();
-		for style in styles {
-			if declare.starts_with(style) {
-				return true;
-			}
-		}
-		return false;
+		return VAR_STYLE_REGEX.is_match(declare);
 	}
 
 	pub fn is_only_static(&self) -> bool {

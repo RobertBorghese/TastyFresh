@@ -14,6 +14,12 @@ use crate::declaration_parser::declaration::{ Declaration, DeclarationResult };
 use crate::declaration_parser::parser::Parser;
 use crate::declaration_parser::cpp_transpiler::CPPTranspiler;
 
+use regex::Regex;
+
+lazy_static! {
+	pub static ref ASSUME_REGEX: Regex = Regex::new(r"^\b(?:assume)\b").unwrap();
+}
+
 type AssumeDeclarationResult = DeclarationResult<AssumeDeclaration>;
 
 #[derive(Clone)]
@@ -64,6 +70,6 @@ impl AssumeDeclaration {
 
 	pub fn is_assume_declaration(content: &str, index: usize) -> bool {
 		let declare = &content[index..];
-		return declare.starts_with("assume ");
+		return ASSUME_REGEX.is_match(declare);
 	}
 }

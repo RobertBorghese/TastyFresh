@@ -19,6 +19,12 @@ use crate::declaration_parser::attribute_declaration::AttributeDeclaration;
 
 use either::*;
 
+use regex::Regex;
+
+lazy_static! {
+	pub static ref ATTRIBUTE_REGEX: Regex = Regex::new(r"^\b(?:attribute)\b").unwrap();
+}
+
 type AttributeClassDeclarationResult = DeclarationResult<AttributeClassDeclaration>;
 
 #[derive(Clone)]
@@ -128,7 +134,7 @@ impl AttributeClassDeclaration {
 
 	pub fn is_attribute_class_declaration(content: &str, index: usize) -> bool {
 		let declare = &content[index..];
-		return declare.starts_with("attribute ");
+		return ATTRIBUTE_REGEX.is_match(declare);
 	}
 
 	pub fn output_new_attributes(&self, attribute: &AttributeDeclaration, content: &str) -> Vec<AttributeDeclaration> {

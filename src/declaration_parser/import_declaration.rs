@@ -14,6 +14,12 @@ use crate::declaration_parser::declaration::{ Declaration, DeclarationResult };
 use crate::declaration_parser::parser::Parser;
 use crate::declaration_parser::cpp_transpiler::CPPTranspiler;
 
+use regex::Regex;
+
+lazy_static! {
+	pub static ref IMPORT_REGEX: Regex = Regex::new(r"^\b(?:import)\b").unwrap();
+}
+
 type ImportDeclarationResult = DeclarationResult<ImportDeclaration>;
 
 #[derive(Clone)]
@@ -64,6 +70,6 @@ impl ImportDeclaration {
 
 	pub fn is_import_declaration(content: &str, index: usize) -> bool {
 		let declare = &content[index..];
-		return declare.starts_with("import ");
+		return IMPORT_REGEX.is_match(declare);
 	}
 }

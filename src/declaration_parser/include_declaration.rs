@@ -14,6 +14,12 @@ use crate::declaration_parser::declaration::{ Declaration, DeclarationResult };
 use crate::declaration_parser::parser::Parser;
 use crate::declaration_parser::cpp_transpiler::CPPTranspiler;
 
+use regex::Regex;
+
+lazy_static! {
+	pub static ref INCLUDE_REGEX: Regex = Regex::new(r"^\b(?:include|contain)\b").unwrap();
+}
+
 type IncludeDeclarationResult = DeclarationResult<IncludeDeclaration>;
 
 #[derive(Clone)]
@@ -131,6 +137,6 @@ impl IncludeDeclaration {
 
 	pub fn is_include_declaration(content: &str, index: usize) -> bool {
 		let declare = &content[index..];
-		return declare.starts_with("include ") || declare.starts_with("contain ");
+		return INCLUDE_REGEX.is_match(declare);
 	}
 }
