@@ -35,7 +35,7 @@ contexts:
     - match: '(?<=[a-zA-Z0-9_])(\@\([^\)]+\))'
       scope: keyword.operator.tasty-fresh
 
-    - match: '(?<!fn)\s*(?!constructor|super|this)({{identifier}})(?=(?:@{{identifier}})?\()'
+    - match: '(?<!fn)\s*(?!constructor|super|this|fn|proc)({{identifier}})(?=(?:@{{identifier}})?\()'
       scope: meta.function.tasty-fresh
       captures:
         1: entity.name.function.tasty-fresh
@@ -70,7 +70,7 @@ contexts:
     - match: '\b(const|constexpr|constinit|extern|mutable|forever|thread_local|volatile|declare)\b'
       scope: storage.type.tasty-fresh
 
-    - match: '\b(fn|op|constructor|destructor)\b'
+    - match: '\b(fn|op|constructor|destructor|proc)\b'
       scope: storage.type.function.tasty-fresh
 
     - match: '\b(inject)\b'
@@ -140,7 +140,7 @@ contexts:
         1: storage.type.import.tasty-fresh
         2: variable.parameter.tasty-fresh
 
-    - match: '\b(void|unsigned|bool|char|short|int|long|float|double|text)\b'
+    - match: '\b(void|unsigned|bool|byte|char|uchar|short|ushort|int|uint|long|ulong|thicc|uthicc|float|double|text)\b'
       scope: storage.type.numeric.tasty-fresh
 
     - match: '\b(?:0[xb])?(-)?[0-9\.]+[ful]*\b'

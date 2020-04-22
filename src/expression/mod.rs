@@ -15,11 +15,16 @@ pub mod function_type;
 use crate::config_management::operator_data::OperatorDataStructure;
 
 use crate::expression::variable_type::{ Type, VariableType };
+use crate::expression::value_type::{ Property, Function };
 
 use crate::context_management::position::Position;
 use crate::context_management::context::Context;
 
+use crate::scope_parser::ScopeExpression;
+
 use std::rc::Rc;
+
+use regex::Regex;
 
 /// Stores the expression and its components recursively. 
 /// The `usize` represents the operators' index in the JSON data.
@@ -35,7 +40,8 @@ pub enum Expression {
 	InitializerList(Rc<Vec<Rc<Expression>>>, VariableType, Position),
 	FunctionCall(Rc<Expression>, Rc<Vec<Rc<Expression>>>, VariableType, Position),
 	ConstructCall(Type, Rc<Vec<Rc<Expression>>>, VariableType, Position),
-	ArrayAccess(Rc<Expression>, Rc<Vec<Rc<Expression>>>, VariableType, Position)
+	ArrayAccess(Rc<Expression>, Rc<Vec<Rc<Expression>>>, VariableType, Position),
+	Function(Rc<ScopeExpression>, Vec<String>, Vec<(VariableType, String, Option<String>)>, VariableType, usize, Position)
 }
 
 impl Expression {
@@ -43,19 +49,46 @@ impl Expression {
 		if let Expression::Invalid = self {
 			return VariableType::inferred();
 		} else {
-			return match self {
-				Expression::Value(_, v, _) => v,
-				Expression::Prefix(_, _, v, _) => v,
-				Expression::Suffix(_, _, v, _) => v,
-				Expression::Infix(_, _, _, v, _) => v,
-				Expression::Ternary(_, _, _, _, v) => v,
-				Expression::Expressions(_, v, _) => v,
-				Expression::InitializerList(_, v, _) => v,
-				Expression::FunctionCall(_, _, v, _) => v,
-				Expression::ConstructCall(_, _, v, _) => v,
-				Expression::ArrayAccess(_, _, v, _) => v,
-				Expression::Invalid => panic!("Invalid!")
-			}.clone();
+			if let Expression::Function(_, _, params, return_type, _, _) = self {
+				let mut is_inferred = false;
+				let mut props = Vec::new();
+				for p in params {
+					if p.0.is_inferred() {
+						is_inferred = true;
+						break;
+					}
+					props.push(Property {
+						name: p.1.clone(),
+						prop_type: p.0.clone(),
+						default_value: p.2.clone(),
+						is_declare: false
+					});
+				}
+				if is_inferred {
+					VariableType::inferred()
+				} else {
+					VariableType::function(Function {
+						name: "".to_string(),
+						parameters: props,
+						return_type: return_type.clone(),
+						styles: Vec::new()
+					})
+				}
+			} else {
+				return match self {
+					Expression::Value(_, v, _) => v,
+					Expression::Prefix(_, _, v, _) => v,
+					Expression::Suffix(_, _, v, _) => v,
+					Expression::Infix(_, _, _, v, _) => v,
+					Expression::Ternary(_, _, _, _, v) => v,
+					Expression::Expressions(_, v, _) => v,
+					Expression::InitializerList(_, v, _) => v,
+					Expression::FunctionCall(_, _, v, _) => v,
+					Expression::ConstructCall(_, _, v, _) => v,
+					Expression::ArrayAccess(_, _, v, _) => v,
+					Expression::Invalid | Expression::Function(..) => panic!("Invalid!")
+				}.clone();
+			}
 		}
 	}
 
@@ -89,6 +122,7 @@ impl Expression {
 				Expression::FunctionCall(_, _, _, p) => p,
 				Expression::ConstructCall(_, _, _, p) => p,
 				Expression::ArrayAccess(_, _, _, p) => p,
+				Expression::Function(_, _, _, _, _, p) => p,
 				Expression::Invalid => panic!("Invalid!")
 			}.clone());
 		}
@@ -106,6 +140,7 @@ impl Expression {
 			Expression::FunctionCall(_, _, _, _) => None,
 			Expression::ConstructCall(_, _, _, _) => None,
 			Expression::ArrayAccess(_, _, _, _) => None,
+			Expression::Function(_, _, _, _, _, _) => None,
 			Expression::Invalid => None
 		}
 	}
@@ -266,6 +301,44 @@ impl Expression {
 					expr_list.push(e.to_string(operators, context));
 				}
 				format!("{}[{}]", expr.to_string(operators, context), expr_list.join(", "))
+			},
+			Expression::Function(scope, captures, params, return_type, end_line, pos) => {
+				let mut prop_list = Vec::new();
+				for p in params {
+					prop_list.push({
+						let var_cpp = p.0.to_cpp();
+						if var_cpp == "auto" {
+							p.1.clone()
+						} else if p.2.is_some() {
+							format!("{} {} = {}", var_cpp, p.1, p.2.as_ref().unwrap())
+						} else {
+							format!("{} {}", var_cpp, p.1)
+						}
+					});
+				}
+
+				let scope_str = scope.to_string(operators, 0, 1, context);
+				let final_scope_str =  if context.align_lines {
+					let re = Regex::new("(?:\n\r|\r\n|\r|\n)").unwrap();
+					let mut final_line = *pos.line.as_ref().unwrap() - 1;
+					for _ in re.split(&scope_str) {
+						final_line += 1;
+					}
+					format!("{{{}{}}}", scope_str, if final_line == *end_line { " " } else { "\n" })
+				} else {
+					format!("{{\n\t{}\n}}", scope_str.trim())
+				};
+
+				if return_type.is_void() {
+					format!("[{}]({}) {}", captures.join(", "), prop_list.join(", "), final_scope_str)
+				} else {
+					format!("[{}]({}) -> {} {}",
+						captures.join(", "),
+						prop_list.join(", "),
+						return_type.to_cpp(),
+						final_scope_str
+					)
+				}
 			}
 		}
 	}

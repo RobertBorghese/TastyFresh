@@ -7,18 +7,25 @@
 
 use crate::expression::Expression;
 use crate::expression::expression_piece::ExpressionPiece;
-use crate::expression::variable_type::VariableType;
+use crate::expression::variable_type::{ VariableType, VarStyle, Type };
 
 use crate::config_management::ConfigData;
 use crate::config_management::operator_data::Operator;
 
 use crate::context_management::position::Position;
+use crate::context_management::context::Context;
 
 use crate::declaration_parser::parser::Parser;
 
-use crate::context_management::context::Context;
+use crate::scope_parser::ScopeExpression;
 
 use std::rc::Rc;
+
+use regex::Regex;
+
+lazy_static! {
+	pub static ref EXPR_FUNC_REGEX: Regex = Regex::new(r"^\b(?:fn|proc)\b").unwrap();
+}
 
 /// Parses an expression represented as a String.
 /// The properties are used throughout the parsing process implemented below.
@@ -162,31 +169,7 @@ impl<'a> ExpressionParser<'a> {
 			},
 			ParseState::Value => {
 				if self.expect_type {
-					self.expect_type = false;
-					let start_index = parser.index;
-					let mut include_style = false;
-					if parser.get_curr() == '(' {
-						include_style = true;
-						parser.increment();
-					}
-
-					let mut unexpected_char = false;
-					let mut specifier_error: Option<&'static str> = None;
-					let tf_type = if include_style {
-						VariableType::from_type_style(parser.parse_type_and_style(&mut unexpected_char, &mut specifier_error))
-					} else {
-						VariableType::of_inferred_style(parser.parse_type(&mut unexpected_char, &mut specifier_error))
-					};
-					self.add_type(tf_type, start_index, parser.index);
-
-					if include_style {
-						parser.parse_whitespace();
-						if parser.get_curr() == ')' {
-							parser.increment();
-						}
-					}
-
-					*state = ParseState::Suffix;
+					self.parse_out_type(state, parser);
 				} else if !self.parse_value(parser, context) {
 					self.set_end_reason(ExpressionEndReason::NoValueError);
 					*state = ParseState::End;
@@ -209,6 +192,34 @@ impl<'a> ExpressionParser<'a> {
 			}
 			ParseState::End => {}
 		}
+	}
+
+	fn parse_out_type(&mut self, state: &mut ParseState, parser: &mut Parser) {
+		self.expect_type = false;
+		let start_index = parser.index;
+		let mut include_style = false;
+		if parser.get_curr() == '(' {
+			include_style = true;
+			parser.increment();
+		}
+
+		let mut unexpected_char = false;
+		let mut specifier_error: Option<&'static str> = None;
+		let tf_type = if include_style {
+			VariableType::from_type_style(parser.parse_type_and_style(&mut unexpected_char, &mut specifier_error))
+		} else {
+			VariableType::of_inferred_style(parser.parse_type(&mut unexpected_char, &mut specifier_error))
+		};
+		self.add_type(tf_type, start_index, parser.index);
+
+		if include_style {
+			parser.parse_whitespace();
+			if parser.get_curr() == ')' {
+				parser.increment();
+			}
+		}
+
+		*state = ParseState::Suffix;
 	}
 
 	fn generate_pos(&self, start: usize, end: Option<usize>) -> Position {
@@ -322,6 +333,9 @@ impl<'a> ExpressionParser<'a> {
 		let space_offset = self.parse_next_whitespace(parser);
 		let value_start = parser.index + space_offset;
 		parser.index = value_start;
+		if EXPR_FUNC_REGEX.is_match(&parser.content[parser.index..]) {
+			return self.parse_function(parser, context);
+		}
 		let mut offset = 0;
 		let first_char = parser.chars[value_start];
 		if first_char == '(' {
@@ -544,5 +558,199 @@ impl<'a> ExpressionParser<'a> {
 			}
 		}
 		return result;
+	}
+
+	fn parse_function(&mut self, parser: &mut Parser, context: &mut Option<&mut Context>) -> bool {
+		let mut scope_vars = Vec::new();
+		let parser_start = parser.index;
+		if parser.check_ahead("fn") {
+			for _ in 0..2 { parser.increment(); }
+		} else if parser.check_ahead("proc") {
+			for _ in 0..4 { parser.increment(); }
+			scope_vars.push("=".to_string());
+		}
+
+		if parser.get_curr() == '@' {
+			parser.increment();
+			if parser.get_curr() == '(' {
+				parser.increment();
+				loop {
+					let mut result = ' ';
+					let start = parser.index;
+					parser.parse_until_at_expr(',', ')', &mut result);
+					if parser.out_of_space { return false; }
+					let end = parser.index;
+					if result != ')' && result != ',' { return false; }
+					scope_vars.push(parser.content[start..end].to_string());
+					if result == ')' {
+						parser.increment();
+						break;
+					}
+				}
+			} else {
+				scope_vars.push(parser.parse_ascii_char_name());
+			}
+		}
+
+		parser.parse_whitespace();
+
+		let mut parameters = Vec::new();
+		if parser.get_curr() == '(' {
+			parser.increment();
+			loop {
+				parser.parse_whitespace();
+				if parser.get_curr() == ')' {
+					parser.increment();
+					break;
+				}
+
+				let param_name: String;
+				let param_type_str;
+				let param_type;
+
+				param_type_str = parser.parse_ascii_char_name();
+				if param_type_str.is_empty() || parser.out_of_space { return false; }
+
+				if VarStyle::styles().contains(&param_type_str.as_str()) {
+					param_type = VarStyle::new(param_type_str.as_str());
+					parser.parse_whitespace();
+					param_name = parser.parse_ascii_char_name();
+					if param_type_str.is_empty() || parser.out_of_space { return false; }
+				} else {
+					param_type = VarStyle::Copy;
+					param_name = param_type_str;
+				}
+
+				parser.parse_whitespace();
+
+				let mut has_value = false;
+				let next_char = parser.get_curr();
+				let var_type: Type;
+				if next_char == ':' {
+					parser.increment();
+					parser.parse_whitespace();
+
+					let mut unexpected_char = false;
+					let mut specifier_error: Option<&'static str> = None;
+					var_type = parser.parse_type(&mut unexpected_char, &mut specifier_error);
+					if specifier_error.is_some() || unexpected_char || parser.out_of_space {
+						return false;
+					}
+				} else if next_char == '=' {
+					var_type = Type::Inferred;
+					parser.increment();
+					has_value = true;
+				} else {
+					var_type = Type::Inferred;
+				}
+
+				parser.parse_whitespace();
+
+				if parser.get_curr() == '=' {
+					parser.increment();
+					has_value = true;
+					parser.parse_whitespace();
+				}
+
+				let mut start = None;
+				let mut end = None;
+				if has_value {
+					start = Some(parser.index);
+					let mut result = ' ';
+					parser.parse_until_at_expr(',', ')', &mut result);
+					if parser.out_of_space { return false; }
+					end = Some(parser.index);
+					if result != ')' && result != ',' { return false; }
+				}
+
+				parser.parse_whitespace();
+
+				if parser.get_curr() != ')' {
+					parser.increment();
+				}
+
+				parameters.push((VariableType {
+					var_type: var_type,
+					var_style: param_type,
+					var_properties: None,
+					var_optional: false
+				}, param_name, if start.is_some() && end.is_some() {
+					Some(parser.content[start.unwrap()..end.unwrap()].to_string())
+				} else {
+					None
+				}));
+			}
+		}
+
+		parser.parse_whitespace();
+
+		let return_type = {
+			if parser.get_curr() == '-' {
+				parser.increment();
+				if parser.get_curr() != '>' {
+					return false;
+				}
+				parser.increment();
+				parser.parse_whitespace();
+
+				let mut unexpected_char = false;
+				let mut specifier_error: Option<&'static str> = None;
+				let type_and_style = parser.parse_type_and_style(&mut unexpected_char, &mut specifier_error);
+				let var_style = type_and_style.0;
+				let var_type = type_and_style.1;
+				if specifier_error.is_some() || unexpected_char || parser.out_of_space {
+					return false;
+				}
+
+				VariableType {
+					var_type: var_type,
+					var_style: var_style,
+					var_properties: None,
+					var_optional: false
+				}
+			} else {
+				VariableType {
+					var_type: Type::Void,
+					var_style: VarStyle::Copy,
+					var_properties: None,
+					var_optional: false
+				}
+			}
+		};
+
+		parser.parse_whitespace();
+
+		let scope: ScopeExpression;
+		if parser.get_curr() == '{' {
+			scope = ScopeExpression::new(parser, None, parser.index + 1, parser.line, "", self.config_data, context.as_mut().unwrap(), None);
+			if parser.get_curr() == '}' {
+				parser.increment();
+			}
+		} else {
+			let mut reason = ExpressionEndReason::Unknown;
+			let expression = Some(parser.parse_expression("".to_string(), self.config_data, Some(context.as_mut().unwrap()), &mut reason, Some(VariableType::boolean())));
+			if expression.is_none() { return false; }
+			match reason {
+				ExpressionEndReason::Unknown => return false,
+				ExpressionEndReason::EndOfContent =>  return false,
+				ExpressionEndReason::NoValueError => return false,
+				_ => ()
+			}
+
+			scope = ScopeExpression::Expression(Rc::clone(&expression.unwrap()));
+			//declare_parse_whitespace!(parser);
+			//scope = ScopeExpression::new(parser, Some(1), parser.index, parser.line, "", self.config_data, context.as_mut().unwrap(), None);
+		}
+
+		let func_piece = ExpressionPiece::Function(Rc::new(scope),
+			scope_vars,
+			parameters,
+			return_type,
+			parser.line,
+			self.generate_pos(parser_start, Some(parser.index)));
+
+		self.parts.push(func_piece);
+
+		return true;
 	}
 }

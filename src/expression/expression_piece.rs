@@ -17,6 +17,8 @@ use crate::context_management::position::Position;
 use crate::context_management::context::Context;
 use crate::context_management::typing_context::ContextType;
 
+use crate::scope_parser::ScopeExpression;
+
 use std::rc::Rc;
 
 pub enum ExpressionPiece {
@@ -30,7 +32,8 @@ pub enum ExpressionPiece {
 	InitializerList(Rc<Vec<Rc<Expression>>>, Position),
 	FunctionParameters(Rc<Vec<Rc<Expression>>>, Position),
 	ArrayAccessParameters(Rc<Vec<Rc<Expression>>>, Position),
-	Type(VariableType, Position)
+	Type(VariableType, Position),
+	Function(Rc<ScopeExpression>, Vec<String>, Vec<(VariableType, String, Option<String>)>, VariableType, usize, Position)
 }
 
 impl ExpressionPiece {
@@ -46,7 +49,8 @@ impl ExpressionPiece {
 			ExpressionPiece::InitializerList(..) => println!("initializer list"),
 			ExpressionPiece::FunctionParameters(..) => println!("function params"),
 			ExpressionPiece::ArrayAccessParameters(..) => println!("array access params"),
-			ExpressionPiece::Type(..) => println!("type")
+			ExpressionPiece::Type(..) => println!("type"),
+			ExpressionPiece::Function(..) => println!("function")
 		}
 	}
 
@@ -417,6 +421,9 @@ impl ExpressionPiece {
 			},
 			ExpressionPiece::Type(tf_type, position) => {
 				Some(Rc::new(Expression::Value(tf_type.to_cpp(), (*tf_type).clone(), position.clone())))
+			},
+			ExpressionPiece::Function(scope, captures, params, return_type, end_line, position) => {
+				Some(Rc::new(Expression::Function(Rc::clone(scope), captures.clone(), params.clone(), return_type.clone(), *end_line, position.clone())))
 			},
 			_ => None
 		};

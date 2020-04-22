@@ -86,6 +86,15 @@ impl VariableType {
 		};
 	}
 
+	pub fn void() -> VariableType {
+		return VariableType {
+			var_type: Type::Void,
+			var_style: VarStyle::Copy,
+			var_properties: None,
+			var_optional: false
+		};
+	}
+
 	pub fn of_inferred_style(tf_type: Type) -> VariableType {
 		return VariableType {
 			var_type: tf_type,
@@ -377,6 +386,13 @@ impl VariableType {
 			if let NumberType::Int = num_type {
 				return true;
 			}
+		}
+		return false;
+	}
+
+	pub fn is_void(&self) -> bool {
+		if let Type::Void = &self.var_type {
+			return true;
 		}
 		return false;
 	}

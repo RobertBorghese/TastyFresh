@@ -7,7 +7,8 @@
 
 use crate::expression::Expression;
 use crate::expression::variable_type::{ VariableType, Type, VarStyle };
-use crate::expression::value_type::{ NumberType, StringType };
+use crate::expression::value_type::{ NumberType, StringType, Function, Property };
+use crate::expression::function_type::FunStyle;
 use crate::expression::expression_parser::{ ExpressionParser, ExpressionEndReason };
 
 use crate::config_management::ConfigData;
@@ -551,31 +552,79 @@ impl Parser {
 		let mut long = false;
 		let mut name_chain: Vec<String> = Vec::new();
 
+		let mut is_function = false;
+		if self.check_ahead("fn") {
+			is_function = true;
+			for _ in 0..2 { self.increment(); }
+		}
+
+		let mut tuple_types = Vec::new();
 		if self.get_curr() == '(' {
+			let mut looking_for_types = true;
 			self.increment();
 			self.parse_whitespace();
 			if self.get_curr() == ')' {
 				self.increment();
-				return Type::Void;
-			}
-			let mut tuple_types = Vec::new();
-			loop {
-				let old_index = self.index;
-				tuple_types.push(VariableType::from_type_style(self.parse_type_and_style(unexpected_character, conflicting_specifiers)));
-				if self.out_of_space || *unexpected_character {
-					break;
-				}
-				if self.get_curr() == ',' {
-					self.increment();
-				} else if self.get_curr() == ')' {
-					self.increment();
-					return Type::Tuple(tuple_types);
-				}
-				if self.index == old_index {
-					break;
+				if !is_function {
+					return Type::Void;
+				} else {
+					looking_for_types = false;
 				}
 			}
-			return Type::Inferred;
+			if looking_for_types {
+				loop {
+					let old_index = self.index;
+					tuple_types.push(VariableType::from_type_style(self.parse_type_and_style(unexpected_character, conflicting_specifiers)));
+					if self.out_of_space || *unexpected_character {
+						break;
+					}
+					if self.get_curr() == ',' {
+						self.increment();
+					} else if self.get_curr() == ')' {
+						self.increment();
+						if !is_function {
+							return Type::Tuple(tuple_types);
+						}
+					}
+					if self.index == old_index {
+						break;
+					}
+				}
+				if !is_function {
+					return Type::Inferred;
+				}
+			}
+		}
+
+		if is_function {
+			self.parse_whitespace();
+			if self.get_curr() == '-' {
+				self.increment();
+				if self.get_curr() == '>' {
+					self.increment();
+					self.parse_whitespace();
+					let ret_type = VariableType::from_type_style(self.parse_type_and_style(unexpected_character, conflicting_specifiers));
+					return Type::Function(Box::new(Function {
+						name: "".to_string(),
+						parameters: if tuple_types.is_empty() {
+							Vec::new()
+						} else {
+							tuple_types.iter().map(|var_type| {
+								Property { name: "".to_string(), prop_type: var_type.clone(), default_value: None, is_declare: false }
+							}).collect::<Vec<Property>>()
+						},
+						return_type: ret_type,
+						styles: Vec::<FunStyle>::new()
+					}));
+				}
+			} else {
+				return Type::Function(Box::new(Function {
+					name: "".to_string(),
+					parameters: Vec::new(),
+					return_type: VariableType::void(),
+					styles: Vec::new()
+				}));
+			}
 		}
 
 		// Get Type Name and Specifiers
@@ -605,6 +654,7 @@ impl Parser {
 					}
 					self.parse_whitespace();
 					if self.check_ahead("long") {
+						for _ in 0..4 { self.increment(); }
 						return Type::Number({
 								if unsigned.is_none() || !unsigned.unwrap() {
 									NumberType::LongLong
@@ -624,7 +674,28 @@ impl Parser {
 				},
 				name => {
 					match name {
-						"char" => {
+						"byte" => {
+							if long {
+								*conflicting_specifiers = Some("cannot use \"long\" specifier on \"byte\"");
+							}
+							if unsigned.unwrap_or(false) {
+								*conflicting_specifiers = Some("cannot use \"unsigned\" specifier on \"byte\"");
+							}
+							return Type::Number(NumberType::UByte);
+						},
+						"thicc" | "uthicc" => {
+							if long {
+								*conflicting_specifiers = Some("cannot use \"long\" specifier on \"thicc\"");
+							}
+							return Type::Number({
+								if name == "uthicc" || unsigned.unwrap_or(false) {
+									NumberType::ULongLong
+								} else {
+									NumberType::LongLong
+								}
+							});
+						},
+						"char" | "uchar" => {
 							if long {
 								*conflicting_specifiers = Some("cannot use \"long\" specifier on \"char\"");
 							}
@@ -636,27 +707,27 @@ impl Parser {
 									}
 								});
 						},
-						"short" => {
+						"short" | "ushort" => {
 							if long {
 								*conflicting_specifiers = Some("cannot use \"long\" specifier on \"short\"");
 							}
 							return Type::Number({
-									if unsigned.is_none() || !unsigned.unwrap() {
-										NumberType::Short
-									} else {
+									if name == "ushort" || unsigned.unwrap_or(false) {
 										NumberType::UShort
+									} else {
+										NumberType::Short
 									}
 								});
 						},
-						"int" => {
+						"int" | "uint" => {
 							if long {
 								*conflicting_specifiers = Some("cannot use \"long\" specifier on \"int\"");
 							}
 							return Type::Number({
-									if unsigned.is_none() || !unsigned.unwrap() {
-										NumberType::Int
-									} else {
+									if name == "uint" || unsigned.unwrap_or(false) {
 										NumberType::UInt
+									} else {
+										NumberType::Int
 									}
 								});
 						},
