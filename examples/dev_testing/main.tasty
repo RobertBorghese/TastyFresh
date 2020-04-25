@@ -1,12 +1,8 @@
 
+
+import alt;
+
 fn main() -> int {
-	let a = 32;
-	test(proc std.cout << a << std.endl);
-
-	let test: thicc = 32;
-}
-
-fn test(a: fn() -> thicc) {
-	a();
-	a();
+	let test = new Test();
+	let a = test.a;
 }

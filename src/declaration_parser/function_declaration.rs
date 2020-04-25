@@ -46,7 +46,8 @@ pub struct FunctionDeclaration {
 	pub function_type: FunctionType,
 	pub line: usize,
 	pub start_index: Option<usize>,
-	pub end_index: Option<usize>
+	pub end_index: Option<usize>,
+	pub declaration_id: usize
 }
 
 #[derive(Clone)]
@@ -401,7 +402,8 @@ impl FunctionDeclaration {
 			function_type: func_type,
 			line: initial_line,
 			start_index: start_index,
-			end_index: end_index
+			end_index: end_index,
+			declaration_id: 0
 		});
 	}
 

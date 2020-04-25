@@ -15,6 +15,7 @@ use crate::declaration_parser::declaration::{ Declaration, DeclarationResult };
 use crate::declaration_parser::parser::Parser;
 
 use crate::context_management::context::Context;
+use crate::context_management::context_manager::ContextManager;
 
 use crate::scope_parser::ScopeExpression;
 
@@ -39,7 +40,7 @@ impl Declaration<LoopParser> for LoopParser {
 }
 
 impl LoopParser {
-	pub fn new(parser: &mut Parser, file_name: String, config_data: &ConfigData, context: &mut Context) -> LoopParserResult {
+	pub fn new(parser: &mut Parser, file_name: String, config_data: &ConfigData, context: &mut Context, context_manager: &mut ContextManager) -> LoopParserResult {
 		let initial_line = parser.line;
 
 		let mut loop_keyword = "".to_string();
@@ -52,12 +53,12 @@ impl LoopParser {
 
 		let scope: Option<ScopeExpression>;
 		if parser.get_curr() == '{' {
-			scope = Some(ScopeExpression::new(parser, None, parser.index + 1, parser.line, &file_name, config_data, context, None));
+			scope = Some(ScopeExpression::new(parser, None, parser.index + 1, parser.line, &file_name, config_data, context, context_manager, None));
 			if parser.get_curr() == '}' {
 				parser.increment();
 			}
 		} else {
-			scope = Some(ScopeExpression::new(parser, Some(1), parser.index, parser.line, &file_name, config_data, context, None));
+			scope = Some(ScopeExpression::new(parser, Some(1), parser.index, parser.line, &file_name, config_data, context, context_manager, None));
 		}
 
 		return LoopParserResult::Ok(LoopParser {

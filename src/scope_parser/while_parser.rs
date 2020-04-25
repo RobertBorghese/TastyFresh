@@ -21,6 +21,7 @@ use crate::declaration_parser::parser::Parser;
 use crate::context_management::context::Context;
 
 use crate::scope_parser::ScopeExpression;
+use crate::context_management::context_manager::ContextManager;
 
 use std::rc::Rc;
 
@@ -68,7 +69,7 @@ impl Declaration<WhileParser> for WhileParser {
 }
 
 impl WhileParser {
-	pub fn new(parser: &mut Parser, file_name: String, config_data: &ConfigData, context: &mut Context) -> WhileParserResult {
+	pub fn new(parser: &mut Parser, file_name: String, config_data: &ConfigData, context: &mut Context, context_manager: &mut ContextManager) -> WhileParserResult {
 		let initial_line = parser.line;
 
 		let mut while_type = WhileType::While;
@@ -85,7 +86,7 @@ impl WhileParser {
 		declare_parse_whitespace!(parser);
 
 		let mut reason = ExpressionEndReason::Unknown;
-		let expression = parser.parse_expression(file_name.clone(), config_data, Some(context), &mut reason, Some(VariableType::boolean()));
+		let expression = parser.parse_expression(file_name.clone(), config_data, Some(context), context_manager, &mut reason, Some(VariableType::boolean()));
 
 		match reason {
 			ExpressionEndReason::Unknown => return WhileParserResult::Err("Unknown Error", "unknown expression parsing error", parser.index - 1, parser.index),
@@ -98,12 +99,12 @@ impl WhileParser {
 
 		let scope: Option<ScopeExpression>;
 		if parser.get_curr() == '{' {
-			scope = Some(ScopeExpression::new(parser, None, parser.index + 1, parser.line, &file_name, config_data, context, None));
+			scope = Some(ScopeExpression::new(parser, None, parser.index + 1, parser.line, &file_name, config_data, context, context_manager, None));
 			if parser.get_curr() == '}' {
 				parser.increment();
 			}
 		} else {
-			scope = Some(ScopeExpression::new(parser, Some(1), parser.index, parser.line, &file_name, config_data, context, None));
+			scope = Some(ScopeExpression::new(parser, Some(1), parser.index, parser.line, &file_name, config_data, context, context_manager, None));
 		}
 
 		return WhileParserResult::Ok(WhileParser {

@@ -20,6 +20,7 @@ use crate::declaration_parser::declaration::{ Declaration, DeclarationResult };
 use crate::declaration_parser::parser::Parser;
 
 use crate::context_management::context::Context;
+use crate::context_management::context_manager::ContextManager;
 
 use crate::scope_parser::ScopeExpression;
 use crate::scope_parser::while_parser::WhileType;
@@ -50,7 +51,7 @@ impl Declaration<DoWhileParser> for DoWhileParser {
 }
 
 impl DoWhileParser {
-	pub fn new(parser: &mut Parser, file_name: String, config_data: &ConfigData, context: &mut Context) -> DoWhileParserResult {
+	pub fn new(parser: &mut Parser, file_name: String, config_data: &ConfigData, context: &mut Context, context_manager: &mut ContextManager) -> DoWhileParserResult {
 		let initial_line = parser.line;
 
 		let mut do_keyword = "".to_string();
@@ -65,14 +66,14 @@ impl DoWhileParser {
 		let mut close_line = 0;
 		let scope: Option<ScopeExpression>;
 		if parser.get_curr() == '{' {
-			scope = Some(ScopeExpression::new(parser, None, parser.index + 1, parser.line, &file_name, config_data, context, None));
+			scope = Some(ScopeExpression::new(parser, None, parser.index + 1, parser.line, &file_name, config_data, context, context_manager, None));
 			declare_parse_whitespace!(parser);
 			if parser.get_curr() == '}' {
 				close_line = parser.line;
 				declare_parse_required_next_char!('}', next_char, parser);
 			}
 		} else {
-			scope = Some(ScopeExpression::new(parser, Some(1), parser.index, parser.line, &file_name, config_data, context, None));
+			scope = Some(ScopeExpression::new(parser, Some(1), parser.index, parser.line, &file_name, config_data, context, context_manager, None));
 			close_line = parser.line;
 		}
 
@@ -93,7 +94,7 @@ impl DoWhileParser {
 		declare_parse_whitespace!(parser);
 
 		let mut reason = ExpressionEndReason::Unknown;
-		let expression = parser.parse_expression(file_name.clone(), config_data, Some(context), &mut reason, Some(VariableType::boolean()));
+		let expression = parser.parse_expression(file_name.clone(), config_data, Some(context), context_manager, &mut reason, Some(VariableType::boolean()));
 
 		match reason {
 			ExpressionEndReason::Unknown => return DoWhileParserResult::Err("Unknown Error", "unknown expression parsing error", parser.index - 1, parser.index),

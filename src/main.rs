@@ -47,6 +47,7 @@ mod transpiler;
 extern crate lazy_static;
 
 use context_management::global_context::GlobalContext;
+use context_management::context_manager::ContextManager;
 
 use declaration_parser::parser::Parser;
 use declaration_parser::module_declaration::{ ModuleDeclaration, DeclarationType };
@@ -214,7 +215,7 @@ fn get_output_dirs(arguments: &BTreeMap<String,Vec<String>>) -> Option<Vec<Strin
 /// # Return
 ///
 /// The `ModuleDeclaration` for the file is returned.
-fn parse_source_file(file: &str, source_location: &str, config_data: &ConfigData, module_contexts: &mut BTreeMap<String,Context>, parser: &mut Parser, global_context: &mut GlobalContext) -> ModuleDeclaration {
+fn parse_source_file(file: &str, source_location: &str, config_data: &ConfigData, module_contexts: &mut ContextManager, parser: &mut Parser, global_context: &mut GlobalContext) -> ModuleDeclaration {
 	let content = std::fs::read_to_string(file).expect("Could not read source file.");
 	if !file.ends_with(".tasty") { panic!("File is not a .tasty. You should be ashamed."); }
 	*parser = Parser::new(content);
@@ -222,22 +223,22 @@ fn parse_source_file(file: &str, source_location: &str, config_data: &ConfigData
 	let mut context = Context::new();
 	let mut module_declaration = ModuleDeclaration::new(parser, file, &config_data.operators);
 	let mut attribute_class_indexes = Vec::new();
-	for declaration in &module_declaration.declarations {
+	for declaration in &mut module_declaration.declarations {
 		match declaration {
 			DeclarationType::Function(d, _) => {
-				context.module.add_function(d.name.clone(), d.to_function(&parser.content));
+				d.declaration_id = context.module.add_function(d.name.clone(), d.to_function(&parser.content), Some(module_contexts));
 				for p in &d.parameters {
 					context.register_type(&p.0);
 				}
 				context.register_type(&d.return_type);
 			},
 			DeclarationType::Variable(d, _) => {
-				context.module.add_variable(d.name.clone(), d.var_type.clone());
+				d.declaration_id = context.module.add_variable(d.name.clone(), d.var_type.clone(), Some(module_contexts));
 				context.register_type(&d.var_type);
 			},
 			DeclarationType::Class(d, _) => {
-				let class_data = d.to_class(&mut context, &parser.content);
-				context.module.add_class(d.name.clone(), class_data);
+				let class_data = d.to_class(&mut context, module_contexts, &parser.content);
+				d.declaration_id = context.module.add_class(d.name.clone(), class_data, Some(module_contexts));
 			},
 			DeclarationType::AttributeClass(_, _) => {
 				attribute_class_indexes.push(curr_index);
@@ -247,7 +248,7 @@ fn parse_source_file(file: &str, source_location: &str, config_data: &ConfigData
 		}
 		curr_index += 1;
 	}
-	module_contexts.insert((&file[source_location.len() + 1..file.len() - 6]).to_string(), context);
+	module_contexts.add_context((&file[source_location.len() + 1..file.len() - 6]).to_string(), context);
 
 	let mut attribute_classes_processed = 0;
 	for attribute_index in attribute_class_indexes {
@@ -272,14 +273,15 @@ fn parse_source_file(file: &str, source_location: &str, config_data: &ConfigData
 /// # Return
 ///
 /// If successful, `true` is returned; otherwise `false`.
-fn transpile_source_file(file: &str, source_location: &str, output_dirs: &Vec<String>, config_data: &ConfigData, module_contexts: &mut BTreeMap<String,Context>, module_declaration: &mut ModuleDeclaration, parser: &mut Parser, global_context: &mut GlobalContext) -> bool {
+fn transpile_source_file(file: &str, source_location: &str, output_dirs: &Vec<String>, config_data: &ConfigData, module_contexts: &mut ContextManager, module_declaration: &mut ModuleDeclaration, parser: &mut Parser, global_context: &mut GlobalContext) -> bool {
 	let access_file_path = &file[source_location.len() + 1..file.len() - 6];
 	{
-		let context = module_contexts.get_mut(access_file_path).unwrap();
+		let context = module_contexts.get_context(access_file_path);
 		let typing = &mut context.typing;
-		typing.add(&context.module);
+		typing.add(access_file_path.to_string());//&context.module);
 	}
 
+	let context_headers = module_contexts.get_context(access_file_path).headers.clone();
 	let mut transpile_context = Transpiler::new(file, access_file_path, config_data, module_contexts, parser);
 	transpile_context.parse_declarations(&mut module_declaration.declarations, global_context, None);
 
@@ -307,9 +309,8 @@ fn transpile_source_file(file: &str, source_location: &str, output_dirs: &Vec<St
 			header_lines.push("#define ".to_string() + &marco_name);
 		}
 		header_lines.push("".to_string());
-		let context = transpile_context.module_contexts.get_mut(access_file_path).unwrap();
-		if !context.headers.is_empty() || !transpile_context.header_system_includes.is_empty() {
-			for head in &context.headers.headers {
+		if !context_headers.is_empty() || !transpile_context.header_system_includes.is_empty() {
+			for head in &context_headers.headers {
 				header_lines.push(format!("#include <{}>", head.path));
 			}
 			for head_path in &transpile_context.header_system_includes {
@@ -468,7 +469,7 @@ fn main() {
 	data.pragma_guard = arguments.contains_key("pragma-guard");
 	data.hpp_headers = !arguments.contains_key("h-headers");
 
-	let mut file_contexts = BTreeMap::new();
+	let mut file_contexts = ContextManager::new();//BTreeMap::new();
 	let mut file_declarations = BTreeMap::new();
 	let mut file_parsers = BTreeMap::new();
 

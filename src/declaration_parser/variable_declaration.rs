@@ -42,7 +42,8 @@ pub struct VariableDeclaration {
 	pub var_type: VariableType,
 	pub line: usize,
 	pub value: Option<(usize, usize)>,
-	pub pure_assign: bool
+	pub pure_assign: bool,
+	pub declaration_id: usize
 }
 
 impl Declaration<VariableDeclaration> for VariableDeclaration {
@@ -149,7 +150,8 @@ impl VariableDeclaration {
 			},
 			line: initial_line,
 			value: value,
-			pure_assign: pure_assign
+			pure_assign: pure_assign,
+			declaration_id: 0
 		});
 	}
 

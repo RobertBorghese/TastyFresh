@@ -7,6 +7,7 @@
 
 use crate::declaration_parser::include_declaration::IncludeType;
 
+#[derive(Clone)]
 pub struct HeaderContext {
 	pub headers: Vec<Header>,
 }
@@ -46,6 +47,7 @@ impl HeaderContext {
 	}
 }
 
+#[derive(Clone)]
 pub struct Header {
 	pub path: String,
 	pub inc_type: IncludeType

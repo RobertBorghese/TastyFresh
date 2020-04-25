@@ -10,6 +10,7 @@ pub mod context;
 pub mod typing_context;
 pub mod header_context;
 pub mod global_context;
+pub mod context_manager;
 
 use position::Position;
 

@@ -34,6 +34,7 @@ use crate::config_management::ConfigData;
 use crate::config_management::operator_data::OperatorDataStructure;
 
 use crate::context_management::context::Context;
+use crate::context_management::context_manager::ContextManager;
 
 use std::rc::Rc;
 
@@ -56,7 +57,7 @@ pub enum ScopeExpression {
 }
 
 impl ScopeExpression {
-	pub fn new(parser: &mut Parser, limit: Option<usize>, start_index: usize, line: usize, file: &str, config_data: &ConfigData, context: &mut Context, expected_return_type: Option<VariableType>) -> ScopeExpression {
+	pub fn new(parser: &mut Parser, limit: Option<usize>, start_index: usize, line: usize, file: &str, config_data: &ConfigData, context: &mut Context, context_manager: &mut ContextManager, expected_return_type: Option<VariableType>) -> ScopeExpression {
 		parser.reset(start_index, line);
 
 		let mut scope_exprs = Vec::new();
@@ -69,7 +70,7 @@ impl ScopeExpression {
 			}
 			parser.parse_whitespace();
 			if ReturnParser::is_declaration(parser) {
-				let result = ReturnParser::new(parser, file.to_string(), config_data, context, expected_return_type.clone());
+				let result = ReturnParser::new(parser, file.to_string(), config_data, context, context_manager, expected_return_type.clone());
 				if result.is_error() {
 					result.print_error(file.to_string(), &parser.content);
 					break;
@@ -82,7 +83,7 @@ impl ScopeExpression {
 					}
 				}
 			} else if IfParser::is_declaration(parser) {
-				let result = IfParser::new(parser, file.to_string(), config_data, context);
+				let result = IfParser::new(parser, file.to_string(), config_data, context, context_manager);
 				if result.is_error() {
 					result.print_error(file.to_string(), &parser.content);
 					break;
@@ -92,7 +93,7 @@ impl ScopeExpression {
 					scope_exprs.push(ScopeExpression::If(if_declare.if_type, if_declare.expression, if_declare.scope, if_declare.line, if_declare.end_line));
 				}
 			} else if WhileParser::is_declaration(parser) {
-				let result = WhileParser::new(parser, file.to_string(), config_data, context);
+				let result = WhileParser::new(parser, file.to_string(), config_data, context, context_manager);
 				if result.is_error() {
 					result.print_error(file.to_string(), &parser.content);
 					break;
@@ -102,7 +103,7 @@ impl ScopeExpression {
 					scope_exprs.push(ScopeExpression::While(while_declare.while_type, while_declare.expression, while_declare.scope, while_declare.line, while_declare.end_line));
 				}
 			} else if LoopParser::is_declaration(parser) {
-				let result = LoopParser::new(parser, file.to_string(), config_data, context);
+				let result = LoopParser::new(parser, file.to_string(), config_data, context, context_manager);
 				if result.is_error() {
 					result.print_error(file.to_string(), &parser.content);
 					break;
@@ -112,7 +113,7 @@ impl ScopeExpression {
 					scope_exprs.push(ScopeExpression::Loop(loop_declare.scope, loop_declare.line, loop_declare.end_line));
 				}
 			} else if DoWhileParser::is_declaration(parser) {
-				let result = DoWhileParser::new(parser, file.to_string(), config_data, context);
+				let result = DoWhileParser::new(parser, file.to_string(), config_data, context, context_manager);
 				if result.is_error() {
 					result.print_error(file.to_string(), &parser.content);
 					break;
@@ -132,7 +133,7 @@ impl ScopeExpression {
 					scope_exprs.push(ScopeExpression::Injection(parser.content[inject_declare.start_index..inject_declare.end_index].to_string(), inject_declare.line, inject_declare.end_line));
 				}
 			} else if ForParser::is_declaration(parser) {
-				let result = ForParser::new(parser, file.to_string(), config_data, context);
+				let result = ForParser::new(parser, file.to_string(), config_data, context, context_manager);
 				if result.is_error() {
 					result.print_error(file.to_string(), &parser.content);
 					break;
@@ -183,7 +184,7 @@ impl ScopeExpression {
 					if var_declare.value.is_some() {
 						parser.reset(var_declare.value.as_ref().unwrap().0, var_declare.line);
 						let mut reason = ExpressionEndReason::Unknown;
-						let expr = parser.parse_expression(file.to_string(), config_data, Some(context), &mut reason, Some(var_declare.var_type.clone()));
+						let expr = parser.parse_expression(file.to_string(), config_data, Some(context), context_manager, &mut reason, Some(var_declare.var_type.clone()));
 						if reason == ExpressionEndReason::EndOfExpression {
 							parser.parse_whitespace();
 							if parser.get_curr() == ';' {
@@ -194,15 +195,15 @@ impl ScopeExpression {
 								if var_declare.var_type.var_style.is_inferred() {
 									var_declare.var_type.var_style = var_declare.var_type.var_style.attempt_inference(&expr.get_type());
 								}
-								var_declare.var_type.resolve(context);
+								var_declare.var_type.resolve(context, context_manager);
 								context.register_type(&var_declare.var_type);
-								context.typing.add_variable(var_declare.name.clone(), var_declare.var_type.clone());
+								context.typing.add_variable(var_declare.name.clone(), var_declare.var_type.clone(), None);
 								scope_exprs.push(ScopeExpression::VariableDeclaration(var_declare, Some(expr)));
 							}
 						}
 					} else {
 						context.register_type(&var_declare.var_type);
-						context.typing.add_variable(var_declare.name.clone(), var_declare.var_type.clone());
+						context.typing.add_variable(var_declare.name.clone(), var_declare.var_type.clone(), None);
 						scope_exprs.push(ScopeExpression::VariableDeclaration(var_declare, None));
 						if parser.get_curr() == ';' {
 							parser.increment();
@@ -214,7 +215,7 @@ impl ScopeExpression {
 				let initial_line = parser.line;
 				parser.increment();
 				scope_exprs.push(ScopeExpression::SubScope(
-					Box::new(ScopeExpression::new(parser, limit, parser.index, parser.line, file, config_data, context, None)),
+					Box::new(ScopeExpression::new(parser, limit, parser.index, parser.line, file, config_data, context, context_manager, None)),
 					initial_line,
 					parser.line
 				));
@@ -225,7 +226,7 @@ impl ScopeExpression {
 					break;
 				}
 				let mut reason = ExpressionEndReason::Unknown;
-				let expr = parser.parse_expression(file.to_string(), config_data, Some(context), &mut reason, None);
+				let expr = parser.parse_expression(file.to_string(), config_data, Some(context), context_manager, &mut reason, None);
 				if reason != ExpressionEndReason::EndOfExpression {
 					break;
 				} else {

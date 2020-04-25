@@ -27,6 +27,8 @@ pub enum NumberType {
 	Float,      // f
 	Double,
 	LongDouble, // l
+	Size,
+	WChar,
 	UnknownNumber
 }
 
@@ -46,6 +48,8 @@ impl NumberType {
 			NumberType::Float => "float",
 			NumberType::Double => "double",
 			NumberType::LongDouble => "long double",
+			NumberType::Size => "size_t",
+			NumberType::WChar => "wchar_t",
 			NumberType::UnknownNumber => "int (unknown)"
 		}
 	}

@@ -10,6 +10,7 @@ use crate::expression::variable_type::VariableType;
 
 use crate::context_management::position::Position;
 use crate::context_management::global_context::GlobalContext;
+use crate::context_management::context_manager::ContextManager;
 
 use crate::declaration_parser::parser::Parser;
 use crate::declaration_parser::module_declaration::DeclarationType;
@@ -19,10 +20,7 @@ use crate::config_management::ConfigData;
 
 use crate::scope_parser::ScopeExpression;
 
-use crate::context_management::context::Context;
 use crate::context_management::print_code_error;
-
-use std::collections::BTreeMap;
 
 use std::rc::Rc;
 
@@ -130,12 +128,12 @@ pub struct Transpiler<'a> {
 	pub file: &'a str,
 	pub access_file_path: &'a str,
 	pub config_data: &'a ConfigData,
-	pub module_contexts: &'a mut BTreeMap<String,Context>,
+	pub module_contexts: &'a mut ContextManager,
 	pub parser: &'a mut Parser
 }
 
 impl<'a> Transpiler<'a> {
-	pub fn new(file: &'a str, access_file_path: &'a str, config_data: &'a ConfigData, module_contexts: &'a mut BTreeMap<String,Context>, parser: &'a mut Parser) -> Transpiler<'a> {
+	pub fn new(file: &'a str, access_file_path: &'a str, config_data: &'a ConfigData, module_contexts: &'a mut ContextManager, parser: &'a mut Parser) -> Transpiler<'a> {
 		return Transpiler {
 			output_lines: Vec::new(),
 
@@ -160,18 +158,18 @@ impl<'a> Transpiler<'a> {
 	pub fn parse_declarations(&mut self, declarations: &mut Vec<DeclarationType>, global_context: &GlobalContext, mut class_declarations: Option<(&str, &mut VarFuncDeclarations, &mut VarFuncDeclarations, &mut VarFuncDeclarations)>) {
 		let is_class_declare = !class_declarations.is_none();
 
-		let mut declarations_clone = declarations.clone();
-		for declaration in &mut declarations_clone {
+		//let mut declarations_clone = declarations.clone();
+		for declaration in declarations.iter_mut() {
 			match declaration {
 				DeclarationType::Variable(var_data, attributes) => {
 					attributes.flatten_attributes(global_context, self.parser.content.as_str());
 
-					let mut context = self.module_contexts.get_mut(self.access_file_path).unwrap();
+					let mut context = self.module_contexts.take_context(self.access_file_path);
 					let mut reason = ExpressionEndReason::Unknown;
 					let mut expr: Option<Rc<Expression>> = None;
 					if var_data.value.is_some() {
 						self.parser.reset(var_data.value.unwrap().0, var_data.line);
-						expr = Some(self.parser.parse_expression(self.file.to_string(), self.config_data, Some(&mut context), &mut reason, Some(var_data.var_type.clone())));
+						expr = Some(self.parser.parse_expression(self.file.to_string(), self.config_data, Some(&mut context), self.module_contexts, &mut reason, Some(var_data.var_type.clone())));
 						if var_data.var_type.is_inferred() {
 							var_data.var_type.var_type = expr.as_ref().unwrap().get_type().var_type;
 						}
@@ -185,9 +183,9 @@ impl<'a> Transpiler<'a> {
 						}
 					};
 					if is_class_declare {
-						context.typing.add_variable(var_data.name.clone(), var_data.var_type.clone());
+						context.typing.add_variable(var_data.name.clone(), var_data.var_type.clone(), None);
 					} else {
-						context.module.add_variable(var_data.name.clone(), var_data.var_type.clone());
+						context.module.add_variable(var_data.name.clone(), var_data.var_type.clone(), Some(self.module_contexts));
 					}
 					if !is_class_declare || var_data.is_only_static() {
 						insert_output_line(&mut self.output_lines,
@@ -238,6 +236,8 @@ impl<'a> Transpiler<'a> {
 							);
 						};
 					}
+
+					self.module_contexts.add_context(self.access_file_path.to_string(), context);
 				},
 				_ => ()
 			}
@@ -246,7 +246,7 @@ impl<'a> Transpiler<'a> {
 		for declaration in declarations {
 			// Module Attributes
 			if let DeclarationType::ModuleAttribute(module_attribute) = declaration {
-				let context = self.module_contexts.get_mut(self.access_file_path).unwrap();
+				let context = self.module_contexts.get_context(self.access_file_path);
 				context.register_module_attribute(&module_attribute.name);
 				if context.align_lines {
 					self.header_include_line = Some(module_attribute.line);
@@ -266,14 +266,21 @@ impl<'a> Transpiler<'a> {
 					let mut private_declares = VarFuncDeclarations::new();
 
 					{
-						let context = self.module_contexts.get_mut(self.access_file_path).unwrap();
+						let context = self.module_contexts.get_context(self.access_file_path);
 						context.typing.push_context();
-						context.typing.add_variable("this".to_string(), VariableType::this());
+						context.typing.add_variable("this".to_string(), VariableType::this(), None);
 					}
 					self.parse_declarations(&mut class_declare.declarations, global_context, Some((&class_declare.name, &mut construct_declares, &mut public_declares, &mut private_declares)));
 					{
-						let context = self.module_contexts.get_mut(self.access_file_path).unwrap();
+						let context = self.module_contexts.get_context(self.access_file_path);
 						context.typing.pop_context();
+					}
+
+					if class_declare.declaration_id != 0 {
+						let mut context = self.module_contexts.take_context(self.access_file_path);
+						let class_data = class_declare.to_class(&mut context, self.module_contexts, &self.parser.content);
+						self.module_contexts.add_context(self.access_file_path.to_string(), context);
+						self.module_contexts.update_class(class_declare.declaration_id, class_data);
 					}
 
 					let mut isolated = false;
@@ -292,7 +299,7 @@ impl<'a> Transpiler<'a> {
 					self.class_declarations.push((class_content, construct_declares, public_declares, private_declares));
 				},
 				DeclarationType::Injection(injection, _attributes) => {
-					let context = self.module_contexts.get_mut(self.access_file_path).unwrap();
+					let context = self.module_contexts.get_context(self.access_file_path);
 					let mut line = if context.align_lines { injection.line } else { self.output_lines.len() + 1 };
 					let injection = if context.align_lines {
 						&self.parser.content[injection.start_index..injection.end_index]
@@ -308,11 +315,10 @@ impl<'a> Transpiler<'a> {
 				DeclarationType::Assume(_assume, _attributes) => {
 				},
 				DeclarationType::Import(import, _attributes) => {
-					if self.module_contexts.contains_key(&import.path) {
-						let module = self.module_contexts.get(&import.path).unwrap().module.clone();
-						let context = self.module_contexts.get_mut(self.access_file_path).unwrap();
-						let typing = &mut context.typing;
-						typing.add(&module);
+					if self.module_contexts.module_exists(&import.path) {
+						let context = self.module_contexts.get_context(self.access_file_path);
+						let typing = &mut context.module;
+						typing.add(import.path.clone());
 						let line = if context.align_lines { import.line } else { self.output_lines.len() };
 						insert_output_line(&mut self.output_lines, if self.config_data.hpp_headers { 
 							format!("#include \"{}.hpp\"", import.path)
@@ -332,7 +338,7 @@ impl<'a> Transpiler<'a> {
 							self.header_system_includes.push(include.path.clone());
 						}
 					} else {
-						let context = self.module_contexts.get_mut(self.access_file_path).unwrap();
+						let context = self.module_contexts.get_context(self.access_file_path);
 						let line = if context.align_lines { include.line } else { self.output_lines.len() };
 						insert_output_line(&mut self.output_lines, format!("#include {}", if include.inc_type.is_local() {
 							format!("\"{}\"", include.path)
@@ -343,9 +349,10 @@ impl<'a> Transpiler<'a> {
 					
 				},
 				DeclarationType::Function(func_data, attributes) => {
+					println!("FUNC IS TRANSPILED");
 					attributes.flatten_attributes(global_context, self.parser.content.as_str());
 
-					let mut context = self.module_contexts.get_mut(self.access_file_path).unwrap();
+					let mut context = self.module_contexts.take_context(self.access_file_path);
 					let mut func_content: Option<String> = None;
 					let mut line = if context.align_lines { func_data.line } else { self.output_lines.len() + 1 };
 					let add_to_header = !attributes.has_attribute("NoHeader");
@@ -354,9 +361,9 @@ impl<'a> Transpiler<'a> {
 						if func_data.start_index.is_some() && func_data.end_index.is_some() {
 							context.typing.push_context();
 							for param in &func_data.parameters {
-								context.typing.add_variable(param.1.clone(), param.0.clone());
+								context.typing.add_variable(param.1.clone(), param.0.clone(), None);
 							}
-							let scope = ScopeExpression::new(self.parser, None, func_data.start_index.unwrap(), func_data.line, self.file, self.config_data, &mut context, Some(func_data.return_type.clone()));
+							let scope = ScopeExpression::new(self.parser, None, func_data.start_index.unwrap(), func_data.line, self.file, self.config_data, &mut context, self.module_contexts, Some(func_data.return_type.clone()));
 							func_content = Some(scope.to_string(&self.config_data.operators, func_data.line, 1, &mut context));
 							context.typing.pop_context();
 						}
@@ -416,6 +423,8 @@ impl<'a> Transpiler<'a> {
 								);
 							}
 						}
+
+						self.module_contexts.add_context(self.access_file_path.to_string(), context);
 					}
 				},
 				_ => {

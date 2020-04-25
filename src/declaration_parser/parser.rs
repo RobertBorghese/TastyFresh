@@ -15,6 +15,7 @@ use crate::config_management::ConfigData;
 
 use crate::context_management::position::Position;
 use crate::context_management::context::Context;
+use crate::context_management::context_manager::ContextManager;
 
 use std::rc::Rc;
 
@@ -525,8 +526,8 @@ impl Parser {
 	/// # Return
 	///
 	/// Returns the configuration data that's taken ownership of.
-	pub fn parse_expression(&mut self, file_name: String, config_data: &ConfigData, mut context: Option<&mut Context>, reason: &mut ExpressionEndReason, final_desired_type: Option<VariableType>) -> Rc<Expression> {
-		let expr_parser = ExpressionParser::new(self, Position::new(file_name, Some(self.line), self.index, None), config_data, &mut context, None, final_desired_type);
+	pub fn parse_expression(&mut self, file_name: String, config_data: &ConfigData, mut context: Option<&mut Context>, manager: &mut ContextManager, reason: &mut ExpressionEndReason, final_desired_type: Option<VariableType>) -> Rc<Expression> {
+		let expr_parser = ExpressionParser::new(self, Position::new(file_name, Some(self.line), self.index, None), config_data, &mut context, manager, None, final_desired_type);
 		self.line += expr_parser.position.line_offset;
 		*reason = expr_parser.end_data.reason;
 		return expr_parser.expression;
@@ -682,6 +683,24 @@ impl Parser {
 								*conflicting_specifiers = Some("cannot use \"unsigned\" specifier on \"byte\"");
 							}
 							return Type::Number(NumberType::UByte);
+						},
+						"size" => {
+							if long {
+								*conflicting_specifiers = Some("cannot use \"long\" specifier on \"size\"");
+							}
+							if unsigned.unwrap_or(false) {
+								*conflicting_specifiers = Some("cannot use \"unsigned\" specifier on \"size\"");
+							}
+							return Type::Number(NumberType::Size);
+						},
+						"wchar" => {
+							if long {
+								*conflicting_specifiers = Some("cannot use \"long\" specifier on \"wchar\"");
+							}
+							if unsigned.unwrap_or(false) {
+								*conflicting_specifiers = Some("cannot use \"unsigned\" specifier on \"wchar\"");
+							}
+							return Type::Number(NumberType::WChar);
 						},
 						"thicc" | "uthicc" => {
 							if long {

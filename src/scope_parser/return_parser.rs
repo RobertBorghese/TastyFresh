@@ -20,6 +20,7 @@ use crate::declaration_parser::parser::Parser;
 use crate::declaration_parser::cpp_transpiler::CPPTranspiler;
 
 use crate::context_management::context::Context;
+use crate::context_management::context_manager::ContextManager;
 
 use std::rc::Rc;
 
@@ -49,7 +50,7 @@ impl CPPTranspiler for ReturnParser {
 }
 
 impl ReturnParser {
-	pub fn new(parser: &mut Parser, file_name: String, config_data: &ConfigData, context: &mut Context, expected_return_type: Option<VariableType>) -> ReturnParserResult {
+	pub fn new(parser: &mut Parser, file_name: String, config_data: &ConfigData, context: &mut Context, context_manager: &mut ContextManager, expected_return_type: Option<VariableType>) -> ReturnParserResult {
 		let initial_line = parser.line;
 
 		let mut return_keyword = "".to_string();
@@ -67,7 +68,7 @@ impl ReturnParser {
 	}*/
 
 		let mut reason = ExpressionEndReason::Unknown;
-		let expression = parser.parse_expression(file_name, config_data, Some(context), &mut reason, expected_return_type);
+		let expression = parser.parse_expression(file_name, config_data, Some(context), context_manager, &mut reason, expected_return_type);
 
 		match reason {
 			ExpressionEndReason::Unknown => return ReturnParserResult::Err("Unknown Error", "unknown expression parsing error", parser.index - 1, parser.index),

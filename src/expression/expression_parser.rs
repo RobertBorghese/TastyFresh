@@ -14,6 +14,7 @@ use crate::config_management::operator_data::Operator;
 
 use crate::context_management::position::Position;
 use crate::context_management::context::Context;
+use crate::context_management::context_manager::ContextManager;
 
 use crate::declaration_parser::parser::Parser;
 
@@ -40,7 +41,8 @@ pub struct ExpressionParser<'a> {
 	pub end_data: ExpressionEnd,
 	pub expect_type: bool,
 
-	pub config_data: &'a ConfigData
+	pub config_data: &'a ConfigData,
+	pub context_manager: &'a mut ContextManager
 }
 
 /// Tracks the positional information of the parser.
@@ -97,7 +99,7 @@ impl Expression {
 }
 
 impl<'a> ExpressionParser<'a> {
-	pub fn new(parser: &mut Parser, start_position: Position, config_data: &'a ConfigData, context: &mut Option<&mut Context>, end_chars: Option<Vec<char>>, final_desired_type: Option<VariableType>) -> ExpressionParser<'a> {
+	pub fn new(parser: &mut Parser, start_position: Position, config_data: &'a ConfigData, context: &mut Option<&mut Context>, context_manager: &'a mut ContextManager, end_chars: Option<Vec<char>>, final_desired_type: Option<VariableType>) -> ExpressionParser<'a> {
 		let mut result = ExpressionParser {
 			expr_str: parser.content.to_string(),
 			position: ExpressionParserPosition {
@@ -114,7 +116,8 @@ impl<'a> ExpressionParser<'a> {
 				end_index: 0,
 				reason: ExpressionEndReason::Unknown
 			},
-			expect_type: false
+			expect_type: false,
+			context_manager: context_manager
 		};
 		result.parse_expr_str(parser, context);
 		result.expression = ExpressionPiece::parse_expr_parts(&mut result, context, &parser.content, final_desired_type);
@@ -451,7 +454,7 @@ impl<'a> ExpressionParser<'a> {
 			parser.index += 1;
 			let chars = vec!(end_char);
 			if self.index_within_bounds(parser) {
-				let expr_parser = ExpressionParser::new(parser, self.generate_pos(parser.index, None), self.config_data, context, Some(chars), None);
+				let expr_parser = ExpressionParser::new(parser, self.generate_pos(parser.index, None), self.config_data, context, self.context_manager, Some(chars), None);
 				let expr = expr_parser.expression;
 				parser.index += 1;
 				if let ExpressionEndReason::ReachedChar(c) = expr_parser.end_data.reason {
@@ -514,7 +517,7 @@ impl<'a> ExpressionParser<'a> {
 		loop {
 			let chars = vec!(end_char, ',');
 			if self.index_within_bounds(parser) {
-				let expr_parser = ExpressionParser::new(parser, self.generate_pos(parser.index, None), self.config_data, context, Some(chars), None);
+				let expr_parser = ExpressionParser::new(parser, self.generate_pos(parser.index, None), self.config_data, context, self.context_manager, Some(chars), None);
 				expressions.push(expr_parser.expression);
 				parser.index += 1;
 				final_line_offset = parser.line + expr_parser.position.line_offset;
@@ -722,13 +725,13 @@ impl<'a> ExpressionParser<'a> {
 
 		let scope: ScopeExpression;
 		if parser.get_curr() == '{' {
-			scope = ScopeExpression::new(parser, None, parser.index + 1, parser.line, "", self.config_data, context.as_mut().unwrap(), None);
+			scope = ScopeExpression::new(parser, None, parser.index + 1, parser.line, "", self.config_data, context.as_mut().unwrap(), self.context_manager, None);
 			if parser.get_curr() == '}' {
 				parser.increment();
 			}
 		} else {
 			let mut reason = ExpressionEndReason::Unknown;
-			let expression = Some(parser.parse_expression("".to_string(), self.config_data, Some(context.as_mut().unwrap()), &mut reason, Some(VariableType::boolean())));
+			let expression = Some(parser.parse_expression("".to_string(), self.config_data, Some(context.as_mut().unwrap()), self.context_manager, &mut reason, Some(VariableType::boolean())));
 			if expression.is_none() { return false; }
 			match reason {
 				ExpressionEndReason::Unknown => return false,

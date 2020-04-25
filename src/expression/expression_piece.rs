@@ -458,7 +458,7 @@ impl ExpressionPiece {
 			return VariableType::boolean();
 		} else if context.is_some() {
 			let c = context.as_ref().unwrap();
-			let ct = c.typing.get_item(value);
+			let ct = c.typing.get_item(value, None, false);
 			if ct.is_some() {
 				return match ct.unwrap() {
 					ContextType::Variable(variable_type) => variable_type,

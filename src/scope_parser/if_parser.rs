@@ -20,6 +20,7 @@ use crate::declaration_parser::declaration::{ Declaration, DeclarationResult };
 use crate::declaration_parser::parser::Parser;
 
 use crate::context_management::context::Context;
+use crate::context_management::context_manager::ContextManager;
 
 use crate::scope_parser::ScopeExpression;
 
@@ -93,7 +94,7 @@ impl Declaration<IfParser> for IfParser {
 }
 
 impl IfParser {
-	pub fn new(parser: &mut Parser, file_name: String, config_data: &ConfigData, context: &mut Context) -> IfParserResult {
+	pub fn new(parser: &mut Parser, file_name: String, config_data: &ConfigData, context: &mut Context, context_manager: &mut ContextManager) -> IfParserResult {
 		let initial_line = parser.line;
 
 		let mut if_keyword = "".to_string();
@@ -130,7 +131,7 @@ impl IfParser {
 		let mut expression: Option<Rc<Expression>> = None;
 		if obtain_condition {
 			let mut reason = ExpressionEndReason::Unknown;
-			expression = Some(parser.parse_expression(file_name.clone(), config_data, Some(context), &mut reason, Some(VariableType::boolean())));
+			expression = Some(parser.parse_expression(file_name.clone(), config_data, Some(context), context_manager, &mut reason, Some(VariableType::boolean())));
 
 			match reason {
 				ExpressionEndReason::Unknown => return IfParserResult::Err("Unknown Error", "unknown expression parsing error", parser.index - 1, parser.index),
@@ -144,12 +145,12 @@ impl IfParser {
 
 		let scope: Option<ScopeExpression>;
 		if parser.get_curr() == '{' {
-			scope = Some(ScopeExpression::new(parser, None, parser.index + 1, parser.line, &file_name, config_data, context, None));
+			scope = Some(ScopeExpression::new(parser, None, parser.index + 1, parser.line, &file_name, config_data, context, context_manager, None));
 			if parser.get_curr() == '}' {
 				parser.increment();
 			}
 		} else {
-			scope = Some(ScopeExpression::new(parser, Some(1), parser.index, parser.line, &file_name, config_data, context, None));
+			scope = Some(ScopeExpression::new(parser, Some(1), parser.index, parser.line, &file_name, config_data, context, context_manager, None));
 		}
 
 		return IfParserResult::Ok(IfParser {

@@ -21,6 +21,7 @@ use crate::declaration_parser::declaration::{ Declaration, DeclarationResult };
 use crate::declaration_parser::parser::Parser;
 
 use crate::context_management::context::Context;
+use crate::context_management::context_manager::ContextManager;
 
 use crate::scope_parser::ScopeExpression;
 
@@ -115,7 +116,7 @@ impl Declaration<ForParser> for ForParser {
 }
 
 impl ForParser {
-	pub fn new(parser: &mut Parser, file_name: String, config_data: &ConfigData, context: &mut Context) -> ForParserResult {
+	pub fn new(parser: &mut Parser, file_name: String, config_data: &ConfigData, context: &mut Context, context_manager: &mut ContextManager) -> ForParserResult {
 		let initial_line = parser.line;
 
 		let mut for_keyword = "".to_string();
@@ -147,7 +148,7 @@ impl ForParser {
 			declare_parse_required_whitespace!(parser);
 
 			let mut reason = ExpressionEndReason::Unknown;
-			let expression = parser.parse_expression(file_name.clone(), config_data, Some(context), &mut reason, Some(VariableType::boolean()));
+			let expression = parser.parse_expression(file_name.clone(), config_data, Some(context), context_manager, &mut reason, Some(VariableType::boolean()));
 
 			match reason {
 				ExpressionEndReason::Unknown => return ForParserResult::Err("Unknown Error", "unknown expression parsing error", parser.index - 1, parser.index),
@@ -170,7 +171,7 @@ impl ForParser {
 			declare_parse_required_whitespace!(parser);
 
 			let mut start_reason = ExpressionEndReason::Unknown;
-			let start_expression = parser.parse_expression(file_name.clone(), config_data, Some(context), &mut start_reason, Some(VariableType::boolean()));
+			let start_expression = parser.parse_expression(file_name.clone(), config_data, Some(context), context_manager, &mut start_reason, Some(VariableType::boolean()));
 
 			match start_reason {
 				ExpressionEndReason::Unknown => return ForParserResult::Err("Unknown Error", "unknown expression parsing error", parser.index - 1, parser.index),
@@ -191,7 +192,7 @@ impl ForParser {
 			declare_parse_whitespace!(parser);
 
 			let mut end_reason = ExpressionEndReason::Unknown;
-			let end_expression = parser.parse_expression(file_name.clone(), config_data, Some(context), &mut end_reason, Some(VariableType::boolean()));
+			let end_expression = parser.parse_expression(file_name.clone(), config_data, Some(context), context_manager, &mut end_reason, Some(VariableType::boolean()));
 
 			match end_reason {
 				ExpressionEndReason::Unknown => return ForParserResult::Err("Unknown Error", "unknown expression parsing error", parser.index - 1, parser.index),
@@ -210,7 +211,7 @@ impl ForParser {
 			let mut by_expression: Option<Rc<Expression>> = None;
 			if by_keyword == "by" {
 				let mut by_reason = ExpressionEndReason::Unknown;
-				by_expression = Some(parser.parse_expression(file_name.clone(), config_data, Some(context), &mut by_reason, Some(VariableType::boolean())));
+				by_expression = Some(parser.parse_expression(file_name.clone(), config_data, Some(context), context_manager, &mut by_reason, Some(VariableType::boolean())));
 
 				match by_reason {
 					ExpressionEndReason::Unknown => return ForParserResult::Err("Unknown Error", "unknown expression parsing error", parser.index - 1, parser.index),
@@ -234,12 +235,12 @@ impl ForParser {
 
 		let scope: Option<ScopeExpression>;
 		if parser.get_curr() == '{' {
-			scope = Some(ScopeExpression::new(parser, None, parser.index + 1, parser.line, &file_name, config_data, context, None));
+			scope = Some(ScopeExpression::new(parser, None, parser.index + 1, parser.line, &file_name, config_data, context, context_manager, None));
 			if parser.get_curr() == '}' {
 				parser.increment();
 			}
 		} else {
-			scope = Some(ScopeExpression::new(parser, Some(1), parser.index, parser.line, &file_name, config_data, context, None));
+			scope = Some(ScopeExpression::new(parser, Some(1), parser.index, parser.line, &file_name, config_data, context, context_manager, None));
 		}
 
 		return ForParserResult::Ok(ForParser {

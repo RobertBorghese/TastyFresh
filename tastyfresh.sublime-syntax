@@ -70,13 +70,16 @@ contexts:
     - match: '\b(const|constexpr|constinit|extern|mutable|forever|thread_local|volatile|declare)\b'
       scope: storage.type.tasty-fresh
 
-    - match: '\b(fn|op|constructor|destructor|proc)\b'
+    - match: '\b(global|of|forward)\b'
+      scope: storage.type.tasty-fresh
+
+    - match: '\b(fn|op|constructor|destructor|proc|get|set)\b'
       scope: storage.type.function.tasty-fresh
 
     - match: '\b(inject)\b'
       scope: storage.type.function.tasty-fresh
 
-    - match: '(class|abstract|enum)\s+({{identifier}})'
+    - match: '(class|abstract|enum|transmute|refurbish)\s+({{identifier}})'
       scope: meta.assume.tasty-fresh
       captures:
         1: storage.type.class.tasty-fresh
@@ -140,7 +143,7 @@ contexts:
         1: storage.type.import.tasty-fresh
         2: variable.parameter.tasty-fresh
 
-    - match: '\b(void|unsigned|bool|byte|char|uchar|short|ushort|int|uint|long|ulong|thicc|uthicc|float|double|text)\b'
+    - match: '\b(void|unsigned|bool|byte|char|wchar|uchar|short|ushort|int|uint|size|long|ulong|thicc|uthicc|float|double|text)\b'
       scope: storage.type.numeric.tasty-fresh
 
     - match: '\b(?:0[xb])?(-)?[0-9\.]+[ful]*\b'

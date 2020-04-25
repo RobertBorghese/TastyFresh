@@ -12,6 +12,7 @@ use crate::expression::value_type::{ NumberType, StringType, ClassType, Function
 
 use crate::context_management::context::Context;
 use crate::context_management::typing_context::ContextType;
+use crate::context_management::context_manager::ContextManager;
 
 lazy_static! {
 	pub static ref STYLE_TYPES: Vec<&'static str> = vec!("copy", "ref", "borrow", "move", "ptr", "autoptr", "uniqueptr", "classptr", "let", "ptr2", "ptr3", "ptr4", "ptr5", "ptr6", "ptr7", "ptr8", "ptr9");
@@ -39,11 +40,11 @@ impl VariableType {
 		return self.var_style.to_cpp(&self.var_type, declare);
 	}
 
-	pub fn resolve(&mut self, context: &Context) {
+	pub fn resolve(&mut self, context: &Context, ctx_manager: &mut ContextManager) {
 		match &self.var_type {
 			Type::Undeclared(names) => {
 				if names.len() == 1 {
-					let context_type = context.module.get_item(names.first().unwrap());
+					let context_type = context.module.get_item(names.first().unwrap(), Some(ctx_manager), false);
 					if context_type.is_some() {
 						if let ContextType::Class(cls) = context_type.unwrap() {
 							self.var_type = Type::Class(cls.clone());

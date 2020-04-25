@@ -16,6 +16,7 @@ use crate::{
 use crate::config_management::operator_data::OperatorDataStructure;
 
 use crate::context_management::context::Context;
+use crate::context_management::context_manager::ContextManager;
 
 use crate::expression::variable_type::Type;
 use crate::expression::value_type::{ ClassType, Property, Function };
@@ -38,7 +39,8 @@ pub struct ClassDeclaration {
 	pub name: String,
 	pub class_type: ClassStyle,
 	pub extensions: Option<Vec<Type>>,
-	pub declarations: Vec<DeclarationType>
+	pub declarations: Vec<DeclarationType>,
+	pub declaration_id: usize
 }
 
 #[derive(Clone)]
@@ -190,7 +192,8 @@ impl ClassDeclaration {
 			name: class_name,
 			class_type: ClassStyle::new(class_type),
 			declarations: declarations,
-			extensions: if type_extensions.is_empty() { None } else { Some(type_extensions) }
+			extensions: if type_extensions.is_empty() { None } else { Some(type_extensions) },
+			declaration_id: 0
 		});
 	}
 
@@ -231,7 +234,7 @@ impl ClassDeclaration {
 		);
 	}
 
-	pub fn to_class(&self, context: &mut Context, content: &str) -> ClassType {
+	pub fn to_class(&self, context: &mut Context, manager: &mut ContextManager, content: &str) -> ClassType {
 		let mut properties = Vec::new();
 		let mut functions = Vec::new();
 		let mut operators: BTreeMap<usize,Vec<Function>> = BTreeMap::new();
@@ -258,7 +261,7 @@ impl ClassDeclaration {
 				},
 				DeclarationType::Variable(d, _) => {
 					let mut prop = d.var_type.clone();
-					prop.resolve(context);
+					prop.resolve(context, manager);
 					properties.push(Property {
 						name: d.name.clone(),
 						prop_type: prop,
