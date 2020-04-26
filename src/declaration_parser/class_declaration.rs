@@ -23,7 +23,6 @@ use crate::expression::value_type::{ ClassType, Property, Function };
 
 use crate::declaration_parser::declaration::{ Declaration, DeclarationResult };
 use crate::declaration_parser::parser::Parser;
-
 use crate::declaration_parser::module_declaration::DeclarationType;
 use crate::declaration_parser::attribute_declaration::AttributeDeclaration;
 use crate::declaration_parser::function_declaration::{ FunctionDeclaration, FunctionDeclarationType };
@@ -31,6 +30,13 @@ use crate::declaration_parser::variable_declaration::VariableDeclaration;
 use crate::declaration_parser::attributes::Attributes;
 
 use std::collections::BTreeMap;
+
+use regex::Regex;
+
+lazy_static! {
+	pub static ref CLASS_REGEX: Regex = Regex::new(r"^\b(?:class|enum|abstract)\b").unwrap();
+	pub static ref FORWARD_REGEX: Regex = Regex::new(r"^\b(?:forward)\b").unwrap();
+}
 
 type ClassDeclarationResult = DeclarationResult<ClassDeclaration>;
 
@@ -40,10 +46,11 @@ pub struct ClassDeclaration {
 	pub class_type: ClassStyle,
 	pub extensions: Option<Vec<Type>>,
 	pub declarations: Vec<DeclarationType>,
+	pub abstract_declarations: Option<Vec<DeclarationType>>,
 	pub declaration_id: usize
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum ClassStyle {
 	Class,
 	Abstract,
@@ -57,6 +64,13 @@ impl ClassStyle {
 
 	pub fn new(index: i32) -> ClassStyle {
 		return match index { 0 => ClassStyle::Class, 1 => ClassStyle::Abstract, 2 => ClassStyle::Enum, _ => panic!("Could not generate ClassType from number!") };
+	}
+
+	pub fn is_abstract(&self) -> bool {
+		if let ClassStyle::Abstract = self {
+			return true;
+		}
+		return false;
 	}
 }
 
@@ -126,7 +140,9 @@ impl ClassDeclaration {
 		declare_parse_required_next_char!('{', next_char, parser);
 
 		let mut declarations = Vec::new();
+		let mut abstract_declarations = if class_type == 1 { Some(Vec::new()) } else { None };
 		let mut attributes = Vec::new();
+		let mut forward = false;
 
 		while !parser.out_of_space {
 			parser.parse_whitespace();
@@ -143,16 +159,39 @@ impl ClassDeclaration {
 				continue;
 			}
 
+			if class_type == 1 {
+				if FORWARD_REGEX.is_match(&parser.content[parser.index..]) {
+					forward = true;
+					for _ in 0..7 { parser.increment(); }
+					parser.parse_whitespace();
+				} else {
+					forward = false;
+				}
+			}
+
 			if FunctionDeclaration::is_declaration(parser) {
-				let result = FunctionDeclaration::new(parser, FunctionDeclarationType::ClassLevel, Some(operator_data));
+				let result = FunctionDeclaration::new(parser, if forward {
+					FunctionDeclarationType::Forward
+				} else {
+					FunctionDeclarationType::ClassLevel
+				}, Some(operator_data));
 				if result.is_error() {
 					result.print_error(file_name.to_string(), &parser.content);
 				} else {
-					declarations.push(DeclarationType::Function(result.unwrap_and_move(), Attributes::new(if attributes.is_empty() {
+					let dec_type = DeclarationType::Function(result.unwrap_and_move(), Attributes::new(if attributes.is_empty() {
 						None
 					} else {
 						Some(std::mem::replace(&mut attributes, Vec::new()))
-					})));
+					}));
+					if class_type == 1 {
+						if forward {
+							declarations.push(dec_type);
+						} else {
+							abstract_declarations.as_mut().unwrap().push(dec_type);
+						}
+					} else {
+						declarations.push(dec_type);
+					}	
 				}
 				attributes.clear();
 				parser.increment();
@@ -160,15 +199,27 @@ impl ClassDeclaration {
 			}
 
 			if VariableDeclaration::is_declaration(parser) {
+				if !forward && class_type == 1 {
+					return ClassDeclarationResult::Err("No Variables in Abstract", "cannot add variable fields to \"abstracts\"", parser.index, parser.index);
+				}
 				let result = VariableDeclaration::new(parser);
 				if result.is_error() {
 					result.print_error(file_name.to_string(), &parser.content);
 				} else {
-					declarations.push(DeclarationType::Variable(result.unwrap_and_move(), Attributes::new(if attributes.is_empty() {
+					let dec_type = DeclarationType::Variable(result.unwrap_and_move(), Attributes::new(if attributes.is_empty() {
 						None
 					} else {
 						Some(std::mem::replace(&mut attributes, Vec::new()))
-					})));
+					}));
+					if class_type == 1 {
+						if forward {
+							declarations.push(dec_type);
+						} else {
+							abstract_declarations.as_mut().unwrap().push(dec_type);
+						}
+					} else {
+						declarations.push(dec_type);
+					}
 				}
 				attributes.clear();
 				parser.increment();
@@ -192,6 +243,7 @@ impl ClassDeclaration {
 			name: class_name,
 			class_type: ClassStyle::new(class_type),
 			declarations: declarations,
+			abstract_declarations: abstract_declarations,
 			extensions: if type_extensions.is_empty() { None } else { Some(type_extensions) },
 			declaration_id: 0
 		});
@@ -203,7 +255,7 @@ impl ClassDeclaration {
 
 	pub fn is_class_declaration(content: &str, index: usize) -> bool {
 		let declare = &content[index..];
-		return declare.starts_with("class ") || declare.starts_with("abstract ") || declare.starts_with("enum ");
+		return CLASS_REGEX.is_match(declare);
 	}
 
 	pub fn to_cpp(&self, attributes: &Attributes, content: &str) -> String {
@@ -234,7 +286,7 @@ impl ClassDeclaration {
 		);
 	}
 
-	pub fn to_class(&self, context: &mut Context, manager: &mut ContextManager, content: &str) -> ClassType {
+	pub fn to_class(&self, context: &mut Context, manager: &mut ContextManager, content: &str, attributes: &Attributes) -> ClassType {
 		let mut properties = Vec::new();
 		let mut functions = Vec::new();
 		let mut operators: BTreeMap<usize,Vec<Function>> = BTreeMap::new();
@@ -275,10 +327,35 @@ impl ClassDeclaration {
 		}
 		return ClassType {
 			name: self.name.clone(),
+			style: self.class_type.clone(),
+			extensions: self.extensions.clone(),
 			type_params: None,
 			properties: properties,
 			functions: functions,
-			operators: operators
+			operators: operators,
+			required_includes: if attributes.has_attribute("RequireInclude") {
+				let mut result = Vec::new();
+				let params = attributes.get_attribute("RequireInclude");
+				if params.is_some() {
+					let param_params = &params.as_ref().unwrap().parameters;
+					if param_params.is_some() {
+						let p = param_params.as_ref().unwrap();
+						let first = p.first();
+						if first.is_some() {
+							let first_unwrap = first.as_ref().unwrap();
+							let right = first_unwrap.as_ref().right();
+							if right.is_some() {
+								let inc = right.as_ref().unwrap().to_string();
+								let sys = p.len() <= 1;
+								result.push((inc, sys));
+							}
+						}
+					}
+				}
+				result
+			} else {
+				Vec::new()
+			}
 		};
 	}
 }

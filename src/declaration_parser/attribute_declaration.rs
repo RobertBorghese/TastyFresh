@@ -18,6 +18,10 @@ use crate::declaration_parser::cpp_transpiler::CPPTranspiler;
 
 use either::*;
 
+lazy_static! {
+	static ref CACHE_ATTRIBUTES: Vec<String> = vec!["RequireInclude".to_string()];
+}
+
 type AttributeDeclarationResult = DeclarationResult<AttributeDeclaration>;
 
 #[derive(Clone)]
@@ -40,7 +44,7 @@ impl CPPTranspiler for AttributeDeclaration {
 }
 
 impl AttributeDeclaration {
-	pub fn new(parser: &mut Parser, store_params: bool) -> AttributeDeclarationResult {
+	pub fn new(parser: &mut Parser, mut store_params: bool) -> AttributeDeclarationResult {
 		let initial_line = parser.line;
 
 		let mut next_char = parser.get_curr();
@@ -52,6 +56,10 @@ impl AttributeDeclaration {
 		// Parse Var Style
 		let mut attribute_name = "".to_string();
 		declare_parse_ascii!(attribute_name, parser);
+
+		if !store_params && CACHE_ATTRIBUTES.contains(&attribute_name) {
+			store_params = true;
+		}
 
 		// Parse Whitespace
 		declare_parse_whitespace!(parser);

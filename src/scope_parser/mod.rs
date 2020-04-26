@@ -202,6 +202,7 @@ impl ScopeExpression {
 							}
 						}
 					} else {
+						var_declare.var_type.resolve(context, context_manager);
 						context.register_type(&var_declare.var_type);
 						context.typing.add_variable(var_declare.name.clone(), var_declare.var_type.clone(), None);
 						scope_exprs.push(ScopeExpression::VariableDeclaration(var_declare, None));

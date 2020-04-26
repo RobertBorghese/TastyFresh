@@ -48,10 +48,13 @@ extern crate lazy_static;
 
 use context_management::global_context::GlobalContext;
 use context_management::context_manager::ContextManager;
+use context_management::static_extension::StaticExtension;
 
 use declaration_parser::parser::Parser;
 use declaration_parser::module_declaration::{ ModuleDeclaration, DeclarationType };
 use declaration_parser::attributes::Attributes;
+
+use expression::variable_type::{ VariableType, Type };
 
 use config_management::ConfigData;
 
@@ -236,8 +239,31 @@ fn parse_source_file(file: &str, source_location: &str, config_data: &ConfigData
 				d.declaration_id = context.module.add_variable(d.name.clone(), d.var_type.clone(), Some(module_contexts));
 				context.register_type(&d.var_type);
 			},
-			DeclarationType::Class(d, _) => {
-				let class_data = d.to_class(&mut context, module_contexts, &parser.content);
+			DeclarationType::Class(d, attributes) => {
+				let class_data = d.to_class(&mut context, module_contexts, &parser.content, &attributes);
+
+				for inc in &class_data.required_includes {
+					context.add_header(&inc.0, inc.1);
+				}
+
+				for e in d.extensions.as_ref().unwrap() {
+					context.register_type_only(e);
+				}
+
+				if d.abstract_declarations.is_some() {
+					for extend in d.abstract_declarations.as_ref().unwrap() {
+						if let DeclarationType::Function(d2, _) = extend {
+							context.static_extends.insert(d2.name.clone(),
+								StaticExtension::new(
+									format!("{}_{}", d.name, d2.name),
+									d2.to_function(&parser.content),
+									VariableType::copy(Type::Undeclared(vec![d.name.clone()]))
+								)
+							);
+						}
+					}
+				}
+
 				d.declaration_id = context.module.add_class(d.name.clone(), class_data, Some(module_contexts));
 			},
 			DeclarationType::AttributeClass(_, _) => {
@@ -276,14 +302,14 @@ fn parse_source_file(file: &str, source_location: &str, config_data: &ConfigData
 fn transpile_source_file(file: &str, source_location: &str, output_dirs: &Vec<String>, config_data: &ConfigData, module_contexts: &mut ContextManager, module_declaration: &mut ModuleDeclaration, parser: &mut Parser, global_context: &mut GlobalContext) -> bool {
 	let access_file_path = &file[source_location.len() + 1..file.len() - 6];
 	{
-		let context = module_contexts.get_context(access_file_path);
+		/*let context = module_contexts.get_context(access_file_path);
 		let typing = &mut context.typing;
 		typing.add(access_file_path.to_string());//&context.module);
+		*/
 	}
 
-	let context_headers = module_contexts.get_context(access_file_path).headers.clone();
 	let mut transpile_context = Transpiler::new(file, access_file_path, config_data, module_contexts, parser);
-	transpile_context.parse_declarations(&mut module_declaration.declarations, global_context, None);
+	transpile_context.parse_declarations(&mut module_declaration.declarations, global_context, None, None);
 
 	if !transpile_context.output_lines.is_empty() {
 		if transpile_context.header_include_line.is_none() {
@@ -309,6 +335,7 @@ fn transpile_source_file(file: &str, source_location: &str, output_dirs: &Vec<St
 			header_lines.push("#define ".to_string() + &marco_name);
 		}
 		header_lines.push("".to_string());
+		let context_headers = &transpile_context.module_contexts.get_context(access_file_path).headers;
 		if !context_headers.is_empty() || !transpile_context.header_system_includes.is_empty() {
 			for head in &context_headers.headers {
 				header_lines.push(format!("#include <{}>", head.path));

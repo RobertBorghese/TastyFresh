@@ -31,8 +31,7 @@ use crate::declaration_parser::cpp_transpiler::CPPTranspiler;
 use regex::Regex;
 
 lazy_static! {
-	pub static ref FUNC_STYLE_REGEX: Regex = Regex::new(r"^\b(?:static|extern|virtual|inline|meta)\b").unwrap();
-	pub static ref FUNC_REGEX: Regex = Regex::new(r"^\b(?:fn|op|constructor|destructor)\b").unwrap();
+	pub static ref FUNC_REGEX: Regex = Regex::new(r"^(\b(?:static|extern|virtual|inline|meta|const|override)\b\s+)*\b(?:fn|op|constructor|destructor)\b").unwrap();
 }
 
 type FunctionDeclarationResult = DeclarationResult<FunctionDeclaration>;
@@ -113,7 +112,8 @@ impl FunctionType {
 pub enum FunctionDeclarationType {
 	ModuleLevel,
 	ClassLevel,
-	Assumption
+	Assumption,
+	Forward
 }
 
 impl FunctionDeclarationType {
@@ -126,6 +126,13 @@ impl FunctionDeclarationType {
 
 	pub fn is_assumption(&self) -> bool {
 		if let FunctionDeclarationType::Assumption = self {
+			return true;
+		}
+		return false;
+	}
+
+	pub fn is_forward(&self) -> bool {
+		if let FunctionDeclarationType::Forward = self {
 			return true;
 		}
 		return false;
@@ -173,6 +180,9 @@ impl FunctionDeclaration {
 					},
 					FunctionDeclarationType::Assumption => {
 						return FunctionDeclarationResult::Err("Style Disallowed", "functions styles cannot be used with assume", parser.index - name.len(), parser.index);
+					},
+					FunctionDeclarationType::Forward => {
+						return FunctionDeclarationResult::Err("Style Disallowed", "functions styles cannot be used with forward", parser.index - name.len(), parser.index);
 					}
 				}
 				if let FunStyle::Extern = style {
@@ -190,7 +200,7 @@ impl FunctionDeclaration {
 				successfully_parsed = true;
 				break;
 			} else if name == "constructor" {
-				if !declare_type.is_class() {
+				if !declare_type.is_class() && !declare_type.is_forward() {
 					return FunctionDeclarationResult::Err("Constructors Disallowed", "constructors can only be used in classes", parser.index - name.len(), parser.index);
 				}
 				func_type = FunctionType::Constructor;
@@ -383,7 +393,7 @@ impl FunctionDeclaration {
 		let mut start_index: Option<usize> = None;
 		let mut end_index: Option<usize> = None;
 
-		if is_extern || declare_type.is_assumption() {
+		if is_extern || declare_type.is_assumption() || declare_type.is_forward() {
 			let mut next_char = ' ';
 			declare_parse_required_next_char!(';', next_char, parser);
 		} else {
@@ -413,9 +423,6 @@ impl FunctionDeclaration {
 
 	pub fn is_func_declaration(content: &str, index: usize) -> bool {
 		let declare = &content[index..];
-		if FUNC_STYLE_REGEX.is_match(declare) {
-			return true;
-		}
 		return FUNC_REGEX.is_match(declare);
 	}
 

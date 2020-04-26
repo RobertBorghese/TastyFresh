@@ -177,7 +177,11 @@ impl Expression {
 				"Invalid".to_string()
 			},
 			Expression::Value(s, _, _) => {
-				s.to_string()
+				if context.convert_this_to_self && s == "this" {
+					"self".to_string()
+				} else {
+					s.to_string()
+				}
 			},
 			Expression::Prefix(expr, id, _, _) => {
 				if *id == 9 {

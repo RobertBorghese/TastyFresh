@@ -44,7 +44,7 @@ impl VariableType {
 		match &self.var_type {
 			Type::Undeclared(names) => {
 				if names.len() == 1 {
-					let context_type = context.module.get_item(names.first().unwrap(), Some(ctx_manager), false);
+					let context_type = context.module.get_item(names.first().unwrap(), Some(context), Some(ctx_manager), false);
 					if context_type.is_some() {
 						if let ContextType::Class(cls) = context_type.unwrap() {
 							self.var_type = Type::Class(cls.clone());
@@ -141,6 +141,24 @@ impl VariableType {
 		return VariableType {
 			var_type: var_type,
 			var_style: VarStyle::Copy,
+			var_properties: None,
+			var_optional: false
+		};
+	}
+
+	pub fn rref(var_type: Type) -> VariableType {
+		return VariableType {
+			var_type: var_type,
+			var_style: VarStyle::Ref,
+			var_properties: None,
+			var_optional: false
+		};
+	}
+
+	pub fn borrow(var_type: Type) -> VariableType {
+		return VariableType {
+			var_type: var_type,
+			var_style: VarStyle::Borrow,
 			var_properties: None,
 			var_optional: false
 		};
@@ -426,7 +444,13 @@ impl Type {
 			Type::Number(num_type) => num_type.to_cpp().to_string(),
 			Type::String(string_type) => string_type.to_cpp().to_string(),
 			Type::Class(class_type) => {
-				if declare { format!("class {}", class_type.name.clone()) } else { class_type.name.clone() }
+				if class_type.style.is_abstract() {
+					class_type.extensions.as_ref().unwrap().first().as_ref().unwrap().to_cpp(declare)
+				} else if declare {
+					format!("class {}", class_type.name.clone())
+				} else {
+					class_type.name.clone()
+				}
 			},
 			Type::Function(func) => {
 				let params = &func.parameters;

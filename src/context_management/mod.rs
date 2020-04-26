@@ -11,6 +11,7 @@ pub mod typing_context;
 pub mod header_context;
 pub mod global_context;
 pub mod context_manager;
+pub mod static_extension;
 
 use position::Position;
 

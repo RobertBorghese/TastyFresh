@@ -375,9 +375,38 @@ impl ExpressionPiece {
 		let result = Self::get_expression_from_piece(&parser.parts[part_index - 1], context);
 		if result.is_some() {
 			let left_expr = result.unwrap();
+
+			if let Expression::Infix(lexpr, rexpr, infix_id, _, _) = &*left_expr {
+				if *infix_id >= 2 && *infix_id <= 5 {
+					if let Expression::Value(name, _, pos) = &**rexpr {
+						let internal_left_type = lexpr.get_type();
+						let ctx = context.as_ref().unwrap();
+						let static_extend = ctx.find_static_extension(&name, &internal_left_type, Some(parser.context_manager), false);
+						if static_extend.is_some() {
+							let static_extend_unwrap = static_extend.unwrap();
+
+							let final_type = static_extend_unwrap.func.return_type.clone();
+
+							let new_left_expr = Expression::Value(
+								static_extend_unwrap.name.clone(),
+								VariableType::function(static_extend_unwrap.func),
+								pos.clone()
+							);
+
+							let mut new_params = vec![Rc::clone(lexpr)];
+							for ex in &*exprs {
+								new_params.push(Rc::clone(&ex));
+							}
+
+							return (Some(ExpressionPiece::Expression(Rc::new(Expression::FunctionCall(Rc::new(new_left_expr), Rc::new(new_params), final_type, position)))), None);
+						}
+					}
+				}
+			}
+
 			let mut is_new_call = false;
-			if let Expression::Prefix(_, _, _, _) = *left_expr {
-				is_new_call = true;
+			if let Expression::Prefix(_, id, _, _) = *left_expr {
+				is_new_call = id == 9;
 			}
 			let mut left_type = left_expr.get_type();
 			if left_type.is_quantum_function() {
@@ -458,7 +487,7 @@ impl ExpressionPiece {
 			return VariableType::boolean();
 		} else if context.is_some() {
 			let c = context.as_ref().unwrap();
-			let ct = c.typing.get_item(value, None, false);
+			let ct = c.typing.get_item(value, None, None, false);
 			if ct.is_some() {
 				return match ct.unwrap() {
 					ContextType::Variable(variable_type) => variable_type,
@@ -516,7 +545,7 @@ impl ExpressionPiece {
 			},
 			ExpressionPiece::FunctionParameters(..) |
 			ExpressionPiece::ArrayAccessParameters(..) => {
-				*priority = 960;
+				*priority = 925;
 			},
 			_ => {
 				*priority = -2;

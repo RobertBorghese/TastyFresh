@@ -6,7 +6,7 @@
  **********************************************************/
 
 lazy_static! {
-	pub static ref FUNCTION_STYLES: Vec<&'static str> = vec!("static", "extern", "virtual", "inline", "meta");
+	pub static ref FUNCTION_STYLES: Vec<&'static str> = vec!("static", "extern", "virtual", "inline", "meta", "const", "override");
 }
 
 #[derive(Clone, PartialEq)]
@@ -16,7 +16,9 @@ pub enum FunStyle {
 	Extern,
 	Virtual,
 	Inline,
-	Meta
+	Meta,
+	Const,
+	Override
 }
 
 impl FunStyle {
@@ -27,6 +29,8 @@ impl FunStyle {
 			"virtual" => FunStyle::Virtual,
 			"inline" => FunStyle::Inline,
 			"meta" => FunStyle::Meta,
+			"const" => FunStyle::Const,
+			"override" => FunStyle::Override,
 			_ => FunStyle::Unknown
 		}
 	}
@@ -42,7 +46,9 @@ impl FunStyle {
 			FunStyle::Extern => "extern",
 			FunStyle::Virtual => "virtual",
 			FunStyle::Inline => "inline",
-			FunStyle::Meta => "meta"
+			FunStyle::Meta => "meta",
+			FunStyle::Const => "const",
+			FunStyle::Override => "override"
 		}
 	}
 
@@ -87,6 +93,8 @@ impl FunStyle {
 			FunStyle::Virtual => true,
 			FunStyle::Inline => true,
 			FunStyle::Static => true,
+			FunStyle::Override => true,
+			FunStyle::Const => true,
 			_ => false
 		}
 	}

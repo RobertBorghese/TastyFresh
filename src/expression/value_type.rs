@@ -7,7 +7,9 @@
 
 use std::collections::BTreeMap;
 
-use crate::expression::variable_type::VariableType;
+use crate::declaration_parser::class_declaration::ClassStyle;
+
+use crate::expression::variable_type::{ VariableType, Type };
 use crate::expression::function_type::FunStyle;
 
 use crate::declaration_parser::function_declaration::FunctionType;
@@ -226,10 +228,13 @@ impl StringType {
 #[derive(Clone, PartialEq)]
 pub struct ClassType {
 	pub name: String,
+	pub style: ClassStyle,
+	pub extensions: Option<Vec<Type>>,
 	pub type_params: Option<Vec<VariableType>>,
 	pub properties: Vec<Property>,
 	pub functions: Vec<Function>,
-	pub operators: BTreeMap<usize,Vec<Function>>
+	pub operators: BTreeMap<usize,Vec<Function>>,
+	pub required_includes: Vec<(String,bool)>
 }
 
 impl ClassType {

@@ -10,6 +10,7 @@ use std::collections::BTreeMap;
 use crate::expression::variable_type::{ VariableType, Type };
 use crate::expression::value_type::{ Function, ClassType };
 
+use crate::context_management::context::Context;
 use crate::context_management::context_manager::ContextManager;
 
 #[derive(Clone)]
@@ -25,7 +26,6 @@ pub enum ContextType {
 #[derive(Clone)]
 pub struct TypingContext {
 	known_data: Vec<BTreeMap<String,usize>>,
-	shared_modules: Vec<String>,
 	context_type: TypingContextType
 }
 
@@ -41,7 +41,6 @@ impl TypingContext {
 		//if !module_only { data.push(Self::global_data()); }
 		let mut result = TypingContext {
 			known_data: data,
-			shared_modules: Vec::new(),
 			context_type: if module_only {
 				TypingContextType::ModuleLevel
 			} else {
@@ -52,11 +51,7 @@ impl TypingContext {
 		return result;
 	}
 
-	pub fn add(&mut self, ctx_module: String) {
-		self.shared_modules.push(ctx_module);
-	}
-
-	pub fn get_item(&self, name: &str, manager: Option<&ContextManager>, recursive: bool) -> Option<ContextType> {
+	pub fn get_item(&self, name: &str, curr_ctx: Option<&Context>, manager: Option<&ContextManager>, recursive: bool) -> Option<ContextType> {
 		for data in self.known_data.iter().rev() {
 			if data.contains_key(name) {
 				if let Some(v) = data.get(name) {
@@ -74,10 +69,10 @@ impl TypingContext {
 				}
 			}
 		}
-		if !recursive && manager.is_some() {
+		if !recursive && curr_ctx.is_some() && manager.is_some() {
 			let manager_unwrap = manager.unwrap();
-			for module in &self.shared_modules {
-				let item = manager_unwrap.get_context_immut(module).module.get_item(name, manager, true);
+			for module in &curr_ctx.unwrap().shared_modules {
+				let item = manager_unwrap.get_context_immut(module).module.get_item(name, curr_ctx, manager, true);
 				if item.is_some() {
 					return item;
 				}

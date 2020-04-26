@@ -1,0 +1,21 @@
+include system iostream;
+
+@RequireInclude(string, true)
+abstract string becomes std.string {
+	forward constructor(input: text);
+	forward fn size() -> size;
+
+	const fn second() -> char {
+		return this.size() >= 2 ? this.at(1) : 0;
+	}
+}
+
+fn main() -> int {
+	let str = new string("123456");
+
+	let size = str.size();
+	let second_char = str.second();
+
+	std.cout << "Size is: " << size << std.endl;
+	std.cout << "Second char is: " << second_char << std.endl;
+}

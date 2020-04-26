@@ -1,4 +1,9 @@
 
-class Test {
-	let a = 32;
+@RequireInclude(string, true)
+abstract string becomes std.string {
+	forward fn size() -> size;
+
+	const fn test() -> size {
+		return this.size() + 1;
+	}
 }
