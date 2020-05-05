@@ -1,13 +1,6 @@
 
-
 import alt;
 
-include system iostream;
-
 fn main() -> int {
-	let b: string;
-	let c = b.size();
-	let d = b.test();
-
-	std::cout << c << d << std::endl;
+	let q = 10.withOne();
 }

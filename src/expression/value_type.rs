@@ -83,10 +83,20 @@ impl NumberType {
 
 		let mut index = -1;
 		let mut rindex = value.len() + 1;
+		let mut expect_num = false;
 		for c in value.chars() {
 			*offset += 1;
 			index += 1;
 			rindex -= 1;
+
+			if expect_num {
+				if !c.is_numeric() {
+					*offset -= 1;
+					break;
+				} else {
+					expect_num = false;
+				}
+			}
 
 			if index == 1 {
 				if c == 'b' {
@@ -99,6 +109,7 @@ impl NumberType {
 			}
 			if c == '.' {
 				if !dot && !suffix {
+					expect_num = true;
 					dot = true;
 					continue;
 				} else {
@@ -289,6 +300,7 @@ pub struct Function {
 impl Function {
 	pub fn to_cpp(&self, use_styles: bool, header: bool, class_name: Option<&str>, func_type: &FunctionType) -> String {
 		let mut style_content = Vec::new();
+		let mut post_style_content = Vec::new();
 		if (func_type.is_normal() || func_type.is_destructor()) && use_styles {
 			for s in &self.styles {
 				if (class_name.is_some() && s.class_exportable()) ||
@@ -299,12 +311,16 @@ impl Function {
 							style_content.push("extern".to_string());
 							break;
 						}
-						style_content.push(s.get_name().to_string());
+						if s.is_override() {
+							post_style_content.push(s.get_name().to_string());
+						} else {
+							style_content.push(s.get_name().to_string());
+						}
 					}
 				}
 			}
 		}
-		format!("{}{}{}{}({})",
+		format!("{}{}{}{}({}){}",
 			if style_content.is_empty() { "".to_string() } else { format!("{} ", style_content.join(" ")) },
 			if func_type.is_normal_or_operator() { format!("{} ", self.return_type.to_cpp()) } else { "".to_string() },
 			if header || class_name.is_none() { "".to_string() } else { format!("{}::", class_name.unwrap()) },
@@ -317,7 +333,8 @@ impl Function {
 			} else {
 				self.name.clone()
 			},
-			self.parameters.iter().map(|param| param.to_cpp(header)).collect::<Vec<String>>().join(", ")
+			self.parameters.iter().map(|param| param.to_cpp(header)).collect::<Vec<String>>().join(", "),
+			if post_style_content.is_empty() { "".to_string() } else { format!(" {}", post_style_content.join(" ")) }
 		)
 	}
 }

@@ -232,6 +232,15 @@ impl VariableType {
 		};
 	}
 
+	pub fn number_template(content: String) -> VariableType {
+		return VariableType {
+			var_type: Type::NumberTemplate(content),
+			var_style: VarStyle::Copy,
+			var_properties: None,
+			var_optional: false
+		};
+	}
+
 	pub fn access_operator(&self) -> &'static str {
 		return if self.is_namespace() {
 			"::"
@@ -415,6 +424,46 @@ impl VariableType {
 		}
 		return false;
 	}
+
+	pub fn is_equal(&self, other: &VariableType) -> bool {
+		if self.var_type != other.var_type {
+			return false;
+		}
+		if self.var_style != other.var_style {
+			return false;
+		}
+		if self.var_optional != other.var_optional {
+			return false;
+		}
+		if (self.var_properties.is_none() || self.var_properties.as_ref().unwrap().is_empty()) !=
+			(other.var_properties.is_none() || other.var_properties.as_ref().unwrap().is_empty()) {
+			return false;
+		}
+		if self.var_properties.is_some() {
+			let my_props = self.var_properties.as_ref().unwrap();
+			let other_props = other.var_properties.as_ref().unwrap();
+			for prop in my_props {
+				if !other_props.contains(prop) {
+					return false;
+				}
+			}
+			for prop in other_props {
+				if !my_props.contains(prop) {
+					return false;
+				}
+			}
+		}
+		return true;
+	}
+
+	pub fn to_string(&self) -> String {
+		return format!("---\nCPP: {}\nSTYLE: {}\nPROPS: {}\nOPTIONAL: {}\n",
+			self.to_cpp(), self.var_style.get_name(), if self.var_properties.is_some() {
+				self.var_properties.as_ref().unwrap().len()
+			} else {
+				0
+			}, self.var_optional);
+	}
 }
 
 #[derive(Clone, PartialEq)]
@@ -432,7 +481,8 @@ pub enum Type {
 	Inferred,
 	Undeclared(Vec<String>),
 	UndeclaredWParams(Vec<String>, Vec<VariableType>),
-	This
+	This,
+	NumberTemplate(String)
 }
 
 impl Type {
@@ -522,6 +572,7 @@ impl Type {
 				result += ">";
 				result
 			},
+			Type::NumberTemplate(content) => content.to_string(),
 			Type::This => "this".to_string()
 		}
 	}
@@ -555,7 +606,8 @@ impl Type {
 			Type::Inferred => None,
 			Type::Undeclared(_) => None,
 			Type::UndeclaredWParams(_, _) => None,
-			Type::This => None
+			Type::This => None,
+			Type::NumberTemplate(_) => None
 		}
 	}
 

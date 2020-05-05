@@ -824,7 +824,20 @@ impl Parser {
 				if self.parse_whitespace_and_check_space() { return Type::Inferred; }
 
 				// Parse Type Parameter
-				type_params.push(VariableType::from_type_style(self.parse_type_and_style(unexpected_character, conflicting_specifiers)));
+				if self.curr_is_numeric() {
+					let mut result = "".to_string();
+					loop {
+						if self.curr_is_numeric() || self.get_curr() == '.' || self.get_curr() == 'f' || self.get_curr() == 'l' {
+							result.push(self.get_curr());
+							self.increment();
+						} else {
+							break;
+						}
+					}
+					type_params.push(VariableType::number_template(result));
+				} else {
+					type_params.push(VariableType::from_type_style(self.parse_type_and_style(unexpected_character, conflicting_specifiers)));
+				}
 
 			} else {
 
@@ -840,7 +853,21 @@ impl Parser {
 					if self.parse_whitespace_and_check_space() { return Type::Inferred; }
 
 					// Parse Type Parameter
-					type_params.push(VariableType::from_type_style(self.parse_type_and_style(unexpected_character, conflicting_specifiers)));
+					//type_params.push(VariableType::from_type_style(self.parse_type_and_style(unexpected_character, conflicting_specifiers)));
+					if self.curr_is_numeric() {
+						let mut result = "".to_string();
+						loop {
+							if self.curr_is_numeric() || self.get_curr() == '.' || self.get_curr() == 'f' || self.get_curr() == 'l' {
+								result.push(self.get_curr());
+								self.increment();
+							} else {
+								break;
+							}
+						}
+						type_params.push(VariableType::number_template(result));
+					} else {
+						type_params.push(VariableType::from_type_style(self.parse_type_and_style(unexpected_character, conflicting_specifiers)));
+					}
 
 					// Check for Errors
 					if self.out_of_space || *unexpected_character || conflicting_specifiers.is_some() { return Type::Inferred; }

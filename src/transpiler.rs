@@ -212,7 +212,7 @@ impl<'a> Transpiler<'a> {
 					let add_to_header = !attributes.has_attribute("NoHeader");
 					if add_to_header {
 						if !is_class_declare {
-							let var_declaraction = format!("extern {} {}", var_type.to_cpp(), var_data.name);
+							let var_declaraction = format!("{} {} {}", if var_data.is_only_static() { "static" } else { "extern" }, var_type.to_cpp(), var_data.name);
 							configure_declaration_with_attributes(
 								&mut self.declarations.variable_declarations,
 								&mut self.declarations.variable_declarations_isolated,
@@ -264,6 +264,20 @@ impl<'a> Transpiler<'a> {
 
 			// All Others
 			match declaration {
+				DeclarationType::Refurbish(refurbish_declare, attributes) => {
+					attributes.flatten_attributes(global_context, self.parser.content.as_str());
+					let context = self.module_contexts.take_context(self.access_file_path);
+					self.module_contexts.add_context(self.access_file_path.to_string(), context);
+
+					let name = refurbish_declare.make_name();
+					let r_type = refurbish_declare.refurbish_type.clone();
+					self.parse_declarations(
+						&mut refurbish_declare.declarations,
+						global_context,
+						None,
+						Some((&name, r_type))
+					);
+				},
 				DeclarationType::Class(class_declare, attributes) => {
 					attributes.flatten_attributes(global_context, self.parser.content.as_str());
 					if class_declare.class_type.is_abstract() {
@@ -392,6 +406,13 @@ impl<'a> Transpiler<'a> {
 					attributes.flatten_attributes(global_context, self.parser.content.as_str());
 
 					let mut context = self.module_contexts.take_context(self.access_file_path);
+
+					func_data.return_type.resolve(&context, self.module_contexts);
+
+					for param in &mut func_data.parameters {
+						param.0.resolve(&context, self.module_contexts);
+					}
+
 					let mut func_content: Option<String> = None;
 					let mut line = if context.align_lines { func_data.line } else { self.output_lines.len() + 1 };
 					let add_to_header = !attributes.has_attribute("NoHeader");

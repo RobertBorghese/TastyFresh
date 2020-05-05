@@ -226,7 +226,7 @@ impl ExpressionPiece {
 					_ => ()
 				}
 			} else {
-				println!("COULD NOT PRINT EXPR!! ");
+				print_code_error("COULD NOT PRINT EXPR", "expression is broken", &parser.position.start_position, file_content);
 			}
 		}
 		return Rc::new(Expression::Invalid);
@@ -545,7 +545,7 @@ impl ExpressionPiece {
 			},
 			ExpressionPiece::FunctionParameters(..) |
 			ExpressionPiece::ArrayAccessParameters(..) => {
-				*priority = 925;
+				*priority = 950;
 			},
 			_ => {
 				*priority = -2;

@@ -266,6 +266,25 @@ fn parse_source_file(file: &str, source_location: &str, config_data: &ConfigData
 
 				d.declaration_id = context.module.add_class(d.name.clone(), class_data, Some(module_contexts));
 			},
+			DeclarationType::Refurbish(d, attributes) => {
+				for inc in attributes.get_required_includes() {
+					context.add_header(&inc.0, inc.1);
+				}
+
+				context.register_type_only(&d.refurbish_type);
+
+				for extend in &d.declarations {
+					if let DeclarationType::Function(d2, _) = extend {
+						context.static_extends.insert(d2.name.clone(),
+							StaticExtension::new(
+								format!("{}_{}", d.make_name(), d2.name),
+								d2.to_function(&parser.content),
+								VariableType::copy(d.refurbish_type.clone())
+							)
+						);
+					}
+				}
+			},
 			DeclarationType::AttributeClass(_, _) => {
 				attribute_class_indexes.push(curr_index);
 			},

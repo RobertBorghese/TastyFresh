@@ -41,7 +41,7 @@ contexts:
         1: entity.name.function.tasty-fresh
         2: keyword.operator.tasty-fresh
 
-    - match: '({{identifier}})(?=(?:::|\.|\->|\.\*|\->\*))'
+    - match: '(?!this)({{identifier}})(?=(?:::|\.|\->|\.\*|\->\*))'
       scope: meta.function.tasty-fresh
       captures:
         1: entity.name.variable.tasty-fresh
@@ -64,7 +64,7 @@ contexts:
     - match: '(?<=let|copy|borrow|ref|move|ptr|autoptr|uniqueptr|ptr2|ptr3|ptr4|ptr5|ptr6|ptr7|ptr8|ptr9)\s+({{identifier}})'
       scope: entity.name.function.tasty-fresh
 
-    - match: '\b(static|inline|extern|virtual|meta)\b'
+    - match: '\b(static|inline|extern|virtual|meta|override)\b'
       scope: storage.type.tasty-fresh
 
     - match: '\b(const|constexpr|constinit|extern|mutable|forever|thread_local|volatile|declare)\b'
@@ -106,7 +106,7 @@ contexts:
         1: storage.type.class.tasty-fresh
         2: entity.name.class.tasty-fresh
 
-    - match: '(?<=extends|and|becomes)\s+(([a-zA-Z_](?:[a-zA-Z0-9_]+|::|\.|\->)+[a-zA-Z0-9_]))'
+    - match: '(?<=\bextends\b|\band\b|\bbecomes\b)\s+(([a-zA-Z_](?:[a-zA-Z0-9_]+|::|\.|\->)+[a-zA-Z0-9_]))'
       scope: entity.name.class.tasty-fresh
 
     - match: '\b(extends|becomes|and)\b'
@@ -146,7 +146,7 @@ contexts:
     - match: '\b(void|unsigned|bool|byte|char|wchar|uchar|short|ushort|int|uint|size|long|ulong|thicc|uthicc|float|double|text)\b'
       scope: storage.type.numeric.tasty-fresh
 
-    - match: '\b(?:0[xb])?(-)?[0-9\.]+[ful]*\b'
+    - match: '\b(?:0[xb])?(-)?[0-9]+(?:\.[0-9]+)?[ful]*\b'
       scope: constant.numeric.tasty-fresh
 
     - match: '\b(true|false)\b'

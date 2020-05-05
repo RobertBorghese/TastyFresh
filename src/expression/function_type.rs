@@ -73,6 +73,13 @@ impl FunStyle {
 		}
 	}
 
+	pub fn is_override(&self) -> bool {
+		return match self {
+			FunStyle::Override => true,
+			_ => false
+		}
+	}
+
 	pub fn class_only(&self) -> bool {
 		return match self {
 			FunStyle::Virtual => true,

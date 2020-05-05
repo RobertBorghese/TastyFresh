@@ -84,4 +84,28 @@ impl Attributes {
 			}
 		}
 	}
+
+	pub fn get_required_includes(&self) -> Vec<(String,bool)> {
+		let mut result = Vec::new();
+		if self.has_attribute("RequireInclude") {
+			let params = self.get_attribute("RequireInclude");
+			if params.is_some() {
+				let param_params = &params.as_ref().unwrap().parameters;
+				if param_params.is_some() {
+					let p = param_params.as_ref().unwrap();
+					let first = p.first();
+					if first.is_some() {
+						let first_unwrap = first.as_ref().unwrap();
+						let right = first_unwrap.as_ref().right();
+						if right.is_some() {
+							let inc = right.as_ref().unwrap().to_string();
+							let sys = p.len() <= 1;
+							result.push((inc, sys));
+						}
+					}
+				}
+			}
+		}
+		return result;
+	}
 }

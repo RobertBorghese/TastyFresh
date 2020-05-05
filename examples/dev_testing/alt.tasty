@@ -1,9 +1,26 @@
 
 @RequireInclude(string, true)
+refurbish int {
+	const fn toString() -> string {
+		return std.to_string(this);
+	}
+
+	const fn addString(ref a: string) {
+		let b = 32;
+	}
+}
+
+@RequireInclude(string, true)
 abstract string becomes std.string {
 	forward fn size() -> size;
 
 	const fn test() -> size {
 		return this.size() + 1;
+	}
+}
+
+refurbish int {
+	const fn withOne() -> int {
+		return this + 1;
 	}
 }

@@ -333,29 +333,7 @@ impl ClassDeclaration {
 			properties: properties,
 			functions: functions,
 			operators: operators,
-			required_includes: if attributes.has_attribute("RequireInclude") {
-				let mut result = Vec::new();
-				let params = attributes.get_attribute("RequireInclude");
-				if params.is_some() {
-					let param_params = &params.as_ref().unwrap().parameters;
-					if param_params.is_some() {
-						let p = param_params.as_ref().unwrap();
-						let first = p.first();
-						if first.is_some() {
-							let first_unwrap = first.as_ref().unwrap();
-							let right = first_unwrap.as_ref().right();
-							if right.is_some() {
-								let inc = right.as_ref().unwrap().to_string();
-								let sys = p.len() <= 1;
-								result.push((inc, sys));
-							}
-						}
-					}
-				}
-				result
-			} else {
-				Vec::new()
-			}
+			required_includes: attributes.get_required_includes()
 		};
 	}
 }

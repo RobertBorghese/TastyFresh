@@ -17,6 +17,7 @@ use crate::declaration_parser::import_declaration::ImportDeclaration;
 use crate::declaration_parser::include_declaration::IncludeDeclaration;
 use crate::declaration_parser::variable_declaration::VariableDeclaration;
 use crate::declaration_parser::class_declaration::ClassDeclaration;
+use crate::declaration_parser::refurbish_declaration::RefurbishDeclaration;
 use crate::declaration_parser::attribute_class_declaration::AttributeClassDeclaration;
 use crate::declaration_parser::inject_declaration::InjectDeclaration;
 use crate::declaration_parser::attributes::Attributes;
@@ -30,6 +31,7 @@ pub enum DeclarationType {
 	Include(IncludeDeclaration, Attributes),
 	Variable(VariableDeclaration, Attributes),
 	Class(ClassDeclaration, Attributes),
+	Refurbish(RefurbishDeclaration, Attributes),
 	AttributeClass(AttributeClassDeclaration, Attributes),
 	Injection(InjectDeclaration, Attributes)
 }
@@ -132,6 +134,21 @@ impl ModuleDeclaration {
 					result.print_error(file_name.to_string(), &parser.content);
 				} else {
 					declarations.push(DeclarationType::Class(result.unwrap_and_move(), Attributes::new(if attributes.is_empty() {
+						None
+					} else {
+						Some(std::mem::replace(&mut attributes, Vec::new()))
+					})));
+				}
+				attributes.clear();
+				continue;
+			}
+
+			if RefurbishDeclaration::is_declaration(parser) {
+				let result = RefurbishDeclaration::new(parser, file_name, operator_data);
+				if result.is_error() {
+					result.print_error(file_name.to_string(), &parser.content);
+				} else {
+					declarations.push(DeclarationType::Refurbish(result.unwrap_and_move(), Attributes::new(if attributes.is_empty() {
 						None
 					} else {
 						Some(std::mem::replace(&mut attributes, Vec::new()))

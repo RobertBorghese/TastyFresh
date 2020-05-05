@@ -62,7 +62,10 @@ impl StaticExtension {
 	}
 
 	pub fn is_type(&self, t: &VariableType) -> bool {
-		if self.extend_type == *t {
+		if self.extend_type.is_equal(t) {
+			return true;
+		}
+		if (self.extend_type.var_style.is_inferred()) && self.extend_type.var_type == t.var_type {
 			return true;
 		}
 		if let Type::Undeclared(names) = &self.extend_type.var_type {
