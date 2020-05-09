@@ -55,7 +55,7 @@ contexts:
     - match: '\b(if|unless|else|for|while|until|do|inc|dec|incto|decto|in|from|to|by)\b'
       scope: keyword.control.tasty-fresh
 
-    - match: \breturn\b
+    - match: \b(return|break|continue|goto)\b
       scope: keyword.control.tasty-fresh
 
     - match: '\b(let|copy|borrow|ref|move|ptr|autoptr|uniqueptr|ptr2|ptr3|ptr4|ptr5|ptr6|ptr7|ptr8|ptr9)\b'

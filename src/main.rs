@@ -246,8 +246,10 @@ fn parse_source_file(file: &str, source_location: &str, config_data: &ConfigData
 					context.add_header(&inc.0, inc.1);
 				}
 
-				for e in d.extensions.as_ref().unwrap() {
-					context.register_type_only(e);
+				if d.extensions.is_some() {
+					for e in d.extensions.as_ref().unwrap() {
+						context.register_type_only(e);
+					}
 				}
 
 				if d.abstract_declarations.is_some() {
