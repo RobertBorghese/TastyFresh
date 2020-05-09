@@ -124,6 +124,18 @@ impl Parser {
 		return 0 as char;
 	}
 
+	/// Provides the next `char`.
+	///
+	/// # Return
+	///
+	/// The next `char`. If the parser has reached the end of the content, `0` is returned.
+	pub fn get_next(&self) -> char {
+		if !self.out_of_space && self.chars.len() > self.index + 1 {
+			return self.chars[self.index + 1];
+		}
+		return 0 as char;
+	}
+
 	/// Checks if the current `char` is an alphabetic character.
 	///
 	/// # Return

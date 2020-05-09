@@ -147,6 +147,9 @@ impl<'a> ExpressionParser<'a> {
 	fn check_for_end_char(&mut self, parser: &mut Parser) -> bool {
 		parser.index += self.parse_next_whitespace(parser);
 		let curr_char = parser.get_curr();
+		if curr_char == ':' && parser.get_next() == ':' {
+			return false;
+		}
 		if self.end_data.until_chars.contains(&curr_char) {
 			self.end_data.end_index = parser.index;
 			self.set_end_reason(ExpressionEndReason::ReachedChar(curr_char));

@@ -129,7 +129,7 @@ impl ExpressionPiece {
 							for _ in 0..1 { parser.parts.remove(part_index + 1); }
 						} else {
 							let pos = expr_and_pos.1.unwrap();
-							print_code_error("Expected Expression", "expected expression after this operator", &pos, file_content);
+							print_code_error("Expected Expression (Prefix)", "expected expression after this operator", &pos, file_content);
 							error = true;
 							break;
 						}
@@ -141,7 +141,7 @@ impl ExpressionPiece {
 							for _ in 0..1 { parser.parts.remove(part_index); }
 						} else {
 							let pos = expr_and_pos.1.unwrap();
-							print_code_error("Expected Expression", "expected expression before this operator", &pos, file_content);
+							print_code_error("Expected Expression (Suffix)", "expected expression before this operator", &pos, file_content);
 							error = true;
 							break;
 						}
@@ -153,7 +153,7 @@ impl ExpressionPiece {
 							for _ in 0..2 { parser.parts.remove(part_index); }
 						} else {
 							let pos = expr_and_pos.1.unwrap();
-							print_code_error("Expected Expression", "expected expressions to surrond this operator", &pos, file_content);
+							print_code_error("Expected Expression (Infix)", "expected expressions to surrond this operator", &pos, file_content);
 							error = true;
 							break;
 						}
@@ -169,7 +169,9 @@ impl ExpressionPiece {
 							if err_type == 1 {
 								print_code_error("Must Share Type", "ternary expressions must share same type", &pos, file_content);
 							} else if err_type == 2 {
-								print_code_error("Expected Expression", "expected expressions to surrond this operator", &pos, file_content);
+								print_code_error("Expected Expression (Ternary)", "expected expressions to surrond this operator", &pos, file_content);
+							} else if err_type == 3 {
+								print_code_error("Expected Expression (Ternary)", "expected expression after ternary", &pos, file_content);
 							}
 							error = true;
 							break;
@@ -356,6 +358,9 @@ impl ExpressionPiece {
 	}
 
 	fn parse_ternary(parser: &ExpressionParser, part_index: &usize, expr: Rc<Expression>, operator_id: usize, context: &Option<&mut Context>, position: Position) -> (Option<ExpressionPiece>,Option<Position>,Option<usize>) {
+		if parser.parts.len() <= *part_index {
+			return (None, Some(position), Some(3));
+		}
 		let left_result = Self::get_expression_from_piece(&parser.parts[part_index - 1], context);
 		let right_result = Self::get_expression_from_piece(&parser.parts[*part_index], context);
 		if left_result.is_some() && right_result.is_some() {
