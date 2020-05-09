@@ -361,12 +361,19 @@ impl ExpressionPiece {
 		if left_result.is_some() && right_result.is_some() {
 			let left_type = expr.get_type();
 			let right_type = right_result.as_ref().unwrap().get_type();
-			let result_type = left_type.compare_types(&right_type);
-			if result_type.is_some() {
-				return (Some(ExpressionPiece::Expression(Rc::new(Expression::Ternary(left_result.unwrap(), expr, right_result.unwrap(), operator_id, result_type.unwrap())))), None, None);
-			} else {
-				return (None, Some(position), Some(1));
+			let mut result_type = left_type.compare_types(&right_type);
+			if result_type.is_none() {
+				if left_type.is_inferred() {
+					result_type = Some(right_type.clone());
+				} else if right_type.is_inferred() {
+					result_type = Some(left_type.clone());
+				}
 			}
+			//if result_type.is_some() {
+			return (Some(ExpressionPiece::Expression(Rc::new(Expression::Ternary(left_result.unwrap(), expr, right_result.unwrap(), operator_id, result_type.unwrap_or(VariableType::inferred()))))), None, None);
+			//} else {
+			//	return (None, Some(position), Some(1));
+			//}
 		}
 		return (None, Some(position), Some(2));
 	}

@@ -2,5 +2,7 @@
 import alt;
 
 fn main() -> int {
-	let q = 10.withOne();
+	let a = 32;
+	let b = a == 32 ? a : 44;
+	return;
 }

@@ -45,7 +45,7 @@ pub enum ScopeExpression {
 	Scope(Vec<ScopeExpression>),
 	SubScope(Box<ScopeExpression>, usize, usize),
 	VariableDeclaration(VariableDeclaration, Option<Rc<Expression>>),
-	Return(Rc<Expression>, usize),
+	Return(Option<Rc<Expression>>, usize),
 	If(IfType, Option<Rc<Expression>>, Box<ScopeExpression>, usize, usize),
 	While(WhileType, Rc<Expression>, Box<ScopeExpression>, usize, usize),
 	Loop(Box<ScopeExpression>, usize, usize),
@@ -322,7 +322,11 @@ impl ScopeExpression {
 				declaration.to_cpp(expr, operators, context, VariableExportType::Scoped)
 			},
 			ScopeExpression::Return(expr, _) => {
-				format!("return {};", expr.to_string(operators, context))
+				if expr.is_none() {
+					"return;".to_string()
+				} else {
+					format!("return {};", expr.as_ref().unwrap().to_string(operators, context))
+				}
 			},
 			ScopeExpression::SubScope(scope, line, end_line) => {
 				let scope_str = scope.to_string(operators, *line, tab_offset, context);
@@ -481,7 +485,11 @@ impl ScopeExpression {
 					None
 				}
 			},
-			ScopeExpression::Return(expr, _) => Some(Rc::clone(expr)),
+			ScopeExpression::Return(expr, _) => if expr.is_some() {
+				Some(Rc::clone(&expr.as_ref().unwrap()))
+			} else {
+				None
+			},
 			_ => None
 		};
 	}

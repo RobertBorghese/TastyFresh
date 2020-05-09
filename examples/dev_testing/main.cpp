@@ -3,5 +3,7 @@
 #include "alt.hpp"
 
 int main() {
-	int q = int_withOne(10);
+	int a = 32;
+	auto b = a == 32 ? a : 44;
+	return;
 }

@@ -33,7 +33,7 @@ lazy_static! {
 type ReturnParserResult = DeclarationResult<ReturnParser>;
 
 pub struct ReturnParser {
-	pub expression: Rc<Expression>,
+	pub expression: Option<Rc<Expression>>,
 	pub line: usize
 }
 
@@ -61,27 +61,24 @@ impl ReturnParser {
 
 		declare_parse_whitespace!(parser);
 
-		/*parse_expression(&mut self, file_name: String, config_data: &ConfigData) -> ExpressionEndReason {
-		let expr_parser = ExpressionParser::new(self, Position::new(file_name, Some(self.line), self.index, None), config_data, None);
-		self.line += expr_parser.position.line_offset;
-		return expr_parser.end_data.reason;
-	}*/
+		let mut expression: Option<Rc<Expression>> = None;
+		if parser.get_curr() != ';' {
+			let mut reason = ExpressionEndReason::Unknown;
+			expression = Some(parser.parse_expression(file_name, config_data, Some(context), context_manager, &mut reason, expected_return_type));
 
-		let mut reason = ExpressionEndReason::Unknown;
-		let expression = parser.parse_expression(file_name, config_data, Some(context), context_manager, &mut reason, expected_return_type);
-
-		match reason {
-			ExpressionEndReason::Unknown => return ReturnParserResult::Err("Unknown Error", "unknown expression parsing error", parser.index - 1, parser.index),
-			ExpressionEndReason::EndOfContent =>  return ReturnParserResult::Err("Unexpected End of Expression", "unexpected end of expression", parser.index - 1, parser.index),
-			ExpressionEndReason::NoValueError => return ReturnParserResult::Err("Value Expected", "expression value expected here", parser.index - 1, parser.index),
-			ExpressionEndReason::EndOfExpression => {
-				let old_index = parser.index;
-				declare_parse_whitespace!(parser);
-				if parser.get_curr() != ';' {
-					return ReturnParserResult::Err("Semicolon Needed", "there should be a ; here", old_index - 1, old_index);
-				}
-			},
-			_ => ()
+			match reason {
+				ExpressionEndReason::Unknown => return ReturnParserResult::Err("Unknown Error", "unknown expression parsing error", parser.index - 1, parser.index),
+				ExpressionEndReason::EndOfContent =>  return ReturnParserResult::Err("Unexpected End of Expression", "unexpected end of expression", parser.index - 1, parser.index),
+				ExpressionEndReason::NoValueError => return ReturnParserResult::Err("Value Expected", "expression value expected here", parser.index - 1, parser.index),
+				ExpressionEndReason::EndOfExpression => {
+					let old_index = parser.index;
+					declare_parse_whitespace!(parser);
+					if parser.get_curr() != ';' {
+						return ReturnParserResult::Err("Semicolon Needed", "there should be a ; here", old_index - 1, old_index);
+					}
+				},
+				_ => ()
+			}
 		}
 
 		return ReturnParserResult::Ok(ReturnParser {
