@@ -1,6 +1,6 @@
 #include "main.hpp"
 
-Base::Base(int a):  { }
+Base::Base(int a) { }
 
 Child::Child(int a, int b): dsadas(a), b(b) {
 

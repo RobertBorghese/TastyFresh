@@ -459,8 +459,11 @@ impl<'a> Transpiler<'a> {
 						insert_output_line(&mut self.output_lines, &func_declaration, line, 0);
 						if func_content.is_some() {
 							if func_data.function_type.is_constructor() && constructor_additions.is_some() {
-								let additions = format!(": {}", constructor_additions.unwrap().join(", "));
-								insert_output_line(&mut self.output_lines, additions.as_str(), line, 2);
+								let constructor_additions_unwrap = constructor_additions.unwrap();
+								if !constructor_additions_unwrap.is_empty() {
+									let additions = format!(": {}", constructor_additions_unwrap.join(", "));
+									insert_output_line(&mut self.output_lines, additions.as_str(), line, 2);	
+								}
 							}
 							let original_line = line;
 							insert_output_line(&mut self.output_lines, "{", line, 0);
