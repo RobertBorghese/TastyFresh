@@ -17,7 +17,7 @@ use crate::declaration_parser::cpp_transpiler::CPPTranspiler;
 use regex::Regex;
 
 lazy_static! {
-	pub static ref IMPORT_REGEX: Regex = Regex::new(r"^\b(?:import)\b").unwrap();
+	pub static ref IMPORT_REGEX: Regex = Regex::new(r"^\b(?:import|derive)\b").unwrap();
 }
 
 type ImportDeclarationResult = DeclarationResult<ImportDeclaration>;
@@ -25,7 +25,8 @@ type ImportDeclarationResult = DeclarationResult<ImportDeclaration>;
 #[derive(Clone)]
 pub struct ImportDeclaration {
 	pub path: String,
-	pub line: usize
+	pub line: usize,
+	pub is_header: bool
 }
 
 impl Declaration<ImportDeclaration> for ImportDeclaration {
@@ -47,8 +48,8 @@ impl ImportDeclaration {
 		// Parse Var Style
 		let mut import_keyword = "".to_string();
 		declare_parse_ascii!(import_keyword, parser);
-		if import_keyword != "import" {
-			return ImportDeclarationResult::Err("Unexpected Keyword", "\"import\" keyword expected", parser.index - import_keyword.len(), parser.index);
+		if import_keyword != "import" && import_keyword != "derive" {
+			return ImportDeclarationResult::Err("Unexpected Keyword", "\"import\" or \"derive\" keyword expected", parser.index - import_keyword.len(), parser.index);
 		}
 
 		declare_parse_required_whitespace!(parser);
@@ -60,7 +61,8 @@ impl ImportDeclaration {
 
 		return ImportDeclarationResult::Ok(ImportDeclaration {
 			path: import_path,
-			line: initial_line
+			line: initial_line,
+			is_header: import_keyword == "derive"
 		});
 	}
 

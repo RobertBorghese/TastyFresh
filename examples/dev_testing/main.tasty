@@ -1,17 +1,10 @@
-
-import alt;
-
+derive alt;
 
 class Child extends Base {
 	let b: int;
 	constructor(a: int, b: int) {
 		super@dsadas(a);
 		b = b;
-
 		bbb().aaa();
-	}
-
-	fn DoThing(a: int) {
-		a = a;
 	}
 }

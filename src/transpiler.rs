@@ -386,16 +386,19 @@ impl<'a> Transpiler<'a> {
 				},
 				DeclarationType::Import(import, _attributes) => {
 					if self.module_contexts.module_exists(&import.path) {
+						let real_path = if self.config_data.hpp_headers { 
+							format!("{}.hpp", import.path)
+						} else {
+							format!("{}.h", import.path)
+						};
 						let context = self.module_contexts.get_context(self.access_file_path);
 						context.import_module(import.path.clone());
-						//let typing = &mut context.module;
-						//typing.add(import.path.clone());
-						let line = if context.align_lines { import.line } else { self.output_lines.len() };
-						insert_output_line(&mut self.output_lines, if self.config_data.hpp_headers { 
-							format!("#include \"{}.hpp\"", import.path)
+						if import.is_header {
+							self.header_local_includes.push(real_path.clone());
 						} else {
-							format!("#include \"{}.h\"", import.path)
-						}.as_str(), line, 0);
+							let line = if context.align_lines { import.line } else { self.output_lines.len() };
+							insert_output_line(&mut self.output_lines, format!("#include \"{}\"", real_path).as_str(), line, 0);
+						}
 					} else {
 						let pos = Position::new(self.file.to_string(), Some(import.line + 1), 7, Some(7 + import.path.len()));
 						print_code_error("Import Not Found", "could not find Tasty Fresh source file", &pos, &self.parser.content)

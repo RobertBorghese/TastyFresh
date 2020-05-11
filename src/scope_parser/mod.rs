@@ -265,6 +265,7 @@ impl ScopeExpression {
 					};
 					let re = Regex::new("(?:\n\r|\r\n|\r|\n)").unwrap();
 					let mut curr_line = line_number;
+					let mut added_any_lines = false;
 					for scope_line in re.split(&line) {
 						while curr_line >= lines.len() {
 							lines.push(Vec::new());
@@ -273,9 +274,12 @@ impl ScopeExpression {
 						if !final_line.is_empty() {
 							lines[curr_line].push(final_line);
 							curr_line += 1;
+							added_any_lines = true;
 						}
 					}
-					last_line_offset = curr_line - 1;
+					if context.align_lines || added_any_lines {
+						last_line_offset = curr_line - 1;
+					}
 					real_last_line_offset = e.get_end_line().unwrap_or(real_line_number + line_offset) - line_offset;
 				}
 				let tabs = String::from_utf8(vec![b'\t'; tab_offset]).unwrap_or("".to_string());

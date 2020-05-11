@@ -137,7 +137,7 @@ contexts:
         2: keyword.control.tasty-fresh
         3: variable.parameter.tasty-fresh
 
-    - match: '(import)\s+([a-zA-Z0-9_\.\/\\]+)'
+    - match: '(import|derive)\s+([a-zA-Z0-9_\.\/\\]+)'
       scope: meta.import.tasty-fresh
       captures:
         1: storage.type.import.tasty-fresh
