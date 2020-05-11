@@ -1,0 +1,13 @@
+class Base {
+	ptr baseA: Base;
+	constructor(a: int) {
+		baseA = this;
+	}
+
+	fn aaa() {
+	}
+
+	fn bbb() -> ptr Base {
+		return baseA;
+	}
+}

@@ -297,10 +297,31 @@ impl<'a> Transpiler<'a> {
 						let mut private_declares = VarFuncDeclarations::new();
 
 						{
-							let context = self.module_contexts.get_context(self.access_file_path);
+							let mut context = self.module_contexts.take_context(self.access_file_path);
 							context.typing.push_context();
 							context.typing.add_variable("this".to_string(), VariableType::this(), None);
 							context.is_class = true;
+
+							if class_declare.extensions.is_some() {
+								let extends = class_declare.extensions.as_ref().unwrap();
+								for e in extends {
+									let mut var_type = VariableType::copy(e.clone());
+									let convert_success = var_type.resolve(&context, self.module_contexts);
+									if convert_success {
+										let cls_type = var_type.var_type.get_class_type();
+										if cls_type.is_some() {
+											let cls_type_unwrap = cls_type.unwrap();
+											for prop in cls_type_unwrap.properties {
+												context.typing.add_variable(prop.name.clone(), prop.prop_type.clone(), Some(self.module_contexts));
+											}
+											for func in cls_type_unwrap.functions {
+												context.typing.add_function(func.name.clone(), func.clone(), Some(self.module_contexts));
+											}
+										}
+									}
+								}
+							}
+							self.module_contexts.add_context(self.access_file_path.to_string(), context);
 						}
 						self.parse_declarations(
 							&mut class_declare.declarations,

@@ -1,9 +1,10 @@
 #include "main.hpp"
 
-Base::Base(int a) { }
+#include "alt.hpp"
 
 Child::Child(int a, int b): dsadas(a), b(b) {
 
+	bbb()->aaa();
 }
 
 void Child::DoThing(int a) {

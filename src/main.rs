@@ -295,7 +295,12 @@ fn parse_source_file(file: &str, source_location: &str, config_data: &ConfigData
 		}
 		curr_index += 1;
 	}
-	module_contexts.add_context((&file[source_location.len() + 1..file.len() - 6]).to_string(), context);
+	let access_file_path = if file.starts_with(&source_location) {
+		&file[source_location.len() + 1..file.len() - 6]
+	} else {
+		&file[..file.len() - 6]
+	};
+	module_contexts.add_context(access_file_path.to_string(), context);
 
 	let mut attribute_classes_processed = 0;
 	for attribute_index in attribute_class_indexes {
@@ -321,7 +326,11 @@ fn parse_source_file(file: &str, source_location: &str, config_data: &ConfigData
 ///
 /// If successful, `true` is returned; otherwise `false`.
 fn transpile_source_file(file: &str, source_location: &str, output_dirs: &Vec<String>, config_data: &ConfigData, module_contexts: &mut ContextManager, module_declaration: &mut ModuleDeclaration, parser: &mut Parser, global_context: &mut GlobalContext) -> bool {
-	let access_file_path = &file[source_location.len() + 1..file.len() - 6];
+	let access_file_path = if file.starts_with(&source_location) {
+		&file[source_location.len() + 1..file.len() - 6]
+	} else {
+		&file[..file.len() - 6]
+	};
 	{
 		/*let context = module_contexts.get_context(access_file_path);
 		let typing = &mut context.typing;

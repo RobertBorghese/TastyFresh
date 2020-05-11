@@ -1,8 +1,5 @@
 
-class Base {
-	constructor(a: int) {
-	}
-}
+import alt;
 
 
 class Child extends Base {
@@ -10,6 +7,8 @@ class Child extends Base {
 	constructor(a: int, b: int) {
 		super@dsadas(a);
 		b = b;
+
+		bbb().aaa();
 	}
 
 	fn DoThing(a: int) {

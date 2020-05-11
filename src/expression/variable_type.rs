@@ -40,7 +40,7 @@ impl VariableType {
 		return self.var_style.to_cpp(&self.var_type, declare);
 	}
 
-	pub fn resolve(&mut self, context: &Context, ctx_manager: &mut ContextManager) {
+	pub fn resolve(&mut self, context: &Context, ctx_manager: &mut ContextManager) -> bool {
 		match &self.var_type {
 			Type::Undeclared(names) => {
 				if names.len() == 1 {
@@ -48,12 +48,14 @@ impl VariableType {
 					if context_type.is_some() {
 						if let ContextType::Class(cls) = context_type.unwrap() {
 							self.var_type = Type::Class(cls.clone());
+							return true;
 						}
 					}
 				}
 			},
 			_ => ()
 		}
+		return false;
 	}
 
 	pub fn from_type_style(info: (VarStyle, Type, bool)) -> VariableType {
