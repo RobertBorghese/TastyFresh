@@ -20,7 +20,9 @@ pub struct Context {
 	pub static_extends: StaticExtensionContext,
 	pub shared_modules: Vec<String>,
 	pub align_lines: bool,
-	pub convert_this_to_self: bool
+	pub convert_this_to_self: bool,
+	pub is_class: bool,
+	pub is_constructor: Option<(Vec<String>,Option<String>)>
 }
 
 impl Context {
@@ -32,7 +34,9 @@ impl Context {
 			static_extends: StaticExtensionContext::new(),
 			shared_modules: Vec::new(),
 			align_lines: false,
-			convert_this_to_self: false
+			convert_this_to_self: false,
+			is_class: false,
+			is_constructor: None
 		}
 	}
 
@@ -94,5 +98,35 @@ impl Context {
 			}
 		}
 		return None;
+	}
+
+	pub fn activate_constructor(&mut self, default_extend_class: Option<String>) {
+		self.is_constructor = Some((Vec::new(), default_extend_class));
+	}
+
+	pub fn deactivate_constructor(&mut self) -> Vec<String> {
+		let result = std::mem::replace(&mut self.is_constructor, None);
+		return result.unwrap().0;
+	}
+
+	pub fn is_constructor(&self) -> bool {
+		return self.is_constructor.is_some();
+	}
+
+	pub fn has_default_extension_class(&self) -> bool {
+		return self.is_constructor.as_ref().unwrap().1.is_some();
+	}
+
+	pub fn get_default_extension_class(&self) -> String {
+		let result = &self.is_constructor.as_ref().unwrap().1;
+		if result.is_some() {
+			return result.as_ref().unwrap().clone();
+		} else {
+			return "".to_string();
+		}
+	}
+
+	pub fn add_constructor_setup(&mut self, content: String) {
+		self.is_constructor.as_mut().unwrap().0.push(content);
 	}
 }

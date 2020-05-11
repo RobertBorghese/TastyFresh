@@ -1,9 +1,11 @@
 #include "main.hpp"
 
-#include "alt.hpp"
+Base::Base(int a):  { }
 
-int main() {
-	int a = 32;
-	auto b = a == 32 ? a : 44;
-	return;
+Child::Child(int a, int b): dsadas(a), b(b) {
+
+}
+
+void Child::DoThing(int a) {
+	this->a = a;
 }

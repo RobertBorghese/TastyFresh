@@ -159,7 +159,7 @@ impl<'a> Transpiler<'a> {
 	pub fn parse_declarations(&mut self,
 		declarations: &mut Vec<DeclarationType>,
 		global_context: &GlobalContext,
-		mut class_declarations: Option<(&str, &mut VarFuncDeclarations, &mut VarFuncDeclarations, &mut VarFuncDeclarations)>,
+		mut class_declarations: Option<(&str, &mut VarFuncDeclarations, &mut VarFuncDeclarations, &mut VarFuncDeclarations, Option<String>)>,
 		abstract_details: Option<(&str, Type)>
 	) {
 		let is_class_declare = !class_declarations.is_none();
@@ -205,7 +205,7 @@ impl<'a> Transpiler<'a> {
 								}
 							),
 							line,
-							false,
+							0,
 						);
 					}
 					self.end_line = var_data.line;
@@ -300,16 +300,28 @@ impl<'a> Transpiler<'a> {
 							let context = self.module_contexts.get_context(self.access_file_path);
 							context.typing.push_context();
 							context.typing.add_variable("this".to_string(), VariableType::this(), None);
+							context.is_class = true;
 						}
 						self.parse_declarations(
 							&mut class_declare.declarations,
 							global_context,
-							Some((&class_declare.name, &mut construct_declares, &mut public_declares, &mut private_declares)),
+							Some((&class_declare.name, &mut construct_declares, &mut public_declares, &mut private_declares, 
+								if class_declare.extensions.is_some() {
+									let extensions = class_declare.extensions.as_ref().unwrap();
+									if extensions.is_empty() || extensions.len() > 1 {
+										None
+									} else {
+										Some(extensions.first().unwrap().to_cpp(false))
+									}
+								} else {
+									None
+								})),
 							None
 						);
 						{
 							let context = self.module_contexts.get_context(self.access_file_path);
 							context.typing.pop_context();
+							context.is_class = false;
 						}
 
 						if class_declare.declaration_id != 0 {
@@ -345,7 +357,7 @@ impl<'a> Transpiler<'a> {
 					};
 					for inject_line in LINE_SPLIT.split(injection) {
 						if !context.align_lines && inject_line.trim().is_empty() { continue; }
-						insert_output_line(&mut self.output_lines, inject_line, line, false);
+						insert_output_line(&mut self.output_lines, inject_line, line, 0);
 						line += 1;
 					}
 				},
@@ -362,7 +374,7 @@ impl<'a> Transpiler<'a> {
 							format!("#include \"{}.hpp\"", import.path)
 						} else {
 							format!("#include \"{}.h\"", import.path)
-						}.as_str(), line, false);
+						}.as_str(), line, 0);
 					} else {
 						let pos = Position::new(self.file.to_string(), Some(import.line + 1), 7, Some(7 + import.path.len()));
 						print_code_error("Import Not Found", "could not find Tasty Fresh source file", &pos, &self.parser.content)
@@ -382,7 +394,7 @@ impl<'a> Transpiler<'a> {
 							format!("\"{}\"", include.path)
 						} else {
 							format!("<{}>", include.path)
-						}).as_str(), line, false);
+						}).as_str(), line, 0);
 					}
 					
 				},
@@ -417,6 +429,7 @@ impl<'a> Transpiler<'a> {
 					let mut line = if context.align_lines { func_data.line } else { self.output_lines.len() + 1 };
 					let add_to_header = !attributes.has_attribute("NoHeader");
 					self.end_line = line;
+					let mut constructor_additions: Option<Vec<String>> = None;
 					if !func_data.header_only() {
 						if func_data.start_index.is_some() && func_data.end_index.is_some() {
 							context.typing.push_context();
@@ -427,7 +440,13 @@ impl<'a> Transpiler<'a> {
 								context.convert_this_to_self = true;
 							}
 							let scope = ScopeExpression::new(self.parser, None, func_data.start_index.unwrap(), func_data.line, self.file, self.config_data, &mut context, self.module_contexts, Some(func_data.return_type.clone()));
+							if func_data.function_type.is_constructor() {
+								context.activate_constructor(class_declarations.as_ref().unwrap().4.clone());
+							}
 							func_content = Some(scope.to_string(&self.config_data.operators, func_data.line, 1, &mut context));
+							if context.is_constructor() {
+								constructor_additions = Some(context.deactivate_constructor());
+							}
 							if is_static_extend {
 								context.convert_this_to_self = false;
 							}
@@ -437,17 +456,21 @@ impl<'a> Transpiler<'a> {
 							if is_class_declare { Some(class_declarations.as_ref().unwrap().0) } else { None },
 							&func_data.function_type
 						);
-						insert_output_line(&mut self.output_lines, &func_declaration, line, false);
+						insert_output_line(&mut self.output_lines, &func_declaration, line, 0);
 						if func_content.is_some() {
+							if func_data.function_type.is_constructor() && constructor_additions.is_some() {
+								let additions = format!(": {}", constructor_additions.unwrap().join(", "));
+								insert_output_line(&mut self.output_lines, additions.as_str(), line, 2);
+							}
 							let original_line = line;
-							insert_output_line(&mut self.output_lines, "{", line, false);
+							insert_output_line(&mut self.output_lines, "{", line, 0);
 							for func_line in LINE_SPLIT.split(&func_content.unwrap()) {
-								insert_output_line(&mut self.output_lines, func_line, line, false);
+								insert_output_line(&mut self.output_lines, func_line, line, 0);
 								line += 1;
 							}
-							insert_output_line(&mut self.output_lines, "}", if original_line == line - 1 { original_line } else { line }, false);
+							insert_output_line(&mut self.output_lines, "}", if original_line == line - 1 { original_line } else { line }, 0);
 						} else {
-							insert_output_line(&mut self.output_lines, ";", line, false);
+							insert_output_line(&mut self.output_lines, ";", line, 0);
 						}
 						self.end_line = func_data.line + (line - self.end_line);
 					}

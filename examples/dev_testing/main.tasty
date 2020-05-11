@@ -1,8 +1,18 @@
 
-import alt;
+class Base {
+	constructor(a: int) {
+	}
+}
 
-fn main() -> int {
-	let a = 32;
-	let b = a == 32 ? a : 44;
-	return;
+
+class Child extends Base {
+	let b: int;
+	constructor(a: int, b: int) {
+		super@dsadas(a);
+		b = b;
+	}
+
+	fn DoThing(a: int) {
+		a = a;
+	}
 }

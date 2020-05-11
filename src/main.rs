@@ -413,7 +413,7 @@ fn transpile_source_file(file: &str, source_location: &str, output_dirs: &Vec<St
 					&header_path[source_location.len() + 1..]
 				} else {
 					&header_path
-				}).as_str(), transpile_context.header_include_line.unwrap(), true);
+				}).as_str(), transpile_context.header_include_line.unwrap(), 1);
 			}
 			let full_source_path = path_base + "cpp";
 			let full_header_path = header_path;
@@ -481,17 +481,21 @@ fn configure_declaration_with_attributes(delcarations: &mut Vec<String>, declara
 	}
 }
 
-fn insert_output_line(output_lines: &mut Vec<String>, line: &str, line_number: usize, clear: bool) {
+// clear
+// 0 - add w/ space
+// 1 - replace entire line
+// 2 - add w/0 space
+fn insert_output_line(output_lines: &mut Vec<String>, line: &str, line_number: usize, clear: usize) {
 	while line_number >= output_lines.len() {
 		output_lines.push("".to_string());
 	}
 	if line.is_empty() {
 		return;
 	}
-	if !output_lines[line_number].is_empty() {
+	if !output_lines[line_number].is_empty() && clear == 0 {
 		output_lines[line_number] += " ";
 	}
-	if !clear {
+	if clear != 1 {
 		output_lines[line_number] += line;
 	} else {
 		output_lines[line_number] = line.to_string();

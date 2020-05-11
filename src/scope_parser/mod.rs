@@ -269,8 +269,11 @@ impl ScopeExpression {
 						while curr_line >= lines.len() {
 							lines.push(Vec::new());
 						}
-						lines[curr_line].push(scope_line.to_string());
-						curr_line += 1;
+						let final_line = scope_line.to_string();
+						if !final_line.is_empty() {
+							lines[curr_line].push(final_line);
+							curr_line += 1;
+						}
 					}
 					last_line_offset = curr_line - 1;
 					real_last_line_offset = e.get_end_line().unwrap_or(real_line_number + line_offset) - line_offset;
@@ -286,7 +289,55 @@ impl ScopeExpression {
 				content.join("\n")
 			},
 			ScopeExpression::Expression(expr) => {
-				format!("{};", expr.to_string(operators, context))
+				let mut should_return: Option<String> = None;
+				if context.is_class {
+					if context.is_constructor() {
+						if let Expression::FunctionCall(expr1, _, _, _) = &**expr {
+							if let Expression::Value(content, _, _) = &**expr1 {
+								if content == "super" {
+									let expr_list = expr.get_parameters(operators, context);
+									context.add_constructor_setup(format!("{}({})", context.get_default_extension_class(), expr_list.join(", ")));
+									should_return = Some("".to_string());
+								}
+							} else if let Expression::Infix(expr_l, expr_r, op_id, _, _) = &**expr1 {
+								if *op_id == 1 {
+									if let Expression::Value(l_name, _, _) = &**expr_l {
+										if l_name == "super" {
+											let expr_list = expr.get_parameters(operators, context);
+											let class_name = expr_r.to_string(operators, context);
+											context.add_constructor_setup(format!("{}({})", class_name, expr_list.join(", ")));
+											should_return = Some("".to_string());
+										}
+									}
+								}
+							}
+						}
+					}
+					if should_return.is_none() {
+						if let Expression::Infix(expr_l, expr_r, op_id, _, _) = &**expr {
+							if *op_id == 29 {
+								if let Expression::Value(l_name, _, _) = &**expr_l {
+									if let Expression::Value(r_name, _, _) = &**expr_r {
+										if l_name == r_name {
+											if context.is_constructor() {
+												context.add_constructor_setup(format!("{}({})", l_name, r_name));
+												should_return = Some("".to_string());
+											} else {
+												should_return = Some(format!("this->{} = {};", l_name, r_name));
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+				
+				if should_return.is_none() {
+					format!("{};", expr.to_string(operators, context))
+				} else {
+					should_return.unwrap()
+				}
 			},
 			ScopeExpression::Injection(content, _, _) => {
 				let mut result = "".to_string();
