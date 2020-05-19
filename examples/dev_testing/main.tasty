@@ -1,10 +1,9 @@
-derive alt;
+import alt;
 
-class Child extends Base {
-	let b: int;
-	constructor(a: int, b: int) {
-		super@dsadas(a);
-		b = b;
-		bbb().aaa();
-	}
+class Base {
+	let a: int;
+}
+
+class Child {
+	ptr a: Base;
 }

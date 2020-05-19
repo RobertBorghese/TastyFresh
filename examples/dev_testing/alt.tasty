@@ -1,13 +1,7 @@
-class Base {
-	ptr baseA: Base;
-	constructor(a: int) {
-		baseA = this;
-	}
 
-	fn aaa() {
-	}
+import main;
 
-	fn bbb() -> ptr Base {
-		return baseA;
-	}
+fn Bla() {
+	let bla = new Child();
+	bla.a.a;
 }

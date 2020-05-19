@@ -1,13 +1,14 @@
 #ifndef MAIN_TASTYFILE
 #define MAIN_TASTYFILE
 
-#include "alt.hpp"
-
-class Child: public Base {
+class Base {
 public:
-	Child(int a, int b);
+	int a = 0;
+};
 
-	int b = 0;
+class Child {
+public:
+	Base* a = nullptr;
 };
 
 #endif

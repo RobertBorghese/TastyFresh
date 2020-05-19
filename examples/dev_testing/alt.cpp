@@ -1,11 +1,8 @@
 #include "alt.hpp"
 
-Base::Base(int a) {
-	baseA = this;
-}
+#include "main.hpp"
 
-void Base::aaa() { }
-
-Base* Base::bbb() {
-	return baseA;
+void Bla() {
+	Child bla;
+	bla.a->a;
 }

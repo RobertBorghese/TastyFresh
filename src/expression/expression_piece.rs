@@ -279,7 +279,7 @@ impl ExpressionPiece {
 		return (None, Some(position));
 	}
 
-	fn parse_infix(parser: &ExpressionParser, part_index: &usize, operator_id: usize, context: &Option<&mut Context>, position: Position) -> (Option<ExpressionPiece>,Option<Position>) {
+	fn parse_infix(parser: &mut ExpressionParser, part_index: &usize, operator_id: usize, context: &Option<&mut Context>, position: Position) -> (Option<ExpressionPiece>,Option<Position>) {
 		let left_result = Self::get_expression_from_piece(&parser.parts[part_index - 1], context);
 		let right_result = Self::get_expression_from_piece(&parser.parts[*part_index], context);
 		let mut final_type = VariableType::inferred();
@@ -333,7 +333,10 @@ impl ExpressionPiece {
 
 			// access operators . -> .* ->*
 			if operator_id >= 2 && operator_id <= 5 {
-				let left_type = left_result.as_ref().unwrap().get_type();
+				let mut left_type = left_result.as_ref().unwrap().get_type();
+				if context.is_some() {
+					left_type.resolve(context.as_ref().unwrap(), parser.context_manager);
+				}
 				let left_type_cls = left_type.var_type.get_class_type();
 				if left_type_cls.is_some() {
 					let cls = left_type_cls.unwrap();
