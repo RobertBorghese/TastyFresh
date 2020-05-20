@@ -8,7 +8,10 @@ public:
 
 class Child {
 public:
+	void test();
+
 	Base* a = nullptr;
+	Base b;
 };
 
 #endif

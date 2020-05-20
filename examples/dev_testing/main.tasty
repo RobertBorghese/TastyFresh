@@ -6,4 +6,10 @@ class Base {
 
 class Child {
 	ptr a: Base;
+	copy b: Base;
+
+	fn test() {
+		a = new Base();
+		b = new Base();
+	}
 }

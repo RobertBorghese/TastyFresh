@@ -22,7 +22,8 @@ pub struct Context {
 	pub align_lines: bool,
 	pub convert_this_to_self: bool,
 	pub is_class: bool,
-	pub is_constructor: Option<(Vec<String>,Option<String>)>
+	pub is_constructor: Option<(Vec<String>,Option<String>)>,
+	pub ltype: Option<VariableType>
 }
 
 impl Context {
@@ -36,7 +37,8 @@ impl Context {
 			align_lines: false,
 			convert_this_to_self: false,
 			is_class: false,
-			is_constructor: None
+			is_constructor: None,
+			ltype: None
 		}
 	}
 

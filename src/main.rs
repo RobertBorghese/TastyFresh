@@ -452,14 +452,28 @@ fn transpile_source_file(file: &str, source_location: &str, output_dirs: &Vec<St
 				}
 			}
 
-			let source_write = std::fs::write(&full_source_path, transpile_context.output_lines.join("\n"));
-			let header_write = std::fs::write(&full_header_path, header_lines.join("\n"));
-			if !source_write.is_ok() {
-				println!("Could not write to file: {}\n{}", full_source_path, source_write.err().unwrap());
+			let content_to_write_source = transpile_context.output_lines.join("\n");
+			let original_source_content = std::fs::read_to_string(&full_source_path);
+			if original_source_content.is_ok() {
+				if original_source_content.unwrap() != content_to_write_source {
+					let source_write = std::fs::write(&full_source_path, content_to_write_source);
+					if !source_write.is_ok() {
+						println!("Could not write to file: {}\n{}", full_source_path, source_write.err().unwrap());
+					}
+				}
 			}
-			if !header_write.is_ok() {
-				println!("Could not write to file: {}\n{}", full_header_path, header_write.err().unwrap());
+
+			let content_to_write_header = header_lines.join("\n");
+			let original_header_content = std::fs::read_to_string(&full_header_path);
+			if original_header_content.is_ok() {
+				if original_header_content.unwrap() != content_to_write_header {
+					let header_write = std::fs::write(&full_header_path, content_to_write_header);
+					if !header_write.is_ok() {
+						println!("Could not write to file: {}\n{}", full_header_path, header_write.err().unwrap());
+					}
+				}
 			}
+			
 		} else {
 			println!("\nCOULD NOT WRITE TO FILE: {}", format!("{}{}", dir, file));
 		}

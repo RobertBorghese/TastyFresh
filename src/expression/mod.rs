@@ -185,7 +185,14 @@ impl Expression {
 			},
 			Expression::Prefix(expr, id, _, _) => {
 				if *id == 9 {
-					expr.to_string(operators, context)
+					let mut result = expr.to_string(operators, context);
+					if context.ltype.is_some() {
+						let ltype = context.ltype.as_ref().unwrap();
+						if ltype.var_style.is_ptr().unwrap_or(false) {
+							result = format!("new {}", result);
+						}
+					}
+					result
 				} else {
 					let operator_data = &operators["prefix"][*id];
 					format!("{}{}{}",
@@ -238,7 +245,9 @@ impl Expression {
 						format!("{}({})", right, left)
 					}
 				} else if *id == 29 || *id == 30 {
+					context.ltype = Some(expr_left.get_type().clone());
 					let right_str = expr_right.to_string(operators, context);
+					context.ltype = None;
 					let right_str_final = if *id == 29 && !expr_right.get_type().is_inferred() {
 						expr_right.get_type().convert_between_styles(&expr_left.get_type(), &right_str).unwrap_or(right_str.to_string())
 					} else {
