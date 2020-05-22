@@ -566,6 +566,7 @@ impl Parser {
 		let mut name_chain: Vec<String> = Vec::new();
 
 		let mut is_function = false;
+		self.parse_whitespace();
 		if self.check_ahead("fn") {
 			is_function = true;
 			for _ in 0..2 { self.increment(); }
@@ -597,6 +598,8 @@ impl Parser {
 						self.increment();
 						if !is_function {
 							return Type::Tuple(tuple_types);
+						} else {
+							break;
 						}
 					}
 					if self.index == old_index {
@@ -611,6 +614,13 @@ impl Parser {
 
 		if is_function {
 			self.parse_whitespace();
+			let final_parameters = if tuple_types.is_empty() {
+				Vec::new()
+			} else {
+				tuple_types.iter().map(|var_type| {
+					Property { name: "".to_string(), prop_type: var_type.clone(), default_value: None, is_declare: false }
+				}).collect::<Vec<Property>>()
+			};
 			if self.get_curr() == '-' {
 				self.increment();
 				if self.get_curr() == '>' {
@@ -619,13 +629,7 @@ impl Parser {
 					let ret_type = VariableType::from_type_style(self.parse_type_and_style(unexpected_character, conflicting_specifiers));
 					return Type::Function(Box::new(Function {
 						name: "".to_string(),
-						parameters: if tuple_types.is_empty() {
-							Vec::new()
-						} else {
-							tuple_types.iter().map(|var_type| {
-								Property { name: "".to_string(), prop_type: var_type.clone(), default_value: None, is_declare: false }
-							}).collect::<Vec<Property>>()
-						},
+						parameters: final_parameters,
 						return_type: ret_type,
 						styles: Vec::<FunStyle>::new()
 					}));
@@ -633,7 +637,7 @@ impl Parser {
 			} else {
 				return Type::Function(Box::new(Function {
 					name: "".to_string(),
-					parameters: Vec::new(),
+					parameters: final_parameters,
 					return_type: VariableType::void(),
 					styles: Vec::new()
 				}));

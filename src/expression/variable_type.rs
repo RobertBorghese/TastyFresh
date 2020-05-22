@@ -513,7 +513,7 @@ impl Type {
 						params_output += ", ";
 					}
 				}
-				format!("std::function<{}({})>", func.return_type.to_cpp(), params_output)
+				format!("std::function<{}({})>", func.return_type.to_cpp(), func.parameters.iter().map(|param| param.prop_type.to_cpp()).collect::<Vec<String>>().join(", "))
 			},
 			Type::QuantumFunction(funcs) => {
 				if !funcs.is_empty() {
