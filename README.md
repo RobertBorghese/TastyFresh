@@ -15,7 +15,7 @@ Tasty Fresh is a programming language that aims to tackle this problem by transp
 
 ---
 
-With that being said, it is very unlikely Tasty Fresh will ever be production ready. It is a small, *MESSY*, one-man project aimed solely at the needs of said main. Bugs, issues, and other unintended behavior will be fixed as needed, and as a result, one must have a relatively advanced understanding of both C++ and Tasty Fresh to receive any benefit from the language. Nonetheless, contributions to clean-up the code base or elevate this language to production quality are always welcome. 
+With that being said, it is very unlikely Tasty Fresh will ever be production ready. It is a small, *MESSY*, one-man project aimed solely at the needs of said man. Bugs, issues, and other unintended behavior will be fixed as needed, and as a result, one must have a relatively advanced understanding of both C++ and Tasty Fresh to receive any benefit from the language. Nonetheless, contributions to clean-up the code base or elevate this language to production quality are always welcome. 
 
 Ultimately, if Tasty Fresh ever reaches version `1.0.0`, it should include:
 
@@ -180,7 +180,7 @@ include system vector;
 
 fn main() {
 	let intList = new std.vector@int();
-	for i in 0..10 {
+	inc i from 0 to 10 {
 		intList.push_back(i);
 	}
 	for num in intList {
